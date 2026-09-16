@@ -67,12 +67,20 @@ struct CompositionChart: View {
 
     var body: some View {
         let theme = Theme(scheme: scheme)
+        let segments = model.monitor.memory?.compositionSegments(scheme: scheme) ?? []
+        let readout: String = {
+            guard let seg = model.hoveredSegment, seg < segments.count else {
+                return String(format: "%.1f GB used", model.usedGB)
+            }
+            return "\(segments[seg].label) · \(segments[seg].gbText)"
+        }()
+
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .lastTextBaseline) {
-                Text("Composition · 16 GB")
+                Text("Composition · \(String(format: "%.0f", model.totalGB)) GB")
                     .font(Fonts.sectionHeader).tracking(1.1).foregroundStyle(theme.sectionHeader)
                 Spacer()
-                Text(model.segReadout)
+                Text(readout)
                     .font(Fonts.monoSmall).foregroundStyle(theme.textMuted)
             }
             .padding(.horizontal, Metrics.rowSidePadding)
@@ -80,7 +88,7 @@ struct CompositionChart: View {
 
             GeometryReader { geo in
                 HStack(spacing: 2) {
-                    ForEach(Array(MockData.compositionSegments.enumerated()), id: \.element.id) { index, seg in
+                    ForEach(Array(segments.enumerated()), id: \.element.id) { index, seg in
                         RoundedRectangle(cornerRadius: 3)
                             .fill(seg.color)
                             .opacity(model.hoveredSegment == nil || model.hoveredSegment == index ? 1 : 0.35)
@@ -96,7 +104,7 @@ struct CompositionChart: View {
             .padding(.top, 10)
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 108), spacing: 14, alignment: .leading)], alignment: .leading, spacing: 6) {
-                ForEach(Array(MockData.compositionSegments.enumerated()), id: \.element.id) { index, seg in
+                ForEach(Array(segments.enumerated()), id: \.element.id) { index, seg in
                     HStack(spacing: 6) {
                         RoundedRectangle(cornerRadius: 2)
                             .fill(seg.color)

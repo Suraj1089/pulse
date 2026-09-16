@@ -10,26 +10,44 @@ enum PaletteState: Equatable {
     case noMatch
 }
 
-/// Drives the palette's search-routed content and the live pressure ticker.
-/// The ticker mirrors the handoff script's `componentDidMount` interval: every
-/// 1.6s, nudge the last sample by a small random delta, clamped to 40...97,
-/// and pause while a bar is hovered (`bar === null` guard in the source).
+/// Thin coordinator between the search query and `SystemMonitor`'s live
+/// data. Owns only transient UI state (the query string, chart hover);
+/// everything else is read straight through to the monitor.
 final class PaletteViewModel: ObservableObject {
-    @Published var query: String = ""
-    @Published var samples: [Double] = MockData.pressureSamples
+    @Published var query: String = "" {
+        didSet {
+            if state == .chromeTabs {
+                monitor.startWatchingChrome()
+            } else {
+                monitor.stopWatchingChrome()
+            }
+        }
+    }
     @Published var hoveredBar: Int?
     @Published var hoveredSegment: Int?
 
     let showKeyHints = true
-    let liveTicker = true
+    let monitor = SystemMonitor()
 
-    private var timer: Timer?
+    private var cancellable: AnyCancellable?
 
-    var currentPercent: Double { samples.last ?? 50 }
-    var level: PressureLevel { PressureLevel(percent: currentPercent) }
+    init() {
+        // Re-publish the monitor's changes as our own so views only need to
+        // observe this one object.
+        cancellable = monitor.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
+    }
 
-    var apps: [AppUsage] { level == .low ? MockData.lowApps : MockData.highApps }
-    var freeGB: Double { level == .low ? MockData.lowFreeGB : MockData.highFreeGB }
+    func start() { monitor.start() }
+    func stop() { monitor.stop() }
+
+    var level: PressureLevel { monitor.pressureLevel }
+    var samples: [Double] { monitor.pressureSamples }
+    var freeGB: Double { monitor.memory?.freeGB ?? 0 }
+    var usedGB: Double { monitor.memory?.usedGB ?? 0 }
+    var totalGB: Double { monitor.memory?.totalGB ?? 0 }
+
+    /// Real top apps, heaviest first — already sorted by `RunningAppsMonitor`.
+    var apps: [AppUsage] { monitor.topApps.map { AppUsage(app: $0) } }
 
     var state: PaletteState {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -41,33 +59,15 @@ final class PaletteViewModel: ObservableObject {
         return .noMatch
     }
 
-    func startTicker() {
-        stopTicker()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.6, repeats: true) { [weak self] _ in
-            guard let self, self.liveTicker, self.hoveredBar == nil else { return }
-            let last = self.samples.last ?? 60
-            let delta = (Double.random(in: 0...1) - 0.45) * 9
-            let next = min(97, max(40, (last + delta).rounded()))
-            self.samples.removeFirst()
-            self.samples.append(next)
-        }
-    }
-
-    func stopTicker() {
-        timer?.invalidate()
-        timer = nil
-    }
-
     func barReadout(atFallback index: Int?) -> String {
+        guard !samples.isEmpty else { return "—" }
         let i = index ?? samples.count - 1
         let v = Int(samples[i])
         let t = i == samples.count - 1 ? "now" : "−\(samples.count - 1 - i)m"
         return "\(t) · \(v)% · \(PressureLevel(percent: Double(v)).rawValue)"
     }
 
-    var segReadout: String {
-        guard let seg = hoveredSegment else { return "12.4 GB used" }
-        let s = MockData.compositionSegments[seg]
-        return "\(s.label) · \(s.gbText)"
+    func quit(pid: pid_t) {
+        monitor.quit(pid: pid)
     }
 }

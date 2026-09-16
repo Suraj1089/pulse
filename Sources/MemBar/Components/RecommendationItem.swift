@@ -41,6 +41,7 @@ struct RecommendationItem: View {
         .background(isSelected ? theme.rowSelected : .clear, in: RoundedRectangle(cornerRadius: Metrics.rowRadius))
         .contentShape(Rectangle())
         .onHover(perform: onHover)
+        .onTapGesture(perform: action.perform)
         .animation(.linear(duration: 0.14), value: isSelected)
     }
 }

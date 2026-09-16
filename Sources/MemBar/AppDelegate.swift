@@ -28,9 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
         panel.delegate = self
 
-        cancellable = model.$samples
-            .map { PressureLevel(percent: $0.last ?? 50) }
-            .removeDuplicates { $0 == $1 }
+        cancellable = model.monitor.$pressureLevel
+            .removeDuplicates()
             .sink { [weak self] _ in self?.updateIcon() }
 
         registerHotKeyMonitor()

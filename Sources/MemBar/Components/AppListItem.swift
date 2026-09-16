@@ -19,11 +19,19 @@ struct AppListItem: View {
         let theme = Theme(scheme: scheme)
         let hasReason = app.reason != nil
         HStack(spacing: 10) {
-            Text(app.initial)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 19, height: 19)
-                .background(app.color, in: RoundedRectangle(cornerRadius: 5))
+            if let icon = app.icon {
+                Image(nsImage: icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 19, height: 19)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+            } else {
+                Text(app.initial)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 19, height: 19)
+                    .background(app.color, in: RoundedRectangle(cornerRadius: 5))
+            }
 
             if let reason = app.reason {
                 VStack(alignment: .leading, spacing: 2) {

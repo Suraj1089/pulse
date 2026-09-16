@@ -18,10 +18,10 @@ struct CommandPaletteView: View {
                 Group {
                     switch model.state {
                     case .overview: OverviewStateView(model: model)
-                    case .diagnosis: DiagnosisStateView()
+                    case .diagnosis: DiagnosisStateView(model: model)
                     case .memory: MemoryStateView(model: model)
-                    case .close: CloseStateView()
-                    case .chromeTabs: ChromeTabsStateView()
+                    case .close: CloseStateView(model: model)
+                    case .chromeTabs: ChromeTabsStateView(model: model)
                     case .noMatch: NoMatchStateView()
                     }
                 }
@@ -45,10 +45,10 @@ struct CommandPaletteView: View {
         )
         .onPreferenceChange(PaletteHeightKey.self, perform: onHeightChange)
         .onAppear {
-            model.startTicker()
+            model.start()
             searchFocused = true
         }
-        .onDisappear { model.stopTicker() }
+        .onDisappear { model.stop() }
         .onExitCommand(perform: onEscape)
     }
 }
