@@ -1,7 +1,8 @@
-# MemPalette
+# MemBar
 
-A macOS menu-bar command palette (Raycast/Alfred-style) showing memory pressure, top memory users, and quit/close
-actions, implemented in SwiftUI from the `project/MemPalette.dc.html` handoff design in this repo.
+See what's eating your RAM and quit it — a Raycast-style memory monitor for your Mac's menu bar, showing memory
+pressure, top memory users, and quit/close actions. Implemented in SwiftUI from the `project/MemPalette.dc.html`
+handoff design in this repo (the design's working title was "MemPalette").
 
 This build is **UI only, with mock data** — no real memory polling, `NSRunningApplication` enumeration, or
 app-quitting. It's meant to validate the interaction design before wiring up real system monitoring.
@@ -17,7 +18,7 @@ app-quitting. It's meant to validate the interaction design before wiring up rea
 swift run
 ```
 
-or open `Package.swift` in Xcode and run the `MemPalette` scheme.
+or open `Package.swift` in Xcode and run the `MemBar` scheme.
 
 The app is menu-bar only (no Dock icon): look for the small four-block icon in the menu bar. Click it to open the
 palette, or press `⌘⌥M` (requires Accessibility/Input Monitoring permission for the global shortcut to register).

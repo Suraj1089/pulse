@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "MemPalette",
+    name: "MemBar",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "MemPalette",
-            path: "Sources/MemPalette"
+            name: "MemBar",
+            path: "Sources/MemBar"
         )
     ]
 )

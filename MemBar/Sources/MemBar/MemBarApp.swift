@@ -4,7 +4,7 @@ import SwiftUI
 /// so the Scene here is an inert `Settings` scene — it satisfies `App` without
 /// opening a window at launch.
 @main
-struct MemPaletteApp: App {
+struct MemBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {

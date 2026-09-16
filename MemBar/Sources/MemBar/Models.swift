@@ -135,7 +135,7 @@ enum MockData {
     ]
 
     static let chromeTabs = [
-        TabUsage(title: "Figma — MemPalette / palette states", meta: "active · pinned", memGB: 1.4, hue: 250, pct: 22.6),
+        TabUsage(title: "Figma — MemBar / palette states", meta: "active · pinned", memGB: 1.4, hue: 250, pct: 22.6),
         TabUsage(title: "YouTube — Build a menu bar app in SwiftUI", meta: "playing audio", memGB: 0.9, hue: 290, pct: 14.5),
         TabUsage(title: "Google Sheets — Q3 infra spend", meta: "idle 2h 40m", memGB: 0.7, hue: 85, pct: 11.3),
         TabUsage(title: "Notion — Engineering wiki", meta: "idle 4h", memGB: 0.5, hue: 150, pct: 8.1),
