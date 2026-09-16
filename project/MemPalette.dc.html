@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+  html, body { margin:0; background:#0d0d0f; -webkit-font-smoothing:antialiased; }
+  a { color:#8fb6ff; text-decoration:none; }
+  a:hover { color:#b6d0ff; }
+  @keyframes mp-pulse { 0%,100% { opacity:1 } 50% { opacity:.55 } }
+  @keyframes mp-rise { from { transform:scaleY(.2); opacity:0 } to { transform:scaleY(1); opacity:1 } }
+</style>
+<script src="./image-slot.js"></script>
+</helmet>
+
+<section style="padding:56px 64px 40px; font-family:-apple-system,'SF Pro Text','Helvetica Neue',Helvetica,sans-serif; color:#e8e8ea; display:flex; flex-direction:column; gap:48px;">
+
+  <div style="display:flex; flex-direction:column; gap:8px; max-width:760px;">
+    <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,.38);">Turn 2</div>
+    <div style="font-size:24px; font-weight:600; letter-spacing:-.02em;">Chrome tab breakdown &amp; live charts</div>
+    <div style="font-size:13.5px; line-height:1.55; color:rgba(255,255,255,.55); text-wrap:pretty;">At runtime each row shows the real app icon from <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12.5px;">NSRunningApplication.icon</span> — no artwork ships with the app, so the mockups use monogram tiles. Drop real icons in the slots below to preview them. Charts animate live and respond to hover.</div>
+  </div>
+
+  <div style="display:flex; gap:16px; flex-wrap:wrap;">
+    <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
+      <image-slot id="mp-icon-chrome" style="width:104px;height:104px" radius="20" placeholder="Chrome"></image-slot>
+      <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; color:rgba(255,255,255,.34);">Chrome</span>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
+      <image-slot id="mp-icon-docker" style="width:104px;height:104px" radius="20" placeholder="Docker"></image-slot>
+      <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; color:rgba(255,255,255,.34);">Docker</span>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
+      <image-slot id="mp-icon-code" style="width:104px;height:104px" radius="20" placeholder="VS Code"></image-slot>
+      <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; color:rgba(255,255,255,.34);">VS Code</span>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
+      <image-slot id="mp-icon-slack" style="width:104px;height:104px" radius="20" placeholder="Slack"></image-slot>
+      <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; color:rgba(255,255,255,.34);">Slack</span>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:28px; flex-wrap:wrap;">
+
+    <!-- 2a — chrome tabs -->
+    <div id="2a" style="display:flex; flex-direction:column; gap:12px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; padding:3px 7px; border-radius:5px; background:rgba(255,255,255,.08); color:rgba(255,255,255,.6);">2a</span>
+        <span style="font-size:13.5px; font-weight:590;">Query “chrome” — per-tab distribution</span>
+      </div>
+      <div style="width:560px; background:#1b1b1e; border:1px solid rgba(255,255,255,.09); border-radius:13px; box-shadow:0 28px 64px rgba(0,0,0,.6); overflow:hidden; display:flex; flex-direction:column;">
+        <div style="height:54px; flex:none; display:flex; align-items:center; gap:11px; padding:0 16px; border-bottom:1px solid rgba(255,255,255,.07);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 20 20"></path></svg>
+          <span style="flex:1; font-size:15.5px; color:#f2f2f4;">chrome<span style="display:inline-block; width:1.5px; height:17px; background:oklch(0.7 0.12 250); margin-left:2px; vertical-align:-3px;"></span></span>
+        </div>
+        <div style="padding:8px 8px 14px; display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:center; gap:10px; padding:10px 10px 12px;">
+            <span style="width:26px; height:26px; flex:none; border-radius:6px; background:oklch(0.62 0.12 250); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; color:#fff;">C</span>
+            <span style="flex:1; display:flex; flex-direction:column; gap:2px;">
+              <span style="font-size:14px; font-weight:590;">Google Chrome</span>
+              <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.4);">6.2 GB · 38 processes · 23 tabs</span>
+            </span>
+            <span style="font-size:11px; padding:4px 10px; border-radius:5px; border:1px solid rgba(255,255,255,.16); color:rgba(255,255,255,.62);">Quit app</span>
+          </div>
+          <div style="padding:0 10px 4px; display:flex; gap:2px; height:6px;">
+            <sc-for list="{{ tabBar }}" as="seg" hint-placeholder-count="5">
+              <span style="border-radius:2px; height:6px; width:{{ seg.pct }}%; background:{{ seg.color }}"></span>
+            </sc-for>
+          </div>
+          <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(255,255,255,.32); padding:16px 10px 6px;">Heaviest tabs</div>
+          <div style="display:flex; flex-direction:column;">
+            <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="5">
+              <div onMouseEnter="{{ tab.onEnter }}" style="height:44px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px; transition:background .14s linear; background:{{ tab.bg }}">
+                <span style="width:6px; height:6px; border-radius:999px; flex:none; background:{{ tab.color }}"></span>
+                <span style="flex:1; display:flex; flex-direction:column; gap:2px; min-width:0;">
+                  <span style="font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ tab.title }}</span>
+                  <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.4);">{{ tab.meta }}</span>
+                </span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(255,255,255,.42);">{{ tab.mem }}</span>
+                <span style="font-size:11px; padding:3px 9px; border-radius:5px; border:1px solid oklch(0.6 0.15 25 / .3); color:oklch(0.78 0.13 25);">Close</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="height:38px; display:flex; align-items:center; gap:10px; padding:0 10px; margin-top:8px; border-radius:7px; background:rgba(255,255,255,.075);">
+            <span style="color:rgba(255,255,255,.45); font-size:13px;">→</span>
+            <span style="flex:1; font-size:13.5px;">Close 9 tabs idle over 2h</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11.5px; color:rgba(255,255,255,.42);">frees ~2.3 GB</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.3); border:1px solid rgba(255,255,255,.12); border-radius:5px; padding:2px 6px;">↵</span>
+          </div>
+        </div>
+        <div style="height:32px; flex:none; display:flex; align-items:center; justify-content:flex-end; gap:14px; padding:0 14px; border-top:1px solid rgba(255,255,255,.06); font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; color:rgba(255,255,255,.3);">
+          <span>↑↓ navigate</span><span>↵ close tab</span><span>esc close</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2b — charts -->
+    <div id="2b" style="display:flex; flex-direction:column; gap:12px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; padding:3px 7px; border-radius:5px; background:rgba(255,255,255,.08); color:rgba(255,255,255,.6);">2b</span>
+        <span style="font-size:13.5px; font-weight:590;">Query “memory” — charts (hover the bars)</span>
+      </div>
+      <div style="width:560px; background:#1b1b1e; border:1px solid rgba(255,255,255,.09); border-radius:13px; box-shadow:0 28px 64px rgba(0,0,0,.6); overflow:hidden; display:flex; flex-direction:column;">
+        <div style="height:54px; flex:none; display:flex; align-items:center; gap:11px; padding:0 16px; border-bottom:1px solid rgba(255,255,255,.07);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 20 20"></path></svg>
+          <span style="flex:1; font-size:15.5px; color:#f2f2f4;">memory<span style="display:inline-block; width:1.5px; height:17px; background:oklch(0.7 0.12 250); margin-left:2px; vertical-align:-3px;"></span></span>
+        </div>
+        <div style="padding:8px 8px 14px; display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:baseline; justify-content:space-between; padding:10px 10px 0;">
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(255,255,255,.32);">Pressure · last 30 min</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11.5px; color:rgba(255,255,255,.6);">{{ barReadout }}</span>
+          </div>
+          <div onMouseLeave="{{ clearBar }}" style="display:flex; align-items:flex-end; gap:3px; height:78px; padding:12px 10px 0;">
+            <sc-for list="{{ bars }}" as="bar" hint-placeholder-count="30">
+              <span onMouseEnter="{{ bar.onEnter }}" style="flex:1; border-radius:2px; min-width:0; transform-origin:bottom; animation:mp-rise .5s cubic-bezier(.2,.8,.2,1) both; transition:height .55s cubic-bezier(.35,0,.25,1), opacity .16s linear, background .55s linear; height:{{ bar.h }}px; background:{{ bar.color }}; opacity:{{ bar.op }}" style-hover="opacity:1; filter:brightness(1.25)"></span>
+            </sc-for>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:6px 10px 0; font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10px; color:rgba(255,255,255,.28);">
+            <span>−30m</span><span>−15m</span><span>now</span>
+          </div>
+
+          <div style="display:flex; align-items:baseline; justify-content:space-between; padding:20px 10px 0;">
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(255,255,255,.32);">Composition · 16 GB</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11.5px; color:rgba(255,255,255,.6);">{{ segReadout }}</span>
+          </div>
+          <div onMouseLeave="{{ clearSeg }}" style="display:flex; gap:2px; height:22px; padding:10px 10px 0;">
+            <sc-for list="{{ segments }}" as="seg" hint-placeholder-count="5">
+              <span onMouseEnter="{{ seg.onEnter }}" style="height:22px; border-radius:3px; min-width:0; transition:width .5s cubic-bezier(.35,0,.25,1), opacity .16s linear, transform .18s cubic-bezier(.2,.8,.2,1); width:{{ seg.pct }}%; background:{{ seg.color }}; opacity:{{ seg.op }}" style-hover="transform:scaleY(1.22)"></span>
+            </sc-for>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px 14px; padding:12px 10px 0;">
+            <sc-for list="{{ segments }}" as="seg" hint-placeholder-count="5">
+              <span onMouseEnter="{{ seg.onEnter }}" style="display:flex; align-items:center; gap:6px;">
+                <span style="width:7px; height:7px; border-radius:2px; background:{{ seg.color }}; opacity:{{ seg.op }}"></span>
+                <span style="font-size:11.5px; color:rgba(255,255,255,.6);">{{ seg.label }}</span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11.5px; color:rgba(255,255,255,.38);">{{ seg.gb }}</span>
+              </span>
+            </sc-for>
+          </div>
+
+          <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(255,255,255,.32); padding:20px 10px 6px;">Top memory users</div>
+          <div style="display:flex; flex-direction:column;">
+            <sc-for list="{{ apps }}" as="app" hint-placeholder-count="4">
+              <div onMouseEnter="{{ app.onEnter }}" style="height:40px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px; transition:background .14s linear; background:{{ app.bg }}">
+                <span style="width:20px; height:20px; flex:none; border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff; background:{{ app.color }}">{{ app.initial }}</span>
+                <span style="flex:1; font-size:13.5px;">{{ app.name }}</span>
+                <span style="width:120px; height:5px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; display:flex;">
+                  <span style="height:5px; border-radius:999px; transition:width .5s cubic-bezier(.35,0,.25,1); width:{{ app.pct }}%; background:{{ app.color }}"></span>
+                </span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(255,255,255,.42); width:52px; text-align:right;">{{ app.mem }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="height:32px; flex:none; display:flex; align-items:center; justify-content:flex-end; gap:14px; padding:0 14px; border-top:1px solid rgba(255,255,255,.06); font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; color:rgba(255,255,255,.3);">
+          <span>↑↓ navigate</span><span>↵ select</span><span>esc close</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:56px 64px 96px; font-family:-apple-system,'SF Pro Text','Helvetica Neue',Helvetica,sans-serif; color:#e8e8ea; display:flex; flex-direction:column; gap:64px;">
+
+  <div style="display:flex; flex-direction:column; gap:8px; max-width:720px;">
+    <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,.38);">MemPalette — macOS menu bar app</div>
+    <div style="font-size:30px; font-weight:600; letter-spacing:-.02em;">Menu bar icon &amp; command palette states</div>
+    <div style="font-size:14px; line-height:1.55; color:rgba(255,255,255,.55); text-wrap:pretty;">Floating palette, 560&thinsp;×&thinsp;400, keyboard-first. Reference an artboard by its id badge (<a href="#1b">1b</a>, <a href="#1d">1d</a>) in chat.</div>
+  </div>
+
+  <!-- 1a — menu bar icon concepts -->
+  <div id="1a" style="display:flex; flex-direction:column; gap:20px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; padding:3px 7px; border-radius:5px; background:rgba(255,255,255,.08); color:rgba(255,255,255,.6);">1a</span>
+      <span style="font-size:15px; font-weight:590;">Menu bar icon — three concepts</span>
+    </div>
+
+    <div style="display:flex; gap:18px; flex-wrap:wrap;">
+
+      <div style="width:288px; background:#17171a; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="height:108px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.03); border-radius:8px;">
+          <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#e8e8ea" stroke-width="1.6" stroke-linecap="round">
+            <rect x="4" y="5" width="16" height="3.4" rx="1.4"></rect>
+            <rect x="4" y="10.3" width="16" height="3.4" rx="1.4"></rect>
+            <rect x="4" y="15.6" width="9" height="3.4" rx="1.4" fill="#e8e8ea"></rect>
+          </svg>
+        </div>
+        <div style="font-size:13px; font-weight:590;">Stacked pages</div>
+        <div style="font-size:12.5px; line-height:1.5; color:rgba(255,255,255,.52);">Three memory rows; the bottom one partially filled reads as “in use”. Most literal to RAM without being a chart.</div>
+        <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.34);">16px: holds up — strokes stay 1px, fill row still legible.</div>
+      </div>
+
+      <div style="width:288px; background:#17171a; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="height:108px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.03); border-radius:8px;">
+          <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#e8e8ea" stroke-width="1.6" stroke-linecap="round">
+            <rect x="6.5" y="6.5" width="11" height="11" rx="2.5"></rect>
+            <rect x="10" y="10" width="4" height="4" rx="1" fill="#e8e8ea" stroke="none"></rect>
+            <path d="M9.5 4v2.5M14.5 4v2.5M9.5 17.5V20M14.5 17.5V20M4 9.5h2.5M4 14.5h2.5M17.5 9.5H20M17.5 14.5H20"></path>
+          </svg>
+        </div>
+        <div style="font-size:13px; font-weight:590;">Chip</div>
+        <div style="font-size:12.5px; line-height:1.5; color:rgba(255,255,255,.52);">Module with pins. Signals “hardware / system” and pairs well with a developer-tool identity.</div>
+        <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.34);">16px: pins merge slightly — needs a 4-pin variant below 18px.</div>
+      </div>
+
+      <div style="width:288px; background:#17171a; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="height:108px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.03); border-radius:8px;">
+          <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#e8e8ea" stroke-width="1.6">
+            <rect x="4.5" y="4.5" width="6.5" height="6.5" rx="1.6" fill="#e8e8ea" stroke="none"></rect>
+            <rect x="13" y="4.5" width="6.5" height="6.5" rx="1.6" fill="#e8e8ea" stroke="none"></rect>
+            <rect x="4.5" y="13" width="6.5" height="6.5" rx="1.6" fill="#e8e8ea" stroke="none"></rect>
+            <rect x="13.3" y="13.3" width="5.9" height="5.9" rx="1.4"></rect>
+          </svg>
+        </div>
+        <div style="font-size:13px; font-weight:590;">Allocation blocks</div>
+        <div style="font-size:12.5px; line-height:1.5; color:rgba(255,255,255,.52);">Four cells, one free. The filled ratio can animate with pressure — three filled at HIGH.</div>
+        <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.34);">16px: strongest at small size — solid shapes, no hairlines.</div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:10px; margin-top:4px;">
+      <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.34);">Actual size, in the menu bar</div>
+      <div style="width:882px; max-width:100%; height:28px; border-radius:7px; background:rgba(255,255,255,.1); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,.08); display:flex; align-items:center; justify-content:flex-end; gap:16px; padding:0 14px;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#f2f2f4" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="5" width="16" height="3.4" rx="1.4"></rect><rect x="4" y="10.3" width="16" height="3.4" rx="1.4"></rect><rect x="4" y="15.6" width="9" height="3.4" rx="1.4" fill="#f2f2f4"></rect></svg>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#f2f2f4" stroke-width="1.8"><rect x="6.5" y="6.5" width="11" height="11" rx="2.5"></rect><rect x="10" y="10" width="4" height="4" rx="1" fill="#f2f2f4" stroke="none"></rect><path d="M9.5 4.2v2.3M14.5 4.2v2.3M9.5 17.5v2.3M14.5 17.5v2.3" stroke-linecap="round"></path></svg>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#f2f2f4" stroke-width="1.8"><rect x="4.5" y="4.5" width="6.5" height="6.5" rx="1.6" fill="#f2f2f4" stroke="none"></rect><rect x="13" y="4.5" width="6.5" height="6.5" rx="1.6" fill="#f2f2f4" stroke="none"></rect><rect x="4.5" y="13" width="6.5" height="6.5" rx="1.6" fill="#f2f2f4" stroke="none"></rect><rect x="13.3" y="13.3" width="5.9" height="5.9" rx="1.4"></rect></svg>
+        <span style="font-size:12.5px; color:#f2f2f4; letter-spacing:-.01em;">Tue 14:22</span>
+      </div>
+      <div style="font-size:12.5px; line-height:1.5; color:rgba(255,255,255,.5); max-width:640px; text-wrap:pretty;">Click opens the palette anchored under the icon, right edge aligned to the icon, 6px below the menu bar; search field takes focus immediately. ⌘⌥M opens it screen-centered instead.</div>
+    </div>
+  </div>
+
+  <!-- 1b / 1c — State A -->
+  <div style="display:flex; flex-direction:column; gap:20px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-size:15px; font-weight:590;">State A — default, no query</span>
+    </div>
+    <div style="display:flex; gap:28px; flex-wrap:wrap;">
+
+      <div id="1b" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; padding:3px 7px; border-radius:5px; background:rgba(255,255,255,.08); color:rgba(255,255,255,.6);">1b</span>
+          <span style="font-size:12.5px; color:rgba(255,255,255,.5);">Pressure LOW · dark</span>
+        </div>
+        <div style="width:560px; height:400px; background:#1b1b1e; border:1px solid rgba(255,255,255,.09); border-radius:13px; box-shadow:0 28px 64px rgba(0,0,0,.6); overflow:hidden; display:flex; flex-direction:column;">
+          <div style="height:54px; flex:none; display:flex; align-items:center; gap:11px; padding:0 16px; border-bottom:1px solid rgba(255,255,255,.07);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 20 20"></path></svg>
+            <span style="flex:1; font-size:15.5px; color:rgba(255,255,255,.34);">Search or type a command…</span>
+            <sc-if value="{{ showKeyHints }}" hint-placeholder-val="{{ true }}">
+              <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.3); border:1px solid rgba(255,255,255,.12); border-radius:5px; padding:2px 6px;">⌘K</span>
+            </sc-if>
+          </div>
+          <div style="flex:1; padding:8px 8px 10px; display:flex; flex-direction:column; overflow:hidden;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px 10px;">
+              <span style="font-size:13.5px; color:rgba(255,255,255,.82);">Memory pressure</span>
+              <span style="display:flex; align-items:center; gap:7px;">
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.38);">4.1 GB free</span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; font-weight:600; letter-spacing:.08em; padding:3px 8px; border-radius:999px; color:oklch(0.86 0.13 150); background:oklch(0.55 0.11 150 / .22);">LOW</span>
+              </span>
+            </div>
+            <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(255,255,255,.32); padding:10px 10px 6px;">Top memory users</div>
+            <div style="display:flex; flex-direction:column;">
+              <div style="height:38px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px; background:rgba(255,255,255,.075);">
+                <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 250); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">C</span>
+                <span style="flex:1; font-size:13.5px;">Chrome</span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(255,255,255,.42);">3.4 GB</span>
+                <sc-if value="{{ showQuitButtons }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-size:11px; padding:3px 9px; border-radius:5px; border:1px solid oklch(0.6 0.15 25 / .35); color:oklch(0.78 0.13 25);">Quit</span>
+                </sc-if>
+              </div>
+              <div style="height:38px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px;">
+                <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 200); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">D</span>
+                <span style="flex:1; font-size:13.5px;">Docker</span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(255,255,255,.42);">1.8 GB</span>
+              </div>
+              <div style="height:38px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px;">
+                <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 290); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">V</span>
+                <span style="flex:1; font-size:13.5px;">Visual Studio Code</span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(255,255,255,.42);">1.1 GB</span>
+              </div>
+            </div>
+            <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(255,255,255,.32); padding:14px 10px 6px;">Suggested actions</div>
+            <div style="height:36px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px;">
+              <span style="color:rgba(255,255,255,.35); font-size:13px;">→</span>
+              <span style="flex:1; font-size:13.5px; color:rgba(255,255,255,.72);">Nothing to do — you have headroom</span>
+            </div>
+          </div>
+          <div style="height:32px; flex:none; display:flex; align-items:center; justify-content:flex-end; gap:14px; padding:0 14px; border-top:1px solid rgba(255,255,255,.06); font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; color:rgba(255,255,255,.3);">
+            <span>↑↓ navigate</span><span>↵ select</span><span>esc close</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="1c" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; padding:3px 7px; border-radius:5px; background:rgba(255,255,255,.08); color:rgba(255,255,255,.6);">1c</span>
+          <span style="font-size:12.5px; color:rgba(255,255,255,.5);">Pressure HIGH · dark</span>
+        </div>
+        <div style="width:560px; background:#1b1b1e; border:1px solid rgba(255,255,255,.09); border-radius:13px; box-shadow:0 28px 64px rgba(0,0,0,.6); overflow:hidden; display:flex; flex-direction:column;">
+          <div style="height:54px; flex:none; display:flex; align-items:center; gap:11px; padding:0 16px; border-bottom:1px solid rgba(255,255,255,.07);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 20 20"></path></svg>
+            <span style="flex:1; font-size:15.5px; color:rgba(255,255,255,.34);">Search or type a command…</span>
+            <sc-if value="{{ showKeyHints }}" hint-placeholder-val="{{ true }}">
+              <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.3); border:1px solid rgba(255,255,255,.12); border-radius:5px; padding:2px 6px;">⌘K</span>
+            </sc-if>
+          </div>
+          <div style="padding:8px 8px 10px; display:flex; flex-direction:column;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px 10px;">
+              <span style="font-size:13.5px; color:rgba(255,255,255,.82);">Memory pressure</span>
+              <span style="display:flex; align-items:center; gap:7px;">
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.38);">0.4 GB free</span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; font-weight:600; letter-spacing:.08em; padding:3px 8px; border-radius:999px; animation:mp-pulse 2.4s ease-in-out infinite; color:oklch(0.84 0.13 25); background:oklch(0.55 0.15 25 / .26);">HIGH</span>
+              </span>
+            </div>
+            <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(255,255,255,.32); padding:10px 10px 6px;">Top memory users</div>
+            <div style="display:flex; flex-direction:column;">
+              <div style="height:38px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px; background:rgba(255,255,255,.075);">
+                <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 250); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">C</span>
+                <span style="flex:1; font-size:13.5px;">Chrome</span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(255,255,255,.42);">6.2 GB</span>
+                <sc-if value="{{ showQuitButtons }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-size:11px; padding:3px 9px; border-radius:5px; border:1px solid oklch(0.6 0.15 25 / .35); color:oklch(0.78 0.13 25);">Quit</span>
+                </sc-if>
+              </div>
+              <div style="height:38px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px;">
+                <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 200); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">D</span>
+                <span style="flex:1; font-size:13.5px;">Docker</span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(255,255,255,.42);">3.1 GB</span>
+              </div>
+              <div style="height:38px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px;">
+                <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 290); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">V</span>
+                <span style="flex:1; font-size:13.5px;">Visual Studio Code</span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(255,255,255,.42);">1.4 GB</span>
+              </div>
+              <div style="height:38px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px;">
+                <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 140); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">S</span>
+                <span style="flex:1; font-size:13.5px;">Slack</span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(255,255,255,.42);">0.9 GB</span>
+              </div>
+            </div>
+            <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(255,255,255,.32); padding:14px 10px 6px;">Suggested actions</div>
+            <div style="display:flex; flex-direction:column;">
+              <div style="height:36px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px;">
+                <span style="color:rgba(255,255,255,.35); font-size:13px;">→</span>
+                <span style="flex:1; font-size:13.5px;">Quit Docker</span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11.5px; color:rgba(255,255,255,.4);">frees ~3.1 GB</span>
+              </div>
+              <div style="height:36px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px;">
+                <span style="color:rgba(255,255,255,.35); font-size:13px;">→</span>
+                <span style="flex:1; font-size:13.5px;">Quit Chrome</span>
+                <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11.5px; color:rgba(255,255,255,.4);">frees ~6.2 GB</span>
+              </div>
+            </div>
+          </div>
+          <div style="height:32px; flex:none; display:flex; align-items:center; justify-content:flex-end; gap:14px; padding:0 14px; border-top:1px solid rgba(255,255,255,.06); font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; color:rgba(255,255,255,.3);">
+            <span>↑↓ navigate</span><span>↵ select</span><span>esc close</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1d — State B -->
+  <div id="1d" style="display:flex; flex-direction:column; gap:12px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; padding:3px 7px; border-radius:5px; background:rgba(255,255,255,.08); color:rgba(255,255,255,.6);">1d</span>
+      <span style="font-size:15px; font-weight:590;">State B — “why is my mac slow”</span>
+      <span style="font-size:12.5px; color:rgba(255,255,255,.5);">dark</span>
+    </div>
+    <div style="width:560px; background:#1b1b1e; border:1px solid rgba(255,255,255,.09); border-radius:13px; box-shadow:0 28px 64px rgba(0,0,0,.6); overflow:hidden; display:flex; flex-direction:column;">
+      <div style="height:54px; flex:none; display:flex; align-items:center; gap:11px; padding:0 16px; border-bottom:1px solid rgba(255,255,255,.07); box-shadow:inset 0 0 0 1px oklch(0.62 0.12 250 / .28);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 20 20"></path></svg>
+        <span style="flex:1; font-size:15.5px; color:#f2f2f4;">why is my mac slow<span style="display:inline-block; width:1.5px; height:17px; background:oklch(0.7 0.12 250); margin-left:2px; vertical-align:-3px;"></span></span>
+      </div>
+      <div style="padding:8px 8px 14px; display:flex; flex-direction:column;">
+        <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(255,255,255,.32); padding:10px 10px 8px;">Diagnosis</div>
+        <div style="display:flex; flex-direction:column; gap:9px; padding:0 10px 4px;">
+          <div style="display:flex; gap:10px; align-items:baseline;">
+            <span style="width:5px; height:5px; border-radius:999px; background:oklch(0.7 0.15 25); flex:none; transform:translateY(-3px);"></span>
+            <span style="font-size:13.5px; line-height:1.45; color:rgba(255,255,255,.88);">Memory pressure is high — 0.4 GB free of 16 GB.</span>
+          </div>
+          <div style="display:flex; gap:10px; align-items:baseline;">
+            <span style="width:5px; height:5px; border-radius:999px; background:rgba(255,255,255,.3); flex:none; transform:translateY(-3px);"></span>
+            <span style="font-size:13.5px; line-height:1.45; color:rgba(255,255,255,.88);">Chrome is using 6.2 GB across 38 processes.</span>
+          </div>
+          <div style="display:flex; gap:10px; align-items:baseline;">
+            <span style="width:5px; height:5px; border-radius:999px; background:rgba(255,255,255,.3); flex:none; transform:translateY(-3px);"></span>
+            <span style="font-size:13.5px; line-height:1.45; color:rgba(255,255,255,.88);">Docker is using 3.1 GB and has been idle for 3 hours.</span>
+          </div>
+          <div style="display:flex; gap:10px; align-items:baseline;">
+            <span style="width:5px; height:5px; border-radius:999px; background:rgba(255,255,255,.3); flex:none; transform:translateY(-3px);"></span>
+            <span style="font-size:13.5px; line-height:1.45; color:rgba(255,255,255,.62);">11 browser tabs have been inactive for several hours.</span>
+          </div>
+        </div>
+        <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(255,255,255,.32); padding:18px 10px 6px;">Recommended actions</div>
+        <div style="display:flex; flex-direction:column;">
+          <div style="height:38px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px; background:rgba(255,255,255,.075);">
+            <span style="color:rgba(255,255,255,.45); font-size:13px;">→</span>
+            <span style="flex:1; font-size:13.5px;">Quit Docker</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11.5px; color:rgba(255,255,255,.42);">frees ~3.1 GB</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.3); border:1px solid rgba(255,255,255,.12); border-radius:5px; padding:2px 6px;">↵</span>
+          </div>
+          <div style="height:38px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px;">
+            <span style="color:rgba(255,255,255,.35); font-size:13px;">→</span>
+            <span style="flex:1; font-size:13.5px;">Close 4 inactive Chrome tabs</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11.5px; color:rgba(255,255,255,.42);">frees ~2.3 GB</span>
+          </div>
+          <div style="height:38px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px;">
+            <span style="color:rgba(255,255,255,.35); font-size:13px;">→</span>
+            <span style="flex:1; font-size:13.5px;">Quit Chrome</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11.5px; color:rgba(255,255,255,.42);">frees ~6.2 GB</span>
+          </div>
+        </div>
+      </div>
+      <div style="height:32px; flex:none; display:flex; align-items:center; justify-content:flex-end; gap:14px; padding:0 14px; border-top:1px solid rgba(255,255,255,.06); font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; color:rgba(255,255,255,.3);">
+        <span>↑↓ navigate</span><span>↵ select</span><span>esc close</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1e — State C, light -->
+  <div id="1e" style="display:flex; flex-direction:column; gap:12px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; padding:3px 7px; border-radius:5px; background:rgba(255,255,255,.08); color:rgba(255,255,255,.6);">1e</span>
+      <span style="font-size:15px; font-weight:590;">State C — “memory”</span>
+      <span style="font-size:12.5px; color:rgba(255,255,255,.5);">light</span>
+    </div>
+    <div style="width:560px; background:#fbfbfa; border:1px solid rgba(0,0,0,.1); border-radius:13px; box-shadow:0 28px 64px rgba(0,0,0,.45); overflow:hidden; display:flex; flex-direction:column; color:#1a1a1c;">
+      <div style="height:54px; flex:none; display:flex; align-items:center; gap:11px; padding:0 16px; border-bottom:1px solid rgba(0,0,0,.08);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 20 20"></path></svg>
+        <span style="flex:1; font-size:15.5px; color:#1a1a1c;">memory<span style="display:inline-block; width:1.5px; height:17px; background:oklch(0.55 0.12 250); margin-left:2px; vertical-align:-3px;"></span></span>
+      </div>
+      <div style="padding:8px 8px 14px; display:flex; flex-direction:column;">
+        <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(0,0,0,.42); padding:10px 10px 6px;">Memory overview</div>
+        <div style="display:flex; flex-direction:column;">
+          <div style="height:32px; display:flex; align-items:center; gap:10px; padding:0 10px;">
+            <span style="flex:1; font-size:13.5px; color:rgba(0,0,0,.7);">Memory pressure</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; font-weight:600; letter-spacing:.08em; padding:3px 8px; border-radius:999px; color:#fff; background:oklch(0.55 0.16 25);">HIGH</span>
+          </div>
+          <div style="height:30px; display:flex; align-items:center; gap:10px; padding:0 10px;">
+            <span style="flex:1; font-size:13.5px; color:rgba(0,0,0,.7);">Total</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12.5px; color:#1a1a1c;">16 GB</span>
+          </div>
+          <div style="height:30px; display:flex; align-items:center; gap:10px; padding:0 10px;">
+            <span style="flex:1; font-size:13.5px; color:rgba(0,0,0,.7);">Used</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12.5px; color:#1a1a1c;">12.4 GB</span>
+          </div>
+          <div style="padding:8px 10px 2px;">
+            <div style="height:5px; border-radius:999px; background:rgba(0,0,0,.08); overflow:hidden; display:flex;">
+              <span style="width:77.5%; background:oklch(0.55 0.16 25);"></span>
+            </div>
+          </div>
+        </div>
+        <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(0,0,0,.42); padding:18px 10px 6px;">Top memory users</div>
+        <div style="display:flex; flex-direction:column;">
+          <div style="height:36px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px; background:rgba(0,0,0,.05);">
+            <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 250); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">C</span>
+            <span style="flex:1; font-size:13.5px;">Chrome</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(0,0,0,.5);">6.2 GB</span>
+            <sc-if value="{{ showQuitButtons }}" hint-placeholder-val="{{ true }}">
+              <span style="font-size:11px; padding:3px 9px; border-radius:5px; border:1px solid oklch(0.55 0.16 25 / .35); color:oklch(0.48 0.16 25);">Quit</span>
+            </sc-if>
+          </div>
+          <div style="height:36px; display:flex; align-items:center; gap:10px; padding:0 10px;">
+            <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 200); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">D</span>
+            <span style="flex:1; font-size:13.5px;">Docker</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(0,0,0,.5);">3.1 GB</span>
+          </div>
+          <div style="height:36px; display:flex; align-items:center; gap:10px; padding:0 10px;">
+            <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 290); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">V</span>
+            <span style="flex:1; font-size:13.5px;">Visual Studio Code</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(0,0,0,.5);">1.4 GB</span>
+          </div>
+          <div style="height:36px; display:flex; align-items:center; gap:10px; padding:0 10px;">
+            <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 140); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">S</span>
+            <span style="flex:1; font-size:13.5px;">Slack</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(0,0,0,.5);">0.9 GB</span>
+          </div>
+          <div style="height:36px; display:flex; align-items:center; gap:10px; padding:0 10px;">
+            <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 60); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">F</span>
+            <span style="flex:1; font-size:13.5px;">Figma</span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(0,0,0,.5);">0.7 GB</span>
+          </div>
+        </div>
+        <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(0,0,0,.42); padding:18px 10px 8px;">Recommendations</div>
+        <div style="display:flex; flex-direction:column; gap:8px; padding:0 10px;">
+          <div style="display:flex; gap:10px; align-items:baseline;">
+            <span style="width:5px; height:5px; border-radius:999px; background:oklch(0.55 0.16 25); flex:none; transform:translateY(-3px);"></span>
+            <span style="font-size:13.5px; line-height:1.45; color:rgba(0,0,0,.78);">Chrome is using 38% of total memory.</span>
+          </div>
+          <div style="display:flex; gap:10px; align-items:baseline;">
+            <span style="width:5px; height:5px; border-radius:999px; background:rgba(0,0,0,.3); flex:none; transform:translateY(-3px);"></span>
+            <span style="font-size:13.5px; line-height:1.45; color:rgba(0,0,0,.78);">Consider quitting Docker — idle for 2h.</span>
+          </div>
+        </div>
+      </div>
+      <div style="height:32px; flex:none; display:flex; align-items:center; justify-content:flex-end; gap:14px; padding:0 14px; border-top:1px solid rgba(0,0,0,.07); font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; color:rgba(0,0,0,.38);">
+        <span>↑↓ navigate</span><span>↵ select</span><span>esc close</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1f — State D -->
+  <div id="1f" style="display:flex; flex-direction:column; gap:12px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; padding:3px 7px; border-radius:5px; background:rgba(255,255,255,.08); color:rgba(255,255,255,.6);">1f</span>
+      <span style="font-size:15px; font-weight:590;">State D — “what can I close”</span>
+      <span style="font-size:12.5px; color:rgba(255,255,255,.5);">dark</span>
+    </div>
+    <div style="width:560px; background:#1b1b1e; border:1px solid rgba(255,255,255,.09); border-radius:13px; box-shadow:0 28px 64px rgba(0,0,0,.6); overflow:hidden; display:flex; flex-direction:column;">
+      <div style="height:54px; flex:none; display:flex; align-items:center; gap:11px; padding:0 16px; border-bottom:1px solid rgba(255,255,255,.07);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 20 20"></path></svg>
+        <span style="flex:1; font-size:15.5px; color:#f2f2f4;">what can I close<span style="display:inline-block; width:1.5px; height:17px; background:oklch(0.7 0.12 250); margin-left:2px; vertical-align:-3px;"></span></span>
+      </div>
+      <div style="padding:8px 8px 14px; display:flex; flex-direction:column;">
+        <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(255,255,255,.32); padding:10px 10px 6px;">Apps you may want to close</div>
+        <div style="display:flex; flex-direction:column;">
+          <div style="height:46px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px; background:rgba(255,255,255,.075);">
+            <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 200); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">D</span>
+            <span style="flex:1; display:flex; flex-direction:column; gap:2px; min-width:0;">
+              <span style="font-size:13.5px;">Docker</span>
+              <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.4);">idle 3h</span>
+            </span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(255,255,255,.42);">3.1 GB</span>
+            <span style="font-size:11px; padding:3px 9px; border-radius:5px; border:1px solid oklch(0.6 0.15 25 / .45); color:oklch(0.82 0.13 25); background:oklch(0.55 0.15 25 / .16);">Quit</span>
+          </div>
+          <div style="height:46px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px;">
+            <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 60); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">F</span>
+            <span style="flex:1; display:flex; flex-direction:column; gap:2px; min-width:0;">
+              <span style="font-size:13.5px;">Figma</span>
+              <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.4);">inactive since 09:40</span>
+            </span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(255,255,255,.42);">0.7 GB</span>
+            <sc-if value="{{ showQuitButtons }}" hint-placeholder-val="{{ true }}">
+              <span style="font-size:11px; padding:3px 9px; border-radius:5px; border:1px solid oklch(0.6 0.15 25 / .3); color:oklch(0.78 0.13 25);">Quit</span>
+            </sc-if>
+          </div>
+          <div style="height:46px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px;">
+            <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 140); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">S</span>
+            <span style="flex:1; display:flex; flex-direction:column; gap:2px; min-width:0;">
+              <span style="font-size:13.5px;">Slack</span>
+              <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; color:rgba(255,255,255,.4);">using 2.4× its usual memory</span>
+            </span>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(255,255,255,.42);">0.9 GB</span>
+            <sc-if value="{{ showQuitButtons }}" hint-placeholder-val="{{ true }}">
+              <span style="font-size:11px; padding:3px 9px; border-radius:5px; border:1px solid oklch(0.6 0.15 25 / .3); color:oklch(0.78 0.13 25);">Quit</span>
+            </sc-if>
+          </div>
+        </div>
+        <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:rgba(255,255,255,.32); padding:18px 10px 6px;">Browser tabs</div>
+        <div style="height:40px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:7px;">
+          <span style="width:19px; height:19px; border-radius:5px; background:oklch(0.62 0.12 250); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;">C</span>
+          <span style="flex:1; font-size:13.5px; color:rgba(255,255,255,.72);">4 inactive Chrome tabs</span>
+          <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12px; color:rgba(255,255,255,.42);">~2.3 GB</span>
+          <span style="font-size:11px; padding:3px 9px; border-radius:5px; border:1px solid rgba(255,255,255,.18); color:rgba(255,255,255,.66);">Review &amp; close</span>
+        </div>
+        <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; color:rgba(255,255,255,.26); padding:2px 10px 0;">v2 — stubbed, no tab data in v1</div>
+      </div>
+      <div style="height:32px; flex:none; display:flex; align-items:center; justify-content:flex-end; gap:14px; padding:0 14px; border-top:1px solid rgba(255,255,255,.06); font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10.5px; color:rgba(255,255,255,.3);">
+        <span>↑↓ navigate</span><span>↵ select</span><span>esc close</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1g — component + spec notes -->
+  <div id="1g" style="display:flex; flex-direction:column; gap:20px; max-width:1180px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11px; padding:3px 7px; border-radius:5px; background:rgba(255,255,255,.08); color:rgba(255,255,255,.6);">1g</span>
+      <span style="font-size:15px; font-weight:590;">Handoff notes</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px;">
+      <div style="background:#17171a; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:10px;">
+        <div style="font-size:13px; font-weight:590;">Type &amp; spacing</div>
+        <div style="font-size:12.5px; line-height:1.6; color:rgba(255,255,255,.55);">SF Pro Text throughout; SF Mono for numbers, section headers and key hints so digits align. Body 13.5, query 15.5, section header 10.5 uppercase / .11em. Rows 38px (46px with a reason line), 10px side padding, 7px corner radius. Window padding 8px so selected rows inset cleanly.</div>
+      </div>
+      <div style="background:#17171a; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:10px;">
+        <div style="font-size:13px; font-weight:590;">Color</div>
+        <div style="font-size:12.5px; line-height:1.6; color:rgba(255,255,255,.55);">Chrome is neutral; color carries meaning only. Pressure pill: green / amber / red at one chroma. Quit borrows the red at 30–45% border, filled only on the selected row. Light mode flips ink to #1a1a1c on #fbfbfa with the same alpha ladder.</div>
+      </div>
+      <div style="background:#17171a; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:10px;">
+        <div style="font-size:13px; font-weight:590;">Window &amp; focus</div>
+        <div style="font-size:12.5px; line-height:1.6; color:rgba(255,255,255,.55);">NSPanel, non-activating, .floating level, 13px radius, no titlebar. Height grows with content to a 480px cap, then the content area scrolls. Loses focus → closes. Search field keeps focus permanently; ↑↓ moves a selection index, so there is no visible caret move.</div>
+      </div>
+      <div style="background:#17171a; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:10px;">
+        <div style="font-size:13px; font-weight:590;">Components</div>
+        <div style="font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:11.5px; line-height:1.9; color:rgba(255,255,255,.55);">CommandPaletteWindow<br>SearchField<br>MemoryPressureBadge<br>SectionHeader<br>AppListItem · QuitButton<br>RecommendationItem<br>DiagnosisBullet</div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showKeyHints&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Palette&quot;},&quot;showQuitButtons&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Palette&quot;},&quot;liveTicker&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Charts&quot;}}">
+const SAMPLES = [52,55,51,58,61,57,63,66,62,68,71,69,74,72,77,81,78,84,88,85,83,89,92,90,87,91,94,92,89,93];
+const PRESSURE_COLOR = v => v > 85 ? 'oklch(0.62 0.16 25)' : v > 65 ? 'oklch(0.72 0.14 85)' : 'oklch(0.64 0.13 150)';
+
+class Component extends DCLogic {
+  state = { bar: null, seg: null, tab: 0, app: 0, samples: SAMPLES };
+
+  componentDidMount() {
+    this._t = setInterval(() => {
+      if (this.props.liveTicker === false || this.state.bar !== null) return;
+      const s = this.state.samples;
+      const next = Math.max(40, Math.min(97, s[s.length - 1] + Math.round((Math.random() - 0.45) * 9)));
+      this.setState({ samples: s.slice(1).concat(next) });
+    }, 1600);
+  }
+
+  componentWillUnmount() { clearInterval(this._t); }
+
+  renderVals() {
+    const { bar, seg } = this.state;
+    const S = this.state.samples;
+    const bars = S.map((v, i) => ({
+      h: Math.round(10 + (v / 100) * 56),
+      color: PRESSURE_COLOR(v),
+      op: bar === null || bar === i ? 1 : 0.38,
+      onEnter: () => this.setState({ bar: i }),
+    }));
+    const segRaw = [
+      { label: 'App memory', gb: '7.8 GB', pct: 48.8, color: 'oklch(0.62 0.12 250)' },
+      { label: 'Wired', gb: '2.6 GB', pct: 16.3, color: 'oklch(0.62 0.12 290)' },
+      { label: 'Compressed', gb: '1.4 GB', pct: 8.8, color: 'oklch(0.72 0.14 85)' },
+      { label: 'Cached', gb: '0.6 GB', pct: 3.8, color: 'oklch(0.64 0.13 150)' },
+      { label: 'Free', gb: '3.6 GB', pct: 22.3, color: 'rgba(255,255,255,.16)' },
+    ];
+    const segments = segRaw.map((s, i) => ({
+      ...s,
+      op: seg === null || seg === i ? 1 : 0.35,
+      onEnter: () => this.setState({ seg: i }),
+    }));
+    const tabRaw = [
+      { title: 'Figma — MemPalette / palette states', meta: 'active · pinned', mem: '1.4 GB', color: 'oklch(0.62 0.12 250)', pct: 22.6 },
+      { title: 'YouTube — Build a menu bar app in SwiftUI', meta: 'playing audio', mem: '0.9 GB', color: 'oklch(0.62 0.12 290)', pct: 14.5 },
+      { title: 'Google Sheets — Q3 infra spend', meta: 'idle 2h 40m', mem: '0.7 GB', color: 'oklch(0.72 0.14 85)', pct: 11.3 },
+      { title: 'Notion — Engineering wiki', meta: 'idle 4h', mem: '0.5 GB', color: 'oklch(0.64 0.13 150)', pct: 8.1 },
+      { title: '19 other tabs', meta: '9 idle over 2h', mem: '2.7 GB', color: 'rgba(255,255,255,.22)', pct: 43.5 },
+    ];
+    const tabs = tabRaw.map((t, i) => ({
+      ...t,
+      bg: this.state.tab === i ? 'rgba(255,255,255,.075)' : 'transparent',
+      onEnter: () => this.setState({ tab: i }),
+    }));
+    const appRaw = [
+      { name: 'Chrome', mem: '6.2 GB', pct: 100, initial: 'C', color: 'oklch(0.62 0.12 250)' },
+      { name: 'Docker', mem: '3.1 GB', pct: 50, initial: 'D', color: 'oklch(0.62 0.12 200)' },
+      { name: 'Visual Studio Code', mem: '1.4 GB', pct: 23, initial: 'V', color: 'oklch(0.62 0.12 290)' },
+      { name: 'Slack', mem: '0.9 GB', pct: 15, initial: 'S', color: 'oklch(0.64 0.13 150)' },
+    ];
+    const apps = appRaw.map((a, i) => ({
+      ...a,
+      bg: this.state.app === i ? 'rgba(255,255,255,.075)' : 'transparent',
+      onEnter: () => this.setState({ app: i }),
+    }));
+    return {
+      bars, segments, tabs, apps,
+      tabBar: tabRaw.map(t => ({ pct: t.pct * 0.98, color: t.color })),
+      barReadout: (() => {
+        const i = bar === null ? S.length - 1 : bar;
+        const v = S[i];
+        const t = i === S.length - 1 ? 'now' : '−' + (S.length - 1 - i) + 'm';
+        return t + ' · ' + v + '% · ' + (v > 85 ? 'HIGH' : v > 65 ? 'MEDIUM' : 'LOW');
+      })(),
+      segReadout: seg === null ? '12.4 GB used' : segRaw[seg].label + ' · ' + segRaw[seg].gb,
+      clearBar: () => this.setState({ bar: null }),
+      clearSeg: () => this.setState({ seg: null }),
+      showKeyHints: this.props.showKeyHints ?? true,
+      showQuitButtons: this.props.showQuitButtons ?? true,
+    };
+  }
+}
+</script>
+</body>
+</html>
