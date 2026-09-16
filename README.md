@@ -1,25 +1,44 @@
-# CODING AGENTS: READ THIS FIRST
+# MemBar
 
-This is a **handoff bundle** from Claude Design (claude.ai/design).
+See what's eating your RAM and quit it — a Raycast-style memory monitor for your Mac's menu bar, showing memory
+pressure, top memory users, and quit/close actions. Implemented in SwiftUI from the
+[`design/project/MemPalette.dc.html`](design/project/MemPalette.dc.html) handoff design in this repo (the design's
+working title was "MemPalette" — see [`design/`](design/) for the original handoff bundle and chat transcript).
 
-A user mocked up designs in HTML/CSS/JS using an AI design tool, then exported this bundle so a coding agent can implement the designs for real.
+This build is **UI only, with mock data** — no real memory polling, `NSRunningApplication` enumeration, or
+app-quitting. It's meant to validate the interaction design before wiring up real system monitoring.
 
-## What you should do — IMPORTANT
+## Requirements
 
-**Read the chat transcripts first.** There are 1 chat transcript(s) in `chats/`. The transcripts show the full back-and-forth between the user and the design assistant — they tell you **what the user actually wants** and **where they landed** after iterating. Don't skip them. The final HTML files are the output, but the chat is where the intent lives.
+- macOS 14+
+- Xcode 15+ (or the Swift 5.9+ toolchain via `swift build` / `swift run`)
 
-**Read `project/MemPalette.dc.html` in full.** The user had this file open when they triggered the handoff, so it's almost certainly the primary design they want built. Read it top to bottom — don't skim. Then **follow its imports**: open every file it pulls in (shared components, CSS, scripts) so you understand how the pieces fit together before you start implementing.
+## Run it
 
-**If anything is ambiguous, ask the user to confirm before you start implementing.** It's much cheaper to clarify scope up front than to build the wrong thing.
+```sh
+swift run
+```
 
-## About the design files
+or open `Package.swift` in Xcode and run the `MemBar` scheme.
 
-The design medium is **HTML/CSS/JS** — these are prototypes, not production code. Your job is to **recreate them pixel-perfectly** in whatever technology makes sense for the target codebase (React, Vue, native, whatever fits). Match the visual output; don't copy the prototype's internal structure unless it happens to fit.
+The app is menu-bar only (no Dock icon): look for the small four-block icon in the menu bar. Click it to open the
+palette, or press `⌘⌥M` (requires Accessibility/Input Monitoring permission for the global shortcut to register).
+Type `memory`, `why is my mac slow`, `chrome`, or `what can I close` to see the other states.
 
-**Don't render these files in a browser or take screenshots unless the user asks you to.** Everything you need — dimensions, colors, layout rules — is spelled out in the source. Read the HTML and CSS directly; a screenshot won't tell you anything they don't.
+## What's implemented
 
-## Bundle contents
+- Menu bar icon ("allocation blocks" concept): a 2×2 grid whose filled-cell count tracks live pressure.
+- A floating, non-activating `NSPanel` command palette that closes on Escape or losing focus, and resizes to fit
+  its content (400–480pt).
+- All states from the handoff: default overview (LOW/HIGH pressure), diagnosis ("why is my mac slow"), a merged
+  memory view (overview numbers + the pressure-history/composition charts added in the second design pass),
+  apps-to-close, and a Chrome per-tab breakdown.
+- Hover-driven selection and chart readouts, a live-ticking pressure history (mirrors the handoff script's
+  1.6s interval), and full light/dark support.
 
-- `README.md` — this file
-- `chats/` — conversation transcripts (read these!)
-- `project/` — the `Menu bar icon concepts` project files (HTML prototypes, assets, components)
+## Known limitations
+
+- No real system data — everything in `Models.swift` is hardcoded mock data matching the design's numbers.
+- The global `⌘⌥M` hotkey is best-effort; without permission it silently won't fire.
+- This was written and reviewed without access to a Mac/Xcode in the authoring environment, so it hasn't been
+  compiled yet — check it in Xcode before relying on it.
