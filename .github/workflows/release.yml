@@ -1,0 +1,35 @@
+name: Release MemBar
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    name: Build & Publish Release
+    runs-on: macos-14
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Make Scripts Executable
+        run: chmod +x scripts/package.sh install.sh
+
+      - name: Build and Package Release Artifacts
+        run: ./scripts/package.sh
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.dmg
+            dist/*.zip
+            dist/membar.rb
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+EOF

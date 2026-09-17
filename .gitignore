@@ -3,3 +3,4 @@
 DerivedData/
 *.xcodeproj
 .DS_Store
+dist/

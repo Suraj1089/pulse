@@ -16,7 +16,25 @@ for the one thing that's a real signal but not an exact one (per-tab memory), an
 - Not sandboxed / not from the App Store — it reads other processes' memory footprint and quits them, which the
   App Sandbox doesn't allow.
 
-## Run it
+## Installation
+
+### Method 1: Homebrew (Recommended)
+```sh
+brew tap Suraj1089/tap
+brew install --cask membar
+```
+
+### Method 2: One-Line Terminal Installer
+```sh
+curl -fsSL https://raw.githubusercontent.com/Suraj1089/MemBar/main/install.sh | bash
+```
+
+### Method 3: Direct Download (.dmg)
+Download the latest `MemBar-1.0.0.dmg` from [GitHub Releases](https://github.com/Suraj1089/MemBar/releases/latest), open it, and drag `MemBar.app` into `/Applications`.
+
+---
+
+## Build & Run from Source
 
 ```sh
 swift run
