@@ -628,6 +628,131 @@
       .secondary-section { grid-template-columns: 1fr; gap: 36px; }
       .hero-macbook-img { max-width: 520px; margin: 0 auto; }
     }
+
+    /* Site Footer */
+    .site-footer {
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      padding: 64px 0 36px;
+      margin-top: 90px;
+      color: var(--text-muted);
+      font-size: 13.5px;
+    }
+
+    .footer-container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    .footer-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 48px;
+      padding-bottom: 44px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .footer-brand {
+      max-width: 360px;
+    }
+
+    .footer-brand .brand {
+      margin-bottom: 12px;
+    }
+
+    .footer-tagline {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .footer-meta-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .meta-pill {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: #ffffff;
+      border: 1px solid var(--border);
+      padding: 3px 9px;
+      border-radius: 999px;
+    }
+
+    .footer-links-grid {
+      display: flex;
+      gap: 64px;
+    }
+
+    .footer-col h4 {
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text);
+      margin-bottom: 14px;
+    }
+
+    .footer-col ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .footer-col a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .footer-col a:hover {
+      color: var(--text);
+    }
+
+    .footer-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 24px;
+      font-size: 13px;
+      color: var(--text-subtle);
+    }
+
+    .footer-bottom a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .footer-bottom a:hover {
+      color: var(--text);
+    }
+
+    .footer-legal {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    @media (max-width: 768px) {
+      .footer-top {
+        flex-direction: column;
+        gap: 36px;
+      }
+      .footer-links-grid {
+        gap: 48px;
+      }
+      .footer-bottom {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+      }
+    }
   </style>
 </head>
 <body>
@@ -805,7 +930,7 @@
   </section>
 
   <!-- Keyboard Shortcuts Section -->
-  <section class="shortcuts-section">
+  <section class="shortcuts-section" id="shortcuts">
     <h2>Keyboard Shortcuts</h2>
     <p>Control everything from your keyboard.</p>
 
@@ -847,7 +972,62 @@
     </div>
   </section>
 
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="footer-container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <a href="#" class="brand">
+            <div class="brand-icon">
+              <span></span><span></span><span></span>
+            </div>
+            <span>Pulse</span>
+          </a>
+          <p class="footer-tagline">
+            Minimalist, real-time memory monitor & command palette for macOS.
+          </p>
+          <div class="footer-meta-badges">
+            <span class="meta-pill">macOS 14+</span>
+            <span class="meta-pill">Apple Silicon & Intel</span>
+            <span class="meta-pill">Zero Telemetry</span>
+          </div>
+        </div>
 
+        <div class="footer-links-grid">
+          <div class="footer-col">
+            <h4>App</h4>
+            <ul>
+              <li><a href="https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg">Download .dmg</a></li>
+              <li><a href="https://github.com/Suraj1089/pulse/releases">Release Notes</a></li>
+              <li><a href="#shortcuts">Shortcuts</a></li>
+              <li><a href="https://pulse0.app/install.sh" target="_blank">Install Script</a></li>
+            </ul>
+          </div>
+
+          <div class="footer-col">
+            <h4>Open Source</h4>
+            <ul>
+              <li><a href="https://github.com/Suraj1089/pulse" target="_blank" rel="noopener">GitHub Repository</a></li>
+              <li><a href="https://github.com/Suraj1089/pulse/issues" target="_blank" rel="noopener">Report an Issue</a></li>
+              <li><a href="https://github.com/Suraj1089/pulse/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+              <li><a href="https://pulse0.app/llms.txt" target="_blank">llms.txt</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div class="footer-copyright">
+          © 2026 px0 · MIT licensed
+        </div>
+        <div class="footer-legal">
+          <span>Crafted for Mac power users</span>
+          <span class="dot-sep">•</span>
+          <a href="https://github.com/Suraj1089/pulse" target="_blank" rel="noopener">Star on GitHub</a>
+        </div>
+      </div>
+    </div>
+  </footer>
 
   <script>
     function copyInstallCmd() {
