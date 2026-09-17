@@ -686,6 +686,47 @@
       color: var(--text-subtle);
     }
 
+    .badge-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: color 0.15s;
+    }
+    .badge-link:hover {
+      color: var(--text);
+    }
+    .badge-link svg {
+      color: var(--text-subtle);
+    }
+
+    .btn-stat-count {
+      font-size: 11.5px;
+      font-weight: 600;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      padding: 1px 7px;
+      border-radius: 999px;
+      color: #374151;
+      margin-left: 2px;
+    }
+
+    .nav-github-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .nav-stars-pill {
+      font-size: 11px;
+      font-weight: 600;
+      background: #f3f4f6;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 1px 6px;
+      color: #4b5563;
+    }
+
     /* Responsive */
     @media (max-width: 900px) {
       .hero-container {
@@ -712,7 +753,10 @@
       <span>Pulse</span>
     </a>
     <div class="nav-actions">
-      <a href="https://github.com/Suraj1089/pulse" target="_blank" rel="noopener" class="nav-link">GitHub</a>
+      <a href="https://github.com/Suraj1089/pulse" target="_blank" rel="noopener" class="nav-link nav-github-link">
+        GitHub
+        <span class="nav-stars-pill" id="navStarPill">★ 0</span>
+      </a>
       <a href="https://github.com/Suraj1089/pulse/releases/latest" target="_blank" rel="noopener" class="nav-link">Releases</a>
       <a href="https://github.com/Suraj1089/pulse/releases/latest/download/Pulse-1.0.0.dmg" class="btn-nav-download">Download</a>
     </div>
@@ -743,12 +787,23 @@
         </a>
         <a href="https://github.com/Suraj1089/pulse" target="_blank" rel="noopener" class="btn-secondary">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-          View on GitHub
+          <span>Star on GitHub</span>
+          <span class="btn-stat-count" id="btnStarCount">★ 0</span>
         </a>
       </div>
 
       <div class="hero-badges">
-        Free and open source <span>•</span> No background bloat <span>•</span> Built for productivity
+        <a href="https://github.com/Suraj1089/pulse/releases" target="_blank" rel="noopener" class="badge-link">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span id="heroDownloadCount">0</span> downloads
+        </a>
+        <span>•</span>
+        <a href="https://github.com/Suraj1089/pulse" target="_blank" rel="noopener" class="badge-link">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+          <span id="heroStarCount">0</span> stars
+        </a>
+        <span>•</span>
+        <span>Free & open source</span>
       </div>
     </div>
 
@@ -1075,6 +1130,49 @@
         });
       }
     });
+
+    // Fetch live GitHub Stars and Downloads
+    async function fetchGitHubStats() {
+      try {
+        const repoRes = await fetch('https://api.github.com/repos/Suraj1089/pulse');
+        if (repoRes.ok) {
+          const repo = await repoRes.json();
+          const stars = repo.stargazers_count ?? 0;
+          const starsFormatted = stars >= 1000 ? (stars / 1000).toFixed(1) + 'k' : stars.toLocaleString();
+          const btnStar = document.getElementById('btnStarCount');
+          if (btnStar) btnStar.textContent = '★ ' + starsFormatted;
+          const navStar = document.getElementById('navStarPill');
+          if (navStar) navStar.textContent = '★ ' + starsFormatted;
+          const heroStar = document.getElementById('heroStarCount');
+          if (heroStar) heroStar.textContent = starsFormatted;
+        }
+      } catch (e) {
+        console.debug('Failed to fetch stars', e);
+      }
+
+      try {
+        const relRes = await fetch('https://api.github.com/repos/Suraj1089/pulse/releases');
+        if (relRes.ok) {
+          const releases = await relRes.json();
+          let totalDownloads = 0;
+          if (Array.isArray(releases)) {
+            for (const r of releases) {
+              if (Array.isArray(r.assets)) {
+                for (const a of r.assets) {
+                  totalDownloads += (a.download_count || 0);
+                }
+              }
+            }
+          }
+          const dlFormatted = totalDownloads >= 1000 ? (totalDownloads / 1000).toFixed(1) + 'k' : totalDownloads.toLocaleString();
+          const heroDl = document.getElementById('heroDownloadCount');
+          if (heroDl) heroDl.textContent = dlFormatted;
+        }
+      } catch (e) {
+        console.debug('Failed to fetch downloads', e);
+      }
+    }
+    fetchGitHubStats();
   </script>
 </body>
 </html>
