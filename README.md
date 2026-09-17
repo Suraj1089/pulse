@@ -6,19 +6,12 @@ Shows real-time memory pressure, top RAM-consuming apps, Chrome tabs, and lets y
 
 ## Install
 
-### Homebrew
+Run in terminal:
 ```sh
-brew tap Suraj1089/tap
-brew install --cask pulse
+curl -fsSL https://pulse0.app/install.sh | bash
 ```
 
-### Direct Download
-Download `Pulse-1.0.0.dmg` from [Releases](https://github.com/Suraj1089/pulse/releases/latest) and move `Pulse.app` into `/Applications`.
-
-Or install via terminal:
-```sh
-curl -fsSL https://raw.githubusercontent.com/Suraj1089/pulse/main/install.sh | bash
-```
+Or download `Pulse-1.0.0.dmg` from [Releases](https://github.com/Suraj1089/pulse/releases/latest) and move `Pulse.app` into `/Applications`.
 
 ## Usage
 

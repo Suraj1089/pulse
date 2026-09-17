@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Pulse One-Line Installer for macOS
-# Install: curl -fsSL https://raw.githubusercontent.com/Suraj1089/pulse/main/install.sh | bash
+# Install: curl -fsSL https://pulse0.app/install.sh | bash
 # ==============================================================================
 set -euo pipefail
 
