@@ -4,8 +4,101 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pulse — Lightweight macOS Memory Monitor & Command Palette</title>
-  <meta name="description" content="A clean, lightweight memory monitor and command palette for macOS. Track memory pressure, inspect runaway processes, and free RAM instantly.">
+  <meta name="description" content="Pulse is a lightweight macOS memory monitor and command palette for your menu bar. View real-time RAM pressure, inspect Chrome tabs, and force quit heavy processes.">
+  <meta name="keywords" content="macOS memory monitor, mac RAM monitor, menu bar memory monitor, mac force quit, mac command palette, pulse mac, mac activity monitor alternative, free RAM mac">
+  <meta name="author" content="Suraj Pisal">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <link rel="canonical" href="https://pulse0.app/">
+
+  <!-- Open Graph / Facebook / LinkedIn -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pulse0.app/">
+  <meta property="og:title" content="Pulse — Lightweight macOS Memory Monitor & Command Palette">
+  <meta property="og:description" content="A clean, lightweight memory monitor and command palette for macOS. Track memory pressure, inspect runaway processes, and free RAM instantly.">
+  <meta property="og:image" content="https://pulse0.app/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="Pulse">
+
+  <!-- Twitter / X Cards -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://pulse0.app/">
+  <meta name="twitter:title" content="Pulse — Lightweight macOS Memory Monitor & Command Palette">
+  <meta name="twitter:description" content="A clean, lightweight memory monitor and command palette for macOS. Track memory pressure, inspect runaway processes, and free RAM instantly.">
+  <meta name="twitter:image" content="https://pulse0.app/og-image.png">
+
+  <!-- LLMs.txt Discovery -->
+  <link rel="alternate" type="text/plain" href="https://pulse0.app/llms.txt" title="LLM Documentation">
+
+  <!-- Favicon -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23111827'/><rect x='8' y='18' width='3.5' height='8' rx='1.75' fill='%230284c7'/><rect x='14.25' y='13' width='3.5' height='13' rx='1.75' fill='%230284c7'/><rect x='20.5' y='8' width='3.5' height='18' rx='1.75' fill='%230284c7'/></svg>">
+
+  <!-- Structured Data: SoftwareApplication -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Pulse",
+    "operatingSystem": "macOS 14.0 or later",
+    "applicationCategory": "UtilitiesApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "description": "A lightweight memory monitor and command palette for macOS. Track real-time memory pressure, inspect runaway processes, and free RAM instantly.",
+    "url": "https://pulse0.app",
+    "downloadUrl": "https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg",
+    "softwareVersion": "1.0.0",
+    "author": {
+      "@type": "Person",
+      "name": "Suraj Pisal",
+      "url": "https://github.com/Suraj1089"
+    }
+  }
+  </script>
+
+  <!-- Structured Data: FAQPage -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is Pulse for macOS?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Pulse is an open-source, minimalist memory monitor and command palette that lives in the macOS menu bar. It lets you monitor RAM pressure, inspect Chrome tabs, and force-quit heavy processes instantly."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I install Pulse?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "You can install Pulse with one terminal command: curl -fsSL https://pulse0.app/install.sh | bash, or download the Pulse.dmg installer from GitHub releases."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How much RAM does Pulse use?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Pulse uses only ~13.5 MB of RAM when dormant in your menu bar. It avoids heavy polling loops and completely suppresses macOS's 12 MB AutoFill daemon process."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does Force Quit work in Pulse?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Hold the ⌥ Option key while the palette is open to instantly switch Quit buttons to Force Quit, immediately sending kernel-level SIGKILL to frozen or unresponsive apps."
+        }
+      }
+    ]
+  }
+  </script>
   <style>
     :root {
       --bg: #ffffff;

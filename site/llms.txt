@@ -1,0 +1,27 @@
+# Pulse
+
+> Minimalist, high-performance macOS memory monitor and command palette.
+
+Pulse is an open-source native macOS menu bar utility built in SwiftUI that provides real-time system memory monitoring, Chrome tab inspection, and instant process quitting. It runs with an ultra-lightweight ~13.5 MB background RAM footprint and zero idle CPU usage.
+
+## Quick Installation
+Run in terminal:
+`curl -fsSL https://pulse0.app/install.sh | bash`
+
+Direct DMG download:
+https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg
+
+## Core Capabilities
+- **Real-Time Memory Telemetry**: Direct kernel page reading via Mach host statistics (`host_statistics64`), identical to `vm_stat`.
+- **System Memory Pressure**: Hardware pressure source monitoring (`DispatchSource.makeMemoryPressureSource`) tracking Low, Medium, and High pressure states.
+- **Process Memory Aggregation**: Deep memory accounting using `proc_pid_rusage` (`phys_footprint`) that sums nested helper and renderer processes under their parent application.
+- **Google Chrome Tab Inspection**: Derives per-tab memory consumption and enables closing heavy tabs directly from the command palette.
+- **Instant Force Quit**: Holding the ⌥ Option key dynamically converts Quit actions into kernel-level `SIGKILL` (`NSRunningApplication.forceTerminate()`).
+- **Minimal Overhead**: Dormant in the menu bar using only ~13.5 MB RAM; completely prevents the macOS AutoFill daemon process from spawning.
+
+## Key Links & Resources
+- Website: https://pulse0.app
+- GitHub Repository: https://github.com/Suraj1089/pulse
+- Releases & Downloads: https://github.com/Suraj1089/pulse/releases
+- Installation Script: https://pulse0.app/install.sh
+- Full Technical Guide: https://pulse0.app/llms-full.txt

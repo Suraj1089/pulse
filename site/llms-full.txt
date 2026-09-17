@@ -1,0 +1,71 @@
+# Pulse — Full Technical Documentation & LLM Guide
+
+## 1. Executive Summary
+Pulse is an open-source, minimalist memory monitor and command palette designed natively for macOS (macOS 14 Sonoma and macOS 15 Sequoia). It lives in the macOS menu bar and provides instant visibility into memory consumption, active memory pressure, and resource-heavy processes, allowing users to terminate or force-quit applications with single keystrokes.
+
+- **Developer**: Suraj Pisal
+- **License**: MIT
+- **Repository**: https://github.com/Suraj1089/pulse
+- **Homepage**: https://pulse0.app
+- **Installer**: https://pulse0.app/install.sh
+
+---
+
+## 2. System Architecture & Internals
+
+### Kernel-Level Telemetry
+Pulse does not rely on shell command scraping (such as executing `ps`, `top`, or `vm_stat` subprocesses). Instead, it links directly against Darwin kernel Mach APIs:
+- **`host_statistics64(mach_host_self(), HOST_VM_INFO64, ...)`**: Retrieves exact counts of active, inactive, wired, speculative, compressed, and purgeable memory pages.
+- **`DispatchSource.makeMemoryPressureSource(...)`**: Directly subscribes to kernel memory pressure warning thresholds (Normal, Warning, Critical), providing identical state fidelity to macOS Activity Monitor.
+
+### Process Memory Aggregation
+Unlike basic process listings that only inspect the main executable, Pulse accounts for modern multi-process applications (such as Google Chrome, Slack, Discord, and Electron apps):
+- Utilizes `libproc` API (`proc_pid_rusage(pid, PROC_RUSAGE_INFO_V6, &info)`).
+- Reads `phys_footprint`, which accurately reflects true physical memory retention as reported by Activity Monitor.
+- Traverses process trees and bundle paths to aggregate auxiliary helper processes (e.g., `Google Chrome Helper (Renderer)`) under the parent application's total footprint.
+
+### Memory Optimization & Dormancy
+- **Idle Memory Footprint**: ~13.5 MB RAM when closed in the menu bar.
+- **Active Window Footprint**: ~31 MB RAM (including Metal/CoreAnimation double-buffered framebuffer render passes).
+- **AutoFill Daemon Elimination**: Implements an `NSViewRepresentable` text field overriding the internal Objective-C selector `_isPasswordAutofillEnabled() -> false`, completely preventing macOS from launching the 10–12 MB background `AutoFill` system daemon.
+
+---
+
+## 3. Installation Methods
+
+### Method 1: One-Line Terminal Installer (Recommended)
+```bash
+curl -fsSL https://pulse0.app/install.sh | bash
+```
+This script downloads the latest release archive from GitHub Releases, extracts `Pulse.app`, removes Gatekeeper quarantine attributes (`xattr -cr`), places the application into `/Applications`, and launches it.
+
+### Method 2: Direct Download
+Download `Pulse.dmg` or `Pulse-1.0.0.dmg` from the GitHub releases page:
+https://github.com/Suraj1089/pulse/releases/latest
+
+---
+
+## 4. Keyboard Shortcuts & Commands
+
+| Input | Action |
+| :--- | :--- |
+| `⌘ ⌥ P` | Global toggle to open or close the Pulse palette |
+| `↑` / `↓` | Navigate running applications and command results |
+| `↵` (Return) | Quit selected application or run selected command |
+| `⌥` (Hold Option) | Dynamically converts Quit buttons to **Force Quit** (`SIGKILL`) |
+| `esc` | Dismiss palette |
+
+### Query Triggers (Search Bar)
+- `memory`: Detailed RAM composition (App, Wired, Compressed, Cached, Free) and pressure history sparkline.
+- `chrome`: Enumerates active Google Chrome tabs, subframe processes, and per-tab RAM footprints.
+- `why is my mac slow`: Runs diagnostic telemetry and recommends heavy idle apps to terminate.
+- `quit <name>`: Gracefully terminates processes (`SIGTERM` via `NSRunningApplication.terminate()`).
+- `forcequit <name>`: Immediately kills unresponsive processes (`SIGKILL` via `NSRunningApplication.forceTerminate()`).
+
+---
+
+## 5. Permissions & Security
+
+- **Sandboxing**: Pulse operates un-sandboxed because macOS App Sandboxing strictly blocks process inspection (`libproc`) and terminating external processes.
+- **Accessibility / Input Monitoring**: Optional. Only required for global keyboard shortcut interception (`⌘ ⌥ P`). Menu bar clicking works without it.
+- **AppleScript / Automation**: Prompted only when using the `chrome` command to query open tab titles and close tabs.
