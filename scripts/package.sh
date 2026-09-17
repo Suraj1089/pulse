@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${1:-${VERSION:-1.0.0}}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+VERSION="${1:-${VERSION:-}}"
+if [ -z "$VERSION" ] && [ -f "$REPO_ROOT/VERSION" ]; then
+    VERSION=$(tr -d '[:space:]' < "$REPO_ROOT/VERSION")
+fi
+VERSION="${VERSION:-1.0.0}"
+
 DIST_DIR="$REPO_ROOT/dist"
 APP_BUNDLE="$DIST_DIR/Pulse.app"
 DMG_STAGING="$DIST_DIR/dmg_staging"
@@ -24,6 +29,9 @@ chmod +x "$APP_BUNDLE/Contents/MacOS/Pulse"
 
 if [ -f "$REPO_ROOT/Sources/Pulse/Resources/Info.plist" ]; then
     cp "$REPO_ROOT/Sources/Pulse/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
+    # Inject version into Info.plist
+    plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true
+    plutil -replace CFBundleVersion -string "$VERSION" "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true
 fi
 
 echo "==> Ad-hoc code signing the application..."
