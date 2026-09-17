@@ -9,19 +9,11 @@ REPO="Suraj1089/pulse"
 APP_NAME="Pulse.app"
 INSTALL_DIR="/Applications"
 
-echo "==> Fetching latest release of Pulse..."
-LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-
-if [ -z "$LATEST_TAG" ]; then
-    LATEST_TAG="v1.0.0"
-fi
-
-VERSION="${LATEST_TAG#v}"
-ZIP_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/Pulse-$VERSION.zip"
-TMP_ZIP="/tmp/Pulse-$VERSION.zip"
+ZIP_URL="https://github.com/$REPO/releases/latest/download/Pulse.zip"
+TMP_ZIP="/tmp/Pulse.zip"
 TMP_DIR="/tmp/Pulse_extract"
 
-echo "==> Downloading Pulse $LATEST_TAG..."
+echo "==> Downloading Pulse..."
 curl -fsSL -L "$ZIP_URL" -o "$TMP_ZIP"
 
 echo "==> Installing to $INSTALL_DIR..."
@@ -43,7 +35,7 @@ xattr -cr "$INSTALL_DIR/$APP_NAME" 2>/dev/null || true
 rm -rf "$TMP_ZIP" "$TMP_DIR"
 
 echo "=========================================================="
-echo "  Pulse $LATEST_TAG installed successfully to $INSTALL_DIR!"
+echo "  Pulse installed successfully to $INSTALL_DIR!"
 echo "  Opening Pulse..."
 echo "=========================================================="
 
