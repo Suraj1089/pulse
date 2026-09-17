@@ -1,9 +1,8 @@
-# MemBar
+# Pulse
 
 See what's eating your RAM and quit it — a Raycast-style memory monitor for your Mac's menu bar, showing memory
 pressure, top memory users, and quit/close actions. Implemented in SwiftUI from the
-[`design/project/MemPalette.dc.html`](design/project/MemPalette.dc.html) handoff design in this repo (the design's
-working title was "MemPalette" — see [`design/`](design/) for the original handoff bundle and chat transcript).
+[`design/project/MemPalette.dc.html`](design/project/MemPalette.dc.html) handoff design in this repo.
 
 This build runs on **real system data**: live kernel memory stats, real per-app memory footprint, real app icons,
 real quitting, and real Chrome tab titles. Nothing in the UI is hardcoded — see [Known limitations](#known-limitations)
@@ -21,16 +20,16 @@ for the one thing that's a real signal but not an exact one (per-tab memory), an
 ### Method 1: Homebrew (Recommended)
 ```sh
 brew tap Suraj1089/tap
-brew install --cask membar
+brew install --cask pulse
 ```
 
 ### Method 2: One-Line Terminal Installer
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Suraj1089/MemBar/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Suraj1089/pulse/main/install.sh | bash
 ```
 
 ### Method 3: Direct Download (.dmg)
-Download the latest `MemBar-1.0.0.dmg` from [GitHub Releases](https://github.com/Suraj1089/MemBar/releases/latest), open it, and drag `MemBar.app` into `/Applications`.
+Download the latest `Pulse-1.0.0.dmg` from [GitHub Releases](https://github.com/Suraj1089/pulse/releases/latest), open it, and drag `Pulse.app` into `/Applications`.
 
 ---
 
@@ -40,10 +39,10 @@ Download the latest `MemBar-1.0.0.dmg` from [GitHub Releases](https://github.com
 swift run
 ```
 
-or open `Package.swift` in Xcode and run the `MemBar` scheme.
+or open `Package.swift` in Xcode and run the `Pulse` scheme.
 
 The app is menu-bar only (no Dock icon): look for the small four-block icon in the menu bar, whose filled-cell
-count tracks live pressure. Click it to open the palette, or press `⌘⌥M` (see [Permissions](#permissions)).
+count tracks live pressure. Click it to open the palette, or press `⌘⌥P` (see [Permissions](#permissions)).
 Type `memory`, `why is my mac slow`, `chrome`, or `what can I close` to see the other states — everything routes
 off the same live data, so what you see always matches what's actually running.
 
@@ -52,10 +51,10 @@ off the same live data, so what you see always matches what's actually running.
 Two features are gated behind macOS's standard permission prompts; without them, the app degrades gracefully
 rather than crashing or hanging:
 
-- **`⌘⌥M` global shortcut** — needs Accessibility (or Input Monitoring) access, under System Settings → Privacy &
+- **`⌘⌥P` global shortcut** — needs Accessibility (or Input Monitoring) access, under System Settings → Privacy &
   Security. Without it, the shortcut just doesn't fire; opening the palette by clicking the menu bar icon still
   works.
-- **Chrome tab breakdown** — the first time you type `chrome`, macOS prompts for Automation access to let MemBar
+- **Chrome tab breakdown** — the first time you type `chrome`, macOS prompts for Automation access to let Pulse
   control Google Chrome (this is how the "chrome" state reads real tab titles and closes tabs). Without it, that
   state shows an explanatory empty state instead of tab data.
 
@@ -74,9 +73,9 @@ may re-prompt across rebuilds during development — that's expected, not a bug.
 - **App icons** — `NSRunningApplication.icon`, not a color swatch.
 - **Quitting** — `NSRunningApplication.terminate()`. Real, not decorative.
 - **Idle duration** — tracked from `NSWorkspace` activation notifications since the app launched. A freshly
-  launched MemBar won't yet know an app's been idle for hours; that knowledge builds up the longer it runs.
+  launched Pulse won't yet know an app's been idle for hours; that knowledge builds up the longer it runs.
 - **Chrome tab titles/URLs, and closing tabs** — real, via AppleScript (see Permissions above).
 
 ## Known limitations
 
-- **Chrome per-tab memory is real, but represents a lower bound.** MemBar derives per-tab footprint by pairing renderer birth bursts with tab open/navigation events via `sysctl(KERN_PROCARGS2)` and `libproc`. If a tab embeds an iframe whose site already shares an existing renderer process, that shared memory is not duplicated into the new tab's count. Tab memory figures are therefore an honest lower bound, denoted with "≈" alongside real process and subframe counts. Unmeasured tabs (e.g. from session restore or bulk opens) are displayed as "—" rather than guessed or estimated.
+- **Chrome per-tab memory is real, but represents a lower bound.** Pulse derives per-tab footprint by pairing renderer birth bursts with tab open/navigation events via `sysctl(KERN_PROCARGS2)` and `libproc`. If a tab embeds an iframe whose site already shares an existing renderer process, that shared memory is not duplicated into the new tab's count. Tab memory figures are therefore an honest lower bound, denoted with "≈" alongside real process and subframe counts. Unmeasured tabs (e.g. from session restore or bulk opens) are displayed as "—" rather than guessed or estimated.

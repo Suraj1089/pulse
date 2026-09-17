@@ -22,7 +22,7 @@ struct HelpStateView: View {
             SectionHeader(title: "Keyboard shortcuts").padding(.top, 14).padding(.bottom, 6)
 
             VStack(spacing: 4) {
-                shortcutRow(keys: "⌘ ⌥ M", desc: "Toggle MemBar palette from anywhere", theme: theme)
+                shortcutRow(keys: "⌘ ⌥ P", desc: "Toggle Pulse palette from anywhere", theme: theme)
                 shortcutRow(keys: "↵", desc: "Execute command or quit selected app", theme: theme)
                 shortcutRow(keys: "↑ ↓", desc: "Navigate suggestions and app lists", theme: theme)
                 shortcutRow(keys: "esc", desc: "Close command palette", theme: theme)

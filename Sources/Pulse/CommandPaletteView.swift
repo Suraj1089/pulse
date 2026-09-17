@@ -10,8 +10,8 @@ struct CommandPaletteView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Brand header: Logo, MemBar, Find. Free. Focus., RAM progress
-            MemBarBrandHeader(
+            // Brand header: Logo, Pulse, Find. Free. Focus., RAM progress
+            PulseBrandHeader(
                 usedGB: model.usedGB,
                 totalGB: model.totalGB,
                 level: model.level

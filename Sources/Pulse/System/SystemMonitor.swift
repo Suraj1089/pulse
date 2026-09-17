@@ -16,7 +16,7 @@ final class SystemMonitor: ObservableObject {
     private let appsMonitor = RunningAppsMonitor()
     private let chromeInventory = ChromeProcessInventory()
     private let tabTracker = TabMemoryTracker()
-    private let workQueue = DispatchQueue(label: "app.membar.system-monitor", qos: .utility)
+    private let workQueue = DispatchQueue(label: "app.pulse.system-monitor", qos: .utility)
 
     private var fastTimer: Timer?
     private var historyTimer: Timer?

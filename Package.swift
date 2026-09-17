@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "MemBar",
+    name: "Pulse",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "MemBar",
-            path: "Sources/MemBar",
+            name: "Pulse",
+            path: "Sources/Pulse",
             // Info.plist is embedded via the linker flag below, not SPM's
             // resource bundling — exclude it from automatic source/resource
             // discovery so it isn't also copied into a resource bundle.
@@ -21,7 +21,7 @@ let package = Package(
                     "-Xlinker", "-sectcreate",
                     "-Xlinker", "__TEXT",
                     "-Xlinker", "__info_plist",
-                    "-Xlinker", "Sources/MemBar/Resources/Info.plist",
+                    "-Xlinker", "Sources/Pulse/Resources/Info.plist",
                 ])
             ]
         )

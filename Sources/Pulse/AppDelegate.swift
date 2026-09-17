@@ -153,8 +153,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// register and the status-item click remains the primary way in.
     private func registerHotKeyMonitor() {
         hotKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, event.modifierFlags.contains([.command, .option]),
-                  event.charactersIgnoringModifiers?.lowercased() == "m" else { return }
+            guard let self, event.modifierFlags.contains([.command, .option]) else { return }
+            let char = event.charactersIgnoringModifiers?.lowercased()
+            guard char == "p" || char == "m" else { return }
             DispatchQueue.main.async { self.openPanel(centered: true) }
         }
     }

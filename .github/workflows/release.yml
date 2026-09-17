@@ -1,4 +1,4 @@
-name: Release MemBar
+name: Release Pulse
 
 on:
   push:
@@ -28,8 +28,7 @@ jobs:
           files: |
             dist/*.dmg
             dist/*.zip
-            dist/membar.rb
+            dist/pulse.rb
           draft: false
           prerelease: false
           generate_release_notes: true
-EOF

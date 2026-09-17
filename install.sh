@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# MemBar One-Line Installer for macOS
-# Install: curl -fsSL https://raw.githubusercontent.com/Suraj1089/MemBar/main/install.sh | bash
+# Pulse One-Line Installer for macOS
+# Install: curl -fsSL https://raw.githubusercontent.com/Suraj1089/pulse/main/install.sh | bash
 # ==============================================================================
 set -euo pipefail
 
-REPO="Suraj1089/MemBar"
-APP_NAME="MemBar.app"
+REPO="Suraj1089/pulse"
+APP_NAME="Pulse.app"
 INSTALL_DIR="/Applications"
 
-echo "==> Fetching latest release of MemBar..."
+echo "==> Fetching latest release of Pulse..."
 LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -z "$LATEST_TAG" ]; then
@@ -17,11 +17,11 @@ if [ -z "$LATEST_TAG" ]; then
 fi
 
 VERSION="${LATEST_TAG#v}"
-ZIP_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/MemBar-$VERSION.zip"
-TMP_ZIP="/tmp/MemBar-$VERSION.zip"
-TMP_DIR="/tmp/MemBar_extract"
+ZIP_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/Pulse-$VERSION.zip"
+TMP_ZIP="/tmp/Pulse-$VERSION.zip"
+TMP_DIR="/tmp/Pulse_extract"
 
-echo "==> Downloading MemBar $LATEST_TAG..."
+echo "==> Downloading Pulse $LATEST_TAG..."
 curl -fsSL -L "$ZIP_URL" -o "$TMP_ZIP"
 
 echo "==> Installing to $INSTALL_DIR..."
@@ -30,7 +30,7 @@ mkdir -p "$TMP_DIR"
 unzip -q -o "$TMP_ZIP" -d "$TMP_DIR"
 
 # Kill existing instance if running
-pkill -x MemBar 2>/dev/null || true
+pkill -x Pulse 2>/dev/null || true
 
 # Copy into /Applications
 rm -rf "$INSTALL_DIR/$APP_NAME"
@@ -43,8 +43,8 @@ xattr -cr "$INSTALL_DIR/$APP_NAME" 2>/dev/null || true
 rm -rf "$TMP_ZIP" "$TMP_DIR"
 
 echo "=========================================================="
-echo "  MemBar $LATEST_TAG installed successfully to $INSTALL_DIR!"
-echo "  Opening MemBar..."
+echo "  Pulse $LATEST_TAG installed successfully to $INSTALL_DIR!"
+echo "  Opening Pulse..."
 echo "=========================================================="
 
 open "$INSTALL_DIR/$APP_NAME"

@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Premium header matching the minimalist design:
-/// Brand badge icon, "MemBar", "Find. Free. Focus.", RAM fraction & slim progress bar.
-struct MemBarBrandHeader: View {
+/// Brand badge icon, "Pulse", "Find. Free. Focus.", RAM fraction & slim progress bar.
+struct PulseBrandHeader: View {
     @Environment(\.colorScheme) private var scheme
     let usedGB: Double
     let totalGB: Double
@@ -41,7 +41,7 @@ struct MemBarBrandHeader: View {
             .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("MemBar")
+                Text("Pulse")
                     .font(Fonts.title)
                     .foregroundStyle(theme.textPrimary)
 

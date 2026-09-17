@@ -3,16 +3,18 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>app.membar</string>
+	<string>app.pulse</string>
 	<key>CFBundleName</key>
-	<string>MemBar</string>
+	<string>Pulse</string>
+	<key>CFBundleDisplayName</key>
+	<string>Pulse</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>1.0.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>MemBar reads open tab titles from Google Chrome to show a per-tab breakdown, and can close tabs you choose from there.</string>
+	<string>Pulse reads open tab titles from Google Chrome to show a per-tab breakdown, and can close tabs you choose from there.</string>
 </dict>
 </plist>
