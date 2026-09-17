@@ -208,6 +208,22 @@ struct SlashCommand: Identifiable, Equatable {
             iconName: "exclamationmark.triangle.fill",
             example: "/slow",
             template: "/slow"
+        ),
+        SlashCommand(
+            name: "/version",
+            trigger: "/version",
+            description: "Show current Pulse version and check for updates",
+            iconName: "info.circle.fill",
+            example: "/version",
+            template: "/version"
+        ),
+        SlashCommand(
+            name: "/update",
+            trigger: "/update",
+            description: "Download and install the latest version of Pulse",
+            iconName: "arrow.down.circle.fill",
+            example: "/update",
+            template: "/update"
         )
     ]
 }

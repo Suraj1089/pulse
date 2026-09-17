@@ -34,6 +34,8 @@ struct CommandPaletteView: View {
                     case .close: CloseStateView(model: model)
                     case .chromeTabs: ChromeTabsStateView(model: model)
                     case .help: HelpStateView(model: model)
+                    case .version: UpdateStateView(model: model)
+                    case .update: UpdateStateView(model: model)
                     case .quitCommand(let appQuery, let isForce): QuitCommandStateView(model: model, appQuery: appQuery, isForce: isForce)
                     case .commandSuggestions(let filter): CommandSuggestionsView(model: model, filter: filter)
                     case .noMatch: NoMatchStateView()
@@ -45,7 +47,8 @@ struct CommandPaletteView: View {
             // Modern minimalist footer
             ModernFooterView(
                 onSettings: { model.query = "/help" },
-                onQuitAll: handleQuitAll
+                onQuitAll: handleQuitAll,
+                onUpdate: { model.query = "/update" }
             )
         }
         .frame(width: Metrics.windowWidth, height: 490)

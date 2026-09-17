@@ -8,6 +8,8 @@ enum PaletteState: Equatable {
     case close
     case chromeTabs
     case help
+    case version
+    case update
     case quitCommand(appQuery: String, isForce: Bool = false)
     case commandSuggestions(filter: String)
     case noMatch
@@ -133,7 +135,15 @@ final class PaletteViewModel: ObservableObject {
                 return .diagnosis
             }
 
-            // Incomplete slash command (e.g. "/", "/q", "/f", "/he")
+            if withoutSlash == "version" || withoutSlash == "v" {
+                return .version
+            }
+
+            if withoutSlash == "update" || withoutSlash == "upgrade" || withoutSlash == "upd" {
+                return .update
+            }
+
+
             let matches = SlashCommand.all.filter {
                 withoutSlash.isEmpty ||
                 $0.trigger.lowercased().contains(withoutSlash) ||
@@ -165,6 +175,8 @@ final class PaletteViewModel: ObservableObject {
         if lower.contains("chrome") || lower.contains("tab") { return .chromeTabs }
         if lower.contains("memory") || lower.contains("ram") { return .memory }
         if lower.contains("close") { return .close }
+        if lower == "version" || lower.contains("what version") { return .version }
+        if lower == "update" || lower == "upgrade" || lower.contains("check update") || lower.contains("new version") { return .update }
 
         return .noMatch
     }
