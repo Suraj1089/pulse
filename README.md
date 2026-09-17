@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/icon.png" alt="Pulse icon" width="120" />
+
 # Pulse
 
 **Minimalist, real-time memory monitor & command palette for macOS.**
