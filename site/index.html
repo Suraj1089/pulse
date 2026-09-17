@@ -218,11 +218,18 @@
     .btn-secondary:hover { background: #e5e7eb; }
 
     .hero-badges {
-      font-size: 12.5px;
-      color: var(--text-subtle);
+      font-size: 13px;
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: nowrap;
+      white-space: nowrap;
     }
-    .hero-badges span {
-      margin: 0 6px;
+    .hero-badges .dot-sep {
+      color: var(--text-subtle);
+      user-select: none;
+      font-size: 11px;
     }
 
     /* Realistic Laptop Bezel & Screen */
@@ -795,14 +802,14 @@
       <div class="hero-badges">
         <a href="https://github.com/Suraj1089/pulse/releases" target="_blank" rel="noopener" class="badge-link">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-          <span id="heroDownloadCount">0</span> downloads
+          <span><span id="heroDownloadCount">0</span> downloads</span>
         </a>
-        <span>•</span>
+        <span class="dot-sep">•</span>
         <a href="https://github.com/Suraj1089/pulse" target="_blank" rel="noopener" class="badge-link">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-          <span id="heroStarCount">0</span> stars
+          <span><span id="heroStarCount">0</span> stars</span>
         </a>
-        <span>•</span>
+        <span class="dot-sep">•</span>
         <span>Free & open source</span>
       </div>
     </div>
@@ -1155,7 +1162,15 @@
         if (relRes.ok) {
           const releases = await relRes.json();
           let totalDownloads = 0;
-          if (Array.isArray(releases)) {
+          if (Array.isArray(releases) && releases.length > 0) {
+            const latest = releases[0];
+            const dmg = latest.assets?.find(a => a.name.endsWith('.dmg'));
+            if (dmg && dmg.browser_download_url) {
+              document.querySelectorAll('a[href*=".dmg"]').forEach(link => {
+                link.href = dmg.browser_download_url;
+              });
+            }
+
             for (const r of releases) {
               if (Array.isArray(r.assets)) {
                 for (const a of r.assets) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.0.0"
+VERSION="${1:-${VERSION:-1.0.0}}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIST_DIR="$REPO_ROOT/dist"
 APP_BUNDLE="$DIST_DIR/Pulse.app"
@@ -45,6 +45,10 @@ hdiutil create -volname "Pulse" \
     "$DIST_DIR/$DMG_NAME"
 
 rm -rf "$DMG_STAGING"
+
+# Also create canonical unversioned copies for permanent direct download links
+cp "$DIST_DIR/$DMG_NAME" "$DIST_DIR/Pulse.dmg"
+cp "$DIST_DIR/$ZIP_NAME" "$DIST_DIR/Pulse.zip"
 
 echo "==> Computing SHA-256 Checksums..."
 DMG_SHA=$(shasum -a 256 "$DIST_DIR/$DMG_NAME" | awk '{print $1}')
