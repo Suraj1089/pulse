@@ -5,7 +5,6 @@ struct ModernFooterView: View {
     @Environment(\.colorScheme) private var scheme
     @ObservedObject private var checker = UpdateChecker.shared
     var onSettings: () -> Void = {}
-    var onQuitAll: () -> Void = {}
     var onUpdate: () -> Void = {}
 
     var body: some View {
@@ -50,24 +49,16 @@ struct ModernFooterView: View {
                 Spacer()
             }
 
-            Button(action: onQuitAll) {
-                HStack(spacing: 6) {
-                    Text("Quit All")
+            Button {
+                NSApp.terminate(nil)
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "power")
+                        .font(.system(size: 10.5, weight: .medium))
+                    Text("Quit Pulse")
                         .font(.system(size: 11.5, weight: .medium))
-                        .foregroundStyle(theme.textSecondary)
-
-                    HStack(spacing: 2) {
-                        Text("⌥")
-                        Text("⌘")
-                        Text("Q")
-                    }
-                    .font(Fonts.monoTiny)
-                    .foregroundStyle(theme.hint)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(theme.pillBackground, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(theme.pillBorder, lineWidth: 0.8))
                 }
+                .foregroundStyle(theme.textSecondary)
                 .padding(.vertical, 4)
                 .padding(.horizontal, 6)
                 .contentShape(Rectangle())

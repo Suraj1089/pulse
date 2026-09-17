@@ -47,7 +47,6 @@ struct CommandPaletteView: View {
             // Modern minimalist footer
             ModernFooterView(
                 onSettings: { model.query = "/help" },
-                onQuitAll: handleQuitAll,
                 onUpdate: { model.query = "/update" }
             )
         }
@@ -116,12 +115,6 @@ struct CommandPaletteView: View {
             break
         default:
             break
-        }
-    }
-
-    private func handleQuitAll() {
-        for app in model.monitor.topApps.filter({ !$0.isFrontmost }).prefix(4) {
-            model.quit(pid: app.pid)
         }
     }
 }
