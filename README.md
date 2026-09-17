@@ -10,6 +10,14 @@
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Website](https://img.shields.io/badge/website-pulse0.app-black?style=flat-square)](https://pulse0.app)
 
+<br />
+<br />
+
+<img src="assets/preview.jpg" alt="Pulse - macOS Memory Monitor and Command Palette" width="480" />
+
+<br />
+<br />
+
 [**Download Pulse.dmg**](https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg) • [**Website**](https://pulse0.app) • [**Release Notes**](https://github.com/Suraj1089/pulse/releases)
 
 </div>
