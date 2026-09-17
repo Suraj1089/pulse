@@ -5,6 +5,7 @@ import AppKit
 /// processes are folded into one "Chrome" entry, matching how Activity
 /// Monitor groups multi-process apps.
 struct RunningAppUsage: Identifiable {
+    var id: pid_t { pid }
     let pid: pid_t
     let name: String
     let bundleIdentifier: String?
@@ -29,6 +30,7 @@ struct RunningAppUsage: Identifiable {
 /// session-bounded) idle durations.
 final class RunningAppsMonitor {
     private var lastActivation: [pid_t: Date] = [:]
+    private var iconCache: [pid_t: NSImage] = [:]
     private var monitorStartDate = Date()
     private var activationObserver: NSObjectProtocol?
 
@@ -51,6 +53,7 @@ final class RunningAppsMonitor {
             NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
         }
         activationObserver = nil
+        iconCache.removeAll()
     }
 
     /// Must be called on the main thread — it reads `NSWorkspace`/
@@ -62,21 +65,68 @@ final class RunningAppsMonitor {
         let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         let regularApps = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
 
+        // Clean icon cache of terminated apps if it grows too large
+        let currentPIDs = Set(regularApps.map(\.processIdentifier))
+        if iconCache.count > regularApps.count + 20 {
+            iconCache = iconCache.filter { currentPIDs.contains($0.key) }
+        }
+
+        // Fast index: PID -> ProcessSample
+        var procByPID: [pid_t: ProcessSample] = [:]
+        procByPID.reserveCapacity(processes.count)
+        for proc in processes {
+            procByPID[proc.pid] = proc
+        }
+
+        let appPrefixes: [(pid: pid_t, prefix: String)] = regularApps.compactMap { app in
+            guard let url = app.bundleURL else { return nil }
+            return (app.processIdentifier, url.path + "/")
+        }
+
+        // Map app PID to all its processes (main + helpers)
+        var appProcesses: [pid_t: [ProcessSample]] = [:]
+        for app in regularApps {
+            let pid = app.processIdentifier
+            if let mainProc = procByPID[pid] {
+                appProcesses[pid] = [mainProc]
+            } else {
+                appProcesses[pid] = []
+            }
+        }
+
+        for proc in processes {
+            guard let path = proc.executablePath else { continue }
+            for (appPID, prefix) in appPrefixes {
+                if proc.pid != appPID && path.hasPrefix(prefix) {
+                    appProcesses[appPID]?.append(proc)
+                    break
+                }
+            }
+        }
+
         let usages: [RunningAppUsage] = regularApps.compactMap { app in
             let pid = app.processIdentifier
-            let bundlePrefix = app.bundleURL.map { $0.path + "/" }
-            let matched = processes.filter { proc in
-                proc.pid == pid || (bundlePrefix != nil && proc.executablePath?.hasPrefix(bundlePrefix!) == true)
-            }
-            guard !matched.isEmpty else { return nil }
+            guard let matched = appProcesses[pid], !matched.isEmpty else { return nil }
 
             let totalBytes = matched.reduce(UInt64(0)) { $0 + $1.physFootprintBytes }
             let isFrontmost = pid == frontmostPID
+
+            let cachedIcon: NSImage?
+            if let icon = iconCache[pid] {
+                cachedIcon = icon
+            } else if let raw = app.icon {
+                let downsampled = Self.downsampleIcon(raw)
+                iconCache[pid] = downsampled
+                cachedIcon = downsampled
+            } else {
+                cachedIcon = nil
+            }
+
             return RunningAppUsage(
                 pid: pid,
                 name: app.localizedName ?? app.bundleIdentifier ?? "Unknown",
                 bundleIdentifier: app.bundleIdentifier,
-                icon: app.icon,
+                icon: cachedIcon,
                 footprintBytes: totalBytes,
                 processCount: matched.count,
                 isFrontmost: isFrontmost,
@@ -85,6 +135,49 @@ final class RunningAppsMonitor {
         }
 
         return usages.sorted { $0.footprintBytes > $1.footprintBytes }
+    }
+
+    func pruneCaches() {
+        let livePIDs = Set(NSWorkspace.shared.runningApplications.map(\.processIdentifier))
+        iconCache = iconCache.filter { livePIDs.contains($0.key) }
+    }
+
+    private static func downsampleIcon(_ original: NSImage, targetSize: NSSize = NSSize(width: 30, height: 30)) -> NSImage {
+        let scale: CGFloat = 2.0
+        let pixelWidth = Int(targetSize.width * scale)
+        let pixelHeight = Int(targetSize.height * scale)
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+
+        guard let context = CGContext(
+            data: nil,
+            width: pixelWidth,
+            height: pixelHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: pixelWidth * 4,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo.rawValue
+        ) else {
+            return original
+        }
+
+        context.interpolationQuality = .high
+        let rect = CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight)
+
+        var imageRect = CGRect(origin: .zero, size: original.size)
+        if let cgImage = original.cgImage(forProposedRect: &imageRect, context: nil, hints: nil) {
+            context.draw(cgImage, in: rect)
+        } else {
+            let nsContext = NSGraphicsContext(cgContext: context, flipped: false)
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = nsContext
+            original.draw(in: NSRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight))
+            NSGraphicsContext.restoreGraphicsState()
+        }
+
+        guard let downscaledCG = context.makeImage() else { return original }
+        return NSImage(cgImage: downscaledCG, size: targetSize)
     }
 
     func terminate(pid: pid_t, force: Bool) {

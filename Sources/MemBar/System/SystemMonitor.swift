@@ -2,15 +2,6 @@ import Foundation
 
 /// Owns every live data source (kernel memory stats, the pressure dispatch
 /// source, process enumeration, Chrome) and publishes what the views need.
-///
-/// Two different polling cadences, matching how expensive/volatile each
-/// source is: memory + top apps refresh every 3s (process enumeration over
-/// a few hundred processes is a few ms of work, cheap enough for that); the
-/// 30-sample "last 30 min" pressure history appends one real sample every
-/// 60s. Chrome is **not** polled continuously — `startWatchingChrome()` is
-/// only called while the palette is actually showing the Chrome-tabs state,
-/// both because AppleScript round-trips are comparatively slow and because
-/// the first call blocks on an Automation permission dialog.
 final class SystemMonitor: ObservableObject {
     @Published private(set) var memory: MemorySnapshot?
     @Published private(set) var pressureLevel: PressureLevel = .low
@@ -18,24 +9,42 @@ final class SystemMonitor: ObservableObject {
     @Published private(set) var pressureSamples: [Double] = []
     @Published private(set) var chromeTabs: [ChromeTab] = []
     @Published private(set) var chromeIsRunning = false
+    @Published private(set) var chromeDistribution: ChromeDistribution?
+    @Published private(set) var tabAttributions: [Int: TabAttribution] = [:]
 
     private let pressureMonitor = PressureMonitor()
     private let appsMonitor = RunningAppsMonitor()
+    private let chromeInventory = ChromeProcessInventory()
+    private let tabTracker = TabMemoryTracker()
     private let workQueue = DispatchQueue(label: "app.membar.system-monitor", qos: .utility)
 
     private var fastTimer: Timer?
     private var historyTimer: Timer?
     private var chromeTimer: Timer?
+    private var vmTimer: Timer?
+    private(set) var isPaletteVisible: Bool = false
 
     func start() {
-        pressureMonitor.onChange = { [weak self] level in self?.pressureLevel = level }
+        pressureMonitor.onChange = { [weak self] kernelLevel in
+            guard let self else { return }
+            let availLevel = self.memory.map {
+                PressureLevel(availableFraction: $0.totalBytes > 0
+                    ? Double($0.availableBytes) / Double($0.totalBytes) : 1)
+            } ?? .low
+            self.pressureLevel = kernelLevel.combined(with: availLevel)
+        }
         pressureMonitor.start()
         appsMonitor.start()
 
+        // Prime topApps and memory once on launch so opening palette is instant
         refreshFast()
         refreshHistorySample()
 
-        fastTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.refreshFast() }
+        // Background timer for menu bar icon pressure (Mach VM statistics only: ~0% CPU, 0 allocations)
+        vmTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+            guard let self, !self.isPaletteVisible else { return }
+            self.refreshVMStats()
+        }
         historyTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshHistorySample() }
     }
 
@@ -45,22 +54,108 @@ final class SystemMonitor: ObservableObject {
         fastTimer?.invalidate()
         historyTimer?.invalidate()
         chromeTimer?.invalidate()
+        vmTimer?.invalidate()
         fastTimer = nil
         historyTimer = nil
         chromeTimer = nil
+        vmTimer = nil
+    }
+
+    func setPaletteVisible(_ visible: Bool) {
+        guard isPaletteVisible != visible else { return }
+        isPaletteVisible = visible
+
+        if visible {
+            // Instantly refresh on background queue so fresh data streams in without UI hitch
+            refreshFast()
+            startFastTimer()
+        } else {
+            stopFastTimer()
+            stopWatchingChrome()
+            cleanupMemoryOnDismiss()
+        }
+    }
+
+    private func startFastTimer() {
+        fastTimer?.invalidate()
+        fastTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+            self?.refreshFast()
+        }
+    }
+
+    private func stopFastTimer() {
+        fastTimer?.invalidate()
+        fastTimer = nil
+    }
+
+    private func cleanupMemoryOnDismiss() {
+        workQueue.async { [weak self] in
+            guard let self else { return }
+            self.appsMonitor.pruneCaches()
+            malloc_zone_pressure_relief(malloc_default_zone(), 0)
+        }
+    }
+
+    /// Ultra-lightweight Mach VM polling for menu bar icon when palette is closed.
+    private func refreshVMStats() {
+        workQueue.async { [weak self] in
+            guard let self, let snapshot = MemoryStats.snapshot() else { return }
+            DispatchQueue.main.async {
+                self.memory = snapshot
+                let availFraction = snapshot.totalBytes > 0
+                    ? Double(snapshot.availableBytes) / Double(snapshot.totalBytes)
+                    : 1.0
+                let availLevel = PressureLevel(availableFraction: availFraction)
+                let kernelLevel = self.pressureMonitor.level
+                self.pressureLevel = kernelLevel.combined(with: availLevel)
+            }
+        }
     }
 
     private func refreshFast() {
         workQueue.async { [weak self] in
             guard let self else { return }
-            // Pure libproc syscalls — safe off the main thread, and the
-            // expensive part (enumerating every process on the system).
             let snapshot = MemoryStats.snapshot()
             let processes = ProcessScanner.allProcesses()
+
+            // 1. Inspect Chrome processes
+            let chromeSamples = processes.filter { proc in
+                if let path = proc.executablePath {
+                    return path.contains("Google Chrome")
+                }
+                return false
+            }
+
+            let (helpers, distribution) = self.chromeInventory.inspect(samples: chromeSamples)
+            let renderers = helpers.filter { $0.kind == .renderer }
+
+            // 2. Fetch tabs only if Chrome watching is active (accordion expanded or Chrome state view)
+            var currentTabs: [ChromeTab]? = nil
+            if self.chromeTimer != nil && ChromeTabsBridge.isRunning {
+                currentTabs = ChromeTabsBridge.fetchTabs()
+            }
+
+            // 3. Update tab memory tracker
+            self.tabTracker.update(renderers: renderers, currentTabs: currentTabs)
+            let attributions = self.tabTracker.attributions
+
             DispatchQueue.main.async {
-                // NSWorkspace/NSRunningApplication access must happen on main.
-                if let snapshot { self.memory = snapshot }
+                if let snapshot {
+                    self.memory = snapshot
+                    let availFraction = snapshot.totalBytes > 0
+                        ? Double(snapshot.availableBytes) / Double(snapshot.totalBytes)
+                        : 1.0
+                    let availLevel = PressureLevel(availableFraction: availFraction)
+                    let kernelLevel = self.pressureMonitor.level
+                    self.pressureLevel = kernelLevel.combined(with: availLevel)
+                }
+
                 self.topApps = self.appsMonitor.aggregate(processes: processes)
+                self.chromeDistribution = distribution
+                self.tabAttributions = attributions
+                if let currentTabs {
+                    self.chromeTabs = currentTabs
+                }
             }
         }
     }
@@ -86,8 +181,8 @@ final class SystemMonitor: ObservableObject {
 
     func startWatchingChrome() {
         guard chromeTimer == nil else { return }
-        refreshChrome()
-        chromeTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refreshChrome() }
+        refreshFast()
+        chromeTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in self?.refreshFast() }
     }
 
     func stopWatchingChrome() {
@@ -96,20 +191,7 @@ final class SystemMonitor: ObservableObject {
     }
 
     private func refreshChrome() {
-        // NSWorkspace read — must be on main; refreshChrome() is only ever
-        // invoked from a main-thread Timer callback or a direct call.
-        let running = ChromeTabsBridge.isRunning
-        chromeIsRunning = running
-        guard running else {
-            chromeTabs = []
-            return
-        }
-        workQueue.async { [weak self] in
-            // The AppleScript round-trip itself is fine off-main — it's the
-            // slow part, and the first call blocks on a permission dialog.
-            let tabs = ChromeTabsBridge.fetchTabs() ?? []
-            DispatchQueue.main.async { self?.chromeTabs = tabs }
-        }
+        refreshFast()
     }
 
     // MARK: - Actions
@@ -121,8 +203,14 @@ final class SystemMonitor: ObservableObject {
 
     func closeChromeTab(_ tab: ChromeTab) {
         workQueue.async { [weak self] in
-            ChromeTabsBridge.closeTab(windowIndex: tab.windowIndex, tabIndex: tab.tabIndex)
+            ChromeTabsBridge.closeTab(id: tab.id)
             DispatchQueue.main.async { self?.refreshChrome() }
+        }
+    }
+
+    func activateChromeTab(_ tab: ChromeTab) {
+        workQueue.async {
+            ChromeTabsBridge.activateTab(id: tab.id)
         }
     }
 

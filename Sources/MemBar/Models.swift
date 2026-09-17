@@ -5,12 +5,32 @@ enum PressureLevel: String, Equatable {
     case low = "LOW", medium = "MEDIUM", high = "HIGH"
 
     /// Thresholds mirror the design's `PRESSURE_COLOR` helper (>85 high, >65 medium, else low).
-    /// Used for the per-sample chart bar color; the headline badge instead uses the kernel's
-    /// own pressure signal via `PressureMonitor` — see `SystemMonitor.pressureLevel`.
+    /// Used for the per-sample chart bar color; the headline badge instead uses the composite
+    /// pressure signal (kernel + availability) from `SystemMonitor.pressureLevel`.
     init(percent: Double) {
         if percent > 85 { self = .high }
         else if percent > 65 { self = .medium }
         else { self = .low }
+    }
+
+    /// Availability-based pressure from `availableFraction` (AVAIL / total).
+    ///   > 25 % available → LOW
+    ///   10–25 %          → MEDIUM   (e.g. < ~4 GB on a 16 GB machine)
+    ///   < 10 %           → HIGH
+    init(availableFraction: Double) {
+        if availableFraction < 0.10 { self = .high }
+        else if availableFraction < 0.25 { self = .medium }
+        else { self = .low }
+    }
+
+    /// Numeric severity so we can take the max of two signals.
+    var severity: Int {
+        switch self { case .low: return 0; case .medium: return 1; case .high: return 2 }
+    }
+
+    /// Returns whichever level is worse (higher severity).
+    func combined(with other: PressureLevel) -> PressureLevel {
+        severity >= other.severity ? self : other
     }
 
     var chartColor: Color {
@@ -62,7 +82,14 @@ struct AppUsage: Identifiable {
 
     var initial: String { String(name.first ?? "?").uppercased() }
     var color: Color { Color(oklch: 0.62, 0.12, hue) }
-    var memText: String { String(format: "%.1f GB", memGB) }
+    var memText: String {
+        if memGB >= 1.0 {
+            return String(format: "%.1f GB", memGB)
+        } else {
+            let mb = memGB * 1024
+            return String(format: "%.0f MB", mb)
+        }
+    }
 
     private static func hue(for key: String) -> Double {
         let hues: [Double] = [250, 200, 290, 140, 60, 85, 150, 340]
@@ -113,4 +140,74 @@ extension MemorySnapshot {
             MemorySegment(label: "Free", gb: Double(freeBytes) / 1e9, pct: pct(freeBytes), color: freeColor),
         ]
     }
+}
+
+/// A registered slash command available in the command palette search field.
+struct SlashCommand: Identifiable, Equatable {
+    var id: String { trigger }
+    let name: String
+    let trigger: String
+    let description: String
+    let iconName: String
+    let example: String
+    let template: String
+
+    static let all: [SlashCommand] = [
+        SlashCommand(
+            name: "/quit <app>",
+            trigger: "/quit",
+            description: "Quit an app with live auto-suggestions",
+            iconName: "xmark.circle.fill",
+            example: "/quit Chrome",
+            template: "/quit "
+        ),
+        SlashCommand(
+            name: "/forcequit <app>",
+            trigger: "/forcequit",
+            description: "Force kill unresponsive or frozen app (SIGKILL)",
+            iconName: "bolt.trianglebadge.exclamationmark.fill",
+            example: "/forcequit Xcode",
+            template: "/forcequit "
+        ),
+        SlashCommand(
+            name: "/help",
+            trigger: "/help",
+            description: "Show all available commands and syntax",
+            iconName: "questionmark.circle.fill",
+            example: "/help",
+            template: "/help"
+        ),
+        SlashCommand(
+            name: "/memory",
+            trigger: "/memory",
+            description: "Detailed RAM breakdown & composition chart",
+            iconName: "memorychip.fill",
+            example: "/memory",
+            template: "/memory"
+        ),
+        SlashCommand(
+            name: "/tabs",
+            trigger: "/tabs",
+            description: "Review & close heavy Google Chrome tabs",
+            iconName: "globe",
+            example: "/tabs",
+            template: "/tabs"
+        ),
+        SlashCommand(
+            name: "/close",
+            trigger: "/close",
+            description: "Review idle background apps safe to close",
+            iconName: "clock.arrow.circlepath",
+            example: "/close",
+            template: "/close"
+        ),
+        SlashCommand(
+            name: "/slow",
+            trigger: "/slow",
+            description: "Diagnose system memory pressure & actions",
+            iconName: "exclamationmark.triangle.fill",
+            example: "/slow",
+            template: "/slow"
+        )
+    ]
 }

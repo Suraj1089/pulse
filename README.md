@@ -61,11 +61,4 @@ may re-prompt across rebuilds during development — that's expected, not a bug.
 
 ## Known limitations
 
-- **Chrome per-tab memory isn't real.** Chrome doesn't expose per-tab memory (or per-tab idle time) through
-  AppleScript — only its remote-debugging protocol does, and that needs Chrome launched with a special flag, which
-  isn't something this app can retrofit onto an already-running browser. So the Chrome-tabs state shows real
-  titles, real URLs, and Chrome's real *aggregate* memory, but deliberately does **not** show or estimate a
-  per-tab number rather than fabricate one. See `ChromeTabsBridge.swift`.
-- This was written and reviewed without access to a Mac/Xcode in the authoring environment (no Swift toolchain
-  there, and SwiftUI/AppKit/libproc don't exist outside macOS), so it hasn't been compiled yet — that's on you to
-  verify by running it.
+- **Chrome per-tab memory is real, but represents a lower bound.** MemBar derives per-tab footprint by pairing renderer birth bursts with tab open/navigation events via `sysctl(KERN_PROCARGS2)` and `libproc`. If a tab embeds an iframe whose site already shares an existing renderer process, that shared memory is not duplicated into the new tab's count. Tab memory figures are therefore an honest lower bound, denoted with "≈" alongside real process and subframe counts. Unmeasured tabs (e.g. from session restore or bulk opens) are displayed as "—" rather than guessed or estimated.

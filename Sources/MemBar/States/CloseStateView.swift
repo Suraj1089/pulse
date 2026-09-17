@@ -7,6 +7,7 @@ struct CloseStateView: View {
     @Environment(\.colorScheme) private var scheme
     @ObservedObject var model: PaletteViewModel
     @State private var selectedApp = 0
+    @State private var quittingPIDs: Set<pid_t> = []
 
     private var candidates: [AppUsage] {
         model.monitor.topApps
@@ -33,19 +34,24 @@ struct CloseStateView: View {
                     .padding(.horizontal, Metrics.rowSidePadding)
                     .frame(height: Metrics.rowHeight, alignment: .leading)
             } else {
+                let displayCandidates = candidates.filter { !quittingPIDs.contains($0.id) }
                 VStack(spacing: 0) {
-                    ForEach(Array(candidates.enumerated()), id: \.element.id) { index, app in
+                    ForEach(Array(displayCandidates.enumerated()), id: \.element.id) { index, app in
                         AppListItem(
                             app: app,
                             isSelected: selectedApp == index,
                             quitMode: .always,
                             onHover: { hovering in
-                                if hovering { selectedApp = index }
+                                if hovering && selectedApp != index {
+                                    selectedApp = index
+                                }
                             },
-                            onQuit: { model.quit(pid: app.id) }
+                            onQuit: { animatedQuit(pid: app.id) }
                         )
+                        .transition(.quitSweep)
                     }
                 }
+                .clipped()
             }
 
             if ChromeTabsBridge.isRunning {
@@ -81,5 +87,17 @@ struct CloseStateView: View {
         .padding(.horizontal, Metrics.windowPadding)
         .padding(.bottom, 10)
         .onAppear { selectedApp = 0 }
+        .onChange(of: model.apps.map { $0.id }) { _, liveIDs in
+            quittingPIDs = quittingPIDs.filter { liveIDs.contains($0) }
+        }
+    }
+
+    private func animatedQuit(pid: pid_t) {
+        _ = withAnimation(.quitSpring) {
+            quittingPIDs.insert(pid)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            model.quit(pid: pid)
+        }
     }
 }

@@ -14,11 +14,23 @@ struct MemorySnapshot {
     /// `external_page_count + purgeable_count` — reclaimable file-backed/purgeable pages.
     let cachedBytes: UInt64
 
-    var usedBytes: UInt64 { totalBytes > freeBytes ? totalBytes - freeBytes : 0 }
+    /// Matches Activity Monitor "Memory Used" = Wired + App + Compressed.
+    var usedBytes: UInt64 { wiredBytes + appBytes + compressedBytes }
+
+    /// True available = free pages + cached (file-backed pages macOS evicts on demand).
+    /// Much more useful than raw free_count which is usually tiny on a busy system.
+    var availableBytes: UInt64 { freeBytes + cachedBytes }
+
     var usedFraction: Double { totalBytes == 0 ? 0 : Double(usedBytes) / Double(totalBytes) }
-    var freeGB: Double { Double(freeBytes) / 1_000_000_000 }
-    var usedGB: Double { Double(usedBytes) / 1_000_000_000 }
-    var totalGB: Double { Double(totalBytes) / 1_000_000_000 }
+
+    // Activity Monitor displays RAM in binary gibibytes labelled "GB".
+    // Divide by 2^30 (1 GiB), not by 10^9.
+    private static let gib: Double = 1_073_741_824
+    var freeGB:      Double { Double(freeBytes)      / Self.gib }
+    var usedGB:      Double { Double(usedBytes)      / Self.gib }
+    var totalGB:     Double { Double(totalBytes)     / Self.gib }
+    var cachedGB:    Double { Double(cachedBytes)    / Self.gib }
+    var availableGB: Double { Double(availableBytes) / Self.gib }
 }
 
 enum MemoryStats {

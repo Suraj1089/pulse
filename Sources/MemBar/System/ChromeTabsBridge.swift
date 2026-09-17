@@ -1,13 +1,9 @@
 import AppKit
 
-/// A real open Chrome tab. Title, URL and which tab is active in its window
-/// all come straight from Chrome via AppleScript. Chrome does **not** expose
-/// per-tab memory or per-tab idle time through scripting (that needs its
-/// remote-debugging protocol, which isn't available against an
-/// already-running, normally-launched browser) — so unlike everything else
-/// in this app, there is no real per-tab memory number to show here.
-struct ChromeTab: Identifiable {
-    var id: String { "\(windowIndex).\(tabIndex)" }
+/// A real open Chrome tab with a stable per-session ID from Chrome's
+/// AppleScript dictionary (`id of t`).
+struct ChromeTab: Identifiable, Equatable {
+    let id: Int
     let windowIndex: Int
     let tabIndex: Int
     let title: String
@@ -18,23 +14,64 @@ struct ChromeTab: Identifiable {
         guard let host = URL(string: url)?.host else { return url }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
+
+    /// Title cleaned up per Phase 3.4
+    var cleanedTitle: String {
+        var t = title.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // 1. Strip leading media/recording glyphs (●, 🔴, •)
+        if t.hasPrefix("● ") || t.hasPrefix("• ") {
+            t = String(t.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+        }
+
+        // 2. Move leading unread count "(12) Inbox" -> "Inbox (12)"
+        if t.hasPrefix("(") {
+            if let closingParen = t.firstIndex(of: ")") {
+                let badge = String(t[...closingParen])
+                let remainder = String(t[t.index(after: closingParen)...]).trimmingCharacters(in: .whitespaces)
+                if !remainder.isEmpty {
+                    t = "\(remainder) \(badge)"
+                }
+            }
+        }
+
+        // 3. Strip trailing site name that repeats the host (e.g. " — GitHub")
+        let hostPart = host.split(separator: ".").first.map(String.init) ?? ""
+        if !hostPart.isEmpty {
+            for separator in [" — ", " - ", " · ", " | "] {
+                if let range = t.range(of: separator, options: .backwards) {
+                    let suffix = t[range.upperBound...].lowercased()
+                    if suffix.contains(hostPart.lowercased()) {
+                        t = String(t[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+                        break
+                    }
+                }
+            }
+        }
+
+        // 4. Fallback if empty
+        if t.isEmpty {
+            if let urlObj = URL(string: url), !urlObj.path.isEmpty && urlObj.path != "/" {
+                t = "\(host)\(urlObj.path)"
+            } else {
+                t = host.isEmpty ? "New Tab" : host
+            }
+        }
+
+        return t
+    }
 }
 
-/// Talks to a *running* Google Chrome via AppleScript (Apple Events). The
-/// first call triggers the standard macOS Automation permission prompt;
-/// until it's granted (System Settings → Privacy & Security → Automation),
-/// every call here just returns `nil`/no-ops rather than throwing.
+/// Talks to Google Chrome via AppleScript with stable tab IDs.
 enum ChromeTabsBridge {
     static let bundleIdentifier = "com.google.Chrome"
 
-    /// `NSWorkspace` access — call on the main thread.
+    /// Call on the main thread.
     static var isRunning: Bool {
         NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == bundleIdentifier }
     }
 
-    /// Synchronous — this is an Apple Event round-trip (and may block on a
-    /// permission dialog the first time), so call it off the main queue.
-    /// Callers are expected to have already checked `isRunning` on main.
+    /// Fetches tabs with their stable IDs.
     static func fetchTabs() -> [ChromeTab]? {
         guard let script = NSAppleScript(source: fetchSource) else { return nil }
         var errorInfo: NSDictionary?
@@ -43,16 +80,46 @@ enum ChromeTabsBridge {
         return parse(raw)
     }
 
-    static func closeTab(windowIndex: Int, tabIndex: Int) {
-        run("tell application \"Google Chrome\" to close tab \(tabIndex) of window \(windowIndex)")
+    /// Closes a tab by its stable ID (immune to index shifts).
+    static func closeTab(id: Int) {
+        let source = """
+        tell application "Google Chrome"
+            repeat with w in windows
+                repeat with t in tabs of w
+                    if (id of t) is \(id) then
+                        close t
+                        return
+                    end if
+                end repeat
+            end repeat
+        end tell
+        """
+        run(source)
     }
 
-    /// Closes every tab that isn't the active tab in its window, in
-    /// descending tab-index order so earlier closes don't shift the indices
-    /// of tabs still queued to close.
+    /// Activates a tab in Google Chrome and brings Chrome frontmost.
+    static func activateTab(id: Int) {
+        let source = """
+        tell application "Google Chrome"
+            repeat with w in windows
+                repeat with t in tabs of w
+                    if (id of t) is \(id) then
+                        set active tab index of w to (index of t)
+                        set index of w to 1
+                        activate
+                        return
+                    end if
+                end repeat
+            end repeat
+        end tell
+        """
+        run(source)
+    }
+
+    /// Closes all background tabs by ID.
     static func closeBackgroundTabs(_ tabs: [ChromeTab]) {
-        for tab in tabs.filter({ !$0.isActive }).sorted(by: { $0.tabIndex > $1.tabIndex }) {
-            closeTab(windowIndex: tab.windowIndex, tabIndex: tab.tabIndex)
+        for tab in tabs where !tab.isActive {
+            closeTab(id: tab.id)
         }
     }
 
@@ -66,10 +133,9 @@ enum ChromeTabsBridge {
         script.executeAndReturnError(&errorInfo)
     }
 
-    /// Built with the bare `tab`/`linefeed` constants rather than quoted
-    /// `\t`/`\n` escapes, so there's no ambiguity between Swift's and
-    /// AppleScript's escaping rules.
     private static let fetchSource = """
+    set tabChar to character id 9
+    set nl to character id 10
     set output to ""
     tell application "Google Chrome"
         set winIndex to 0
@@ -79,7 +145,7 @@ enum ChromeTabsBridge {
             set tabIndex to 0
             repeat with t in tabs of w
                 set tabIndex to tabIndex + 1
-                set output to output & winIndex & tab & tabIndex & tab & (title of t) & tab & (URL of t) & tab & (tabIndex = activeIdx) & linefeed
+                set output to output & (id of t) & tabChar & winIndex & tabChar & tabIndex & tabChar & (title of t) & tabChar & (URL of t) & tabChar & (tabIndex = activeIdx) & nl
             end repeat
         end repeat
     end tell
@@ -89,13 +155,17 @@ enum ChromeTabsBridge {
     private static func parse(_ raw: String) -> [ChromeTab] {
         raw.split(separator: "\n").compactMap { line -> ChromeTab? in
             let fields = line.components(separatedBy: "\t")
-            guard fields.count == 5, let windowIndex = Int(fields[0]), let tabIndex = Int(fields[1]) else { return nil }
+            guard fields.count == 6,
+                  let tabID = Int(fields[0]),
+                  let windowIndex = Int(fields[1]),
+                  let tabIndex = Int(fields[2]) else { return nil }
             return ChromeTab(
+                id: tabID,
                 windowIndex: windowIndex,
                 tabIndex: tabIndex,
-                title: fields[2],
-                url: fields[3],
-                isActive: fields[4] == "true"
+                title: fields[3],
+                url: fields[4],
+                isActive: fields[5] == "true"
             )
         }
     }

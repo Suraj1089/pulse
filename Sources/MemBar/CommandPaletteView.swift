@@ -7,14 +7,25 @@ struct CommandPaletteView: View {
     @ObservedObject var model: PaletteViewModel
     @FocusState private var searchFocused: Bool
     var onEscape: () -> Void = {}
-    var onHeightChange: (CGFloat) -> Void = { _ in }
 
     var body: some View {
-        let theme = Theme(scheme: scheme)
         VStack(spacing: 0) {
-            SearchFieldView(query: $model.query, showKeyHints: model.showKeyHints, isFocused: $searchFocused)
+            // Brand header: Logo, MemBar, Find. Free. Focus., RAM progress
+            MemBarBrandHeader(
+                usedGB: model.usedGB,
+                totalGB: model.totalGB,
+                level: model.level
+            )
 
-            ScrollView {
+            // Minimalist pill search bar
+            SearchFieldView(
+                query: $model.query,
+                showKeyHints: model.showKeyHints,
+                isFocused: $searchFocused,
+                onSubmit: handleSearchSubmit
+            )
+
+            ScrollView(showsIndicators: false) {
                 Group {
                     switch model.state {
                     case .overview: OverviewStateView(model: model)
@@ -22,33 +33,92 @@ struct CommandPaletteView: View {
                     case .memory: MemoryStateView(model: model)
                     case .close: CloseStateView(model: model)
                     case .chromeTabs: ChromeTabsStateView(model: model)
+                    case .help: HelpStateView(model: model)
+                    case .quitCommand(let appQuery, let isForce): QuitCommandStateView(model: model, appQuery: appQuery, isForce: isForce)
+                    case .commandSuggestions(let filter): CommandSuggestionsView(model: model, filter: filter)
                     case .noMatch: NoMatchStateView()
                     }
                 }
             }
-            .frame(maxHeight: Metrics.windowMaxHeight - Metrics.headerHeight - Metrics.footerHeight)
+            .frame(maxHeight: .infinity)
 
-            FooterHints(items: model.state == .chromeTabs
-                ? ["↑↓ navigate", "↵ close tab", "esc close"]
-                : ["↑↓ navigate", "↵ select", "esc close"])
+            // Modern minimalist footer
+            ModernFooterView(
+                onSettings: { model.query = "/help" },
+                onQuitAll: handleQuitAll
+            )
         }
-        .frame(width: Metrics.windowWidth)
-        .frame(minHeight: Metrics.windowMinHeight)
-        .background(theme.background)
-        .clipShape(RoundedRectangle(cornerRadius: Metrics.windowRadius))
-        .overlay(RoundedRectangle(cornerRadius: Metrics.windowRadius).strokeBorder(theme.border, lineWidth: 1))
-        .shadow(color: .black.opacity(0.5), radius: 40, y: 20)
+        .frame(width: Metrics.windowWidth, height: 490)
         .background(
-            GeometryReader { proxy in
-                Color.clear.preference(key: PaletteHeightKey.self, value: proxy.size.height)
+            ZStack {
+                RoundedRectangle(cornerRadius: Metrics.windowRadius, style: .continuous)
+                    .fill(.regularMaterial)
+                RoundedRectangle(cornerRadius: Metrics.windowRadius, style: .continuous)
+                    .fill(scheme == .dark
+                        ? Color(red: 0.12, green: 0.12, blue: 0.14).opacity(0.85)
+                        : Color.white.opacity(0.72))
             }
         )
-        .onPreferenceChange(PaletteHeightKey.self, perform: onHeightChange)
+        .clipShape(RoundedRectangle(cornerRadius: Metrics.windowRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Metrics.windowRadius, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        stops: [
+                            .init(color: scheme == .dark ? Color.white.opacity(0.20) : Color.white.opacity(0.65), location: 0),
+                            .init(color: scheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06), location: 0.25),
+                            .init(color: scheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.10), location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1
+                )
+        )
         .onAppear {
             model.start()
             searchFocused = true
         }
         .onDisappear { model.stop() }
         .onExitCommand(perform: onEscape)
+    }
+
+    private var footerItems: [String] {
+        switch model.state {
+        case .chromeTabs:
+            return ["↑↓ navigate", "↵ close tab", "esc close"]
+        case .quitCommand(_, let isForce):
+            return isForce ? ["↑↓ select", "↵ force quit (SIGKILL)", "esc close"] : ["↑↓ select", "↵ quit app", "esc close"]
+        case .commandSuggestions:
+            return ["↑↓ select", "↵ complete", "esc close"]
+        case .help:
+            return ["click command to run", "esc close"]
+        default:
+            return ["↑↓ navigate", "↵ select", "esc close"]
+        }
+    }
+
+    private func handleSearchSubmit() {
+        switch model.state {
+        case .commandSuggestions(let filter):
+            if let topCmd = model.matchingCommands(for: filter).first {
+                model.query = topCmd.template
+            }
+        case .quitCommand(let appQuery, let isForce):
+            if let topApp = model.matchingApps(for: appQuery).first {
+                model.quit(pid: topApp.id, force: isForce)
+                model.query = ""
+            }
+        case .help:
+            break
+        default:
+            break
+        }
+    }
+
+    private func handleQuitAll() {
+        for app in model.monitor.topApps.filter({ !$0.isFrontmost }).prefix(4) {
+            model.quit(pid: app.pid)
+        }
     }
 }

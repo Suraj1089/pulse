@@ -14,18 +14,34 @@ struct ProcessSample {
 /// (`proc_listpids` / `proc_pidpath` / `proc_pid_rusage`) — no elevated
 /// privileges required to read your own processes' memory footprint.
 enum ProcessScanner {
+    private static var pathCache: [pid_t: String] = [:]
+
     static func allProcesses() -> [ProcessSample] {
-        allPIDs().compactMap { pid in
+        let pids = allPIDs()
+        let pidSet = Set(pids)
+
+        // Evict dead PIDs when cache grows excessively
+        if pathCache.count > pids.count + 200 {
+            pathCache = pathCache.filter { pidSet.contains($0.key) }
+        }
+
+        return pids.compactMap { pid in
             guard let footprint = physFootprint(of: pid) else { return nil }
-            return ProcessSample(pid: pid, executablePath: path(of: pid), physFootprintBytes: footprint)
+            let execPath: String?
+            if let cached = pathCache[pid] {
+                execPath = cached
+            } else {
+                let p = path(of: pid)
+                if let p { pathCache[pid] = p }
+                execPath = p
+            }
+            return ProcessSample(pid: pid, executablePath: execPath, physFootprintBytes: footprint)
         }
     }
 
     private static func allPIDs() -> [pid_t] {
         let neededBytes = proc_listpids(UInt32(PROC_ALL_PIDS), 0, nil, 0)
         guard neededBytes > 0 else { return [] }
-        // Double the reported size: the process list can grow between the
-        // sizing call and the fetch call.
         let capacity = (Int(neededBytes) / MemoryLayout<pid_t>.stride) * 2
         var buffer = [pid_t](repeating: 0, count: max(capacity, 1))
         let writtenBytes = buffer.withUnsafeMutableBytes { raw in
@@ -33,14 +49,23 @@ enum ProcessScanner {
         }
         guard writtenBytes > 0 else { return [] }
         let count = Int(writtenBytes) / MemoryLayout<pid_t>.stride
-        return Array(buffer.prefix(count)).filter { $0 > 0 }
+        var result: [pid_t] = []
+        result.reserveCapacity(count)
+        for i in 0..<count {
+            let pid = buffer[i]
+            if pid > 0 { result.append(pid) }
+        }
+        return result
     }
 
     private static func path(of pid: pid_t) -> String? {
-        var buffer = [CChar](repeating: 0, count: Int(PROC_PIDPATHINFO_MAXSIZE))
-        let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
-        guard length > 0 else { return nil }
-        return String(cString: buffer)
+        let maxLen = 4 * Int(MAXPATHLEN)
+        return withUnsafeTemporaryAllocation(of: CChar.self, capacity: maxLen) { buffer in
+            guard let base = buffer.baseAddress else { return nil }
+            let length = proc_pidpath(pid, base, UInt32(maxLen))
+            guard length > 0 else { return nil }
+            return String(cString: base)
+        }
     }
 
     private static func physFootprint(of pid: pid_t) -> UInt64? {

@@ -8,8 +8,16 @@ struct OverviewStateView: View {
     @ObservedObject var model: PaletteViewModel
     @State private var selectedApp = 0
     @State private var hoveredAction: Int?
+    @State private var expandedAppID: pid_t? = nil
+    @State private var isOptionPressed: Bool = false
+    @State private var flagsMonitor: Any? = nil
+    /// PIDs whose rows are currently animating out — filtered from display
+    /// immediately so the animation fires before the model's 3 s refresh.
+    @State private var quittingPIDs: Set<pid_t> = []
 
-    private var apps: [AppUsage] { Array(model.apps.prefix(4)) }
+    private var apps: [AppUsage] {
+        Array(model.apps.prefix(6)).filter { !quittingPIDs.contains($0.id) }
+    }
 
     private var suggestedActions: [RecommendedAction] {
         model.monitor.topApps
@@ -17,7 +25,7 @@ struct OverviewStateView: View {
             .prefix(2)
             .map { app in
                 RecommendedAction(title: "Quit \(app.name)", freesGB: app.footprintGB) {
-                    model.quit(pid: app.pid)
+                    animatedQuit(pid: app.pid)
                 }
             }
     }
@@ -25,35 +33,66 @@ struct OverviewStateView: View {
     var body: some View {
         let theme = Theme(scheme: scheme)
         VStack(alignment: .leading, spacing: 0) {
+            // Section Header matching screenshot: Top Memory Usage & RAM
             HStack {
-                Text("Memory pressure").font(Fonts.body).foregroundStyle(theme.textSecondary)
+                Text("Top Memory Usage")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(theme.textPrimary)
+
                 Spacer()
-                HStack(spacing: 7) {
-                    Text(String(format: "%.1f GB free", model.freeGB))
-                        .font(Fonts.monoSmall)
-                        .foregroundStyle(theme.textDim)
-                    MemoryPressureBadge(level: model.level)
-                }
+
+                Text("RAM")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(theme.textDim)
+
+                Spacer().frame(width: 52) // Aligns with the Quit pill button
             }
             .padding(.horizontal, Metrics.rowSidePadding)
-            .padding(.top, 8)
-            .padding(.bottom, 10)
+            .padding(.top, 4)
+            .padding(.bottom, 6)
 
-            SectionHeader(title: "Top memory users").padding(.bottom, 6)
-
-            VStack(spacing: 0) {
+            VStack(spacing: 2) {
                 ForEach(Array(apps.enumerated()), id: \.element.id) { index, app in
-                    AppListItem(
-                        app: app,
-                        isSelected: selectedApp == index,
-                        quitMode: .onSelected,
-                        onHover: { hovering in
-                            if hovering { selectedApp = index }
-                        },
-                        onQuit: { model.quit(pid: app.id) }
-                    )
+                    let isChrome = app.name.lowercased().contains("chrome")
+                    let isExpanded = expandedAppID == app.id
+
+                    VStack(spacing: 0) {
+                        AppListItem(
+                            app: app,
+                            isSelected: selectedApp == index,
+                            quitMode: .always,
+                            quitLabel: isOptionPressed ? "Force Quit" : "Quit",
+                            isDestructive: isOptionPressed,
+                            hasExpandSlot: false,
+                            isExpandable: isChrome,
+                            isExpanded: isExpanded,
+                            onToggleExpand: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    expandedAppID = (expandedAppID == app.id) ? nil : app.id
+                                    if expandedAppID != nil {
+                                        model.monitor.startWatchingChrome()
+                                    } else {
+                                        model.monitor.stopWatchingChrome()
+                                    }
+                                }
+                            },
+                            onHover: { hovering in
+                                if hovering && selectedApp != index {
+                                    selectedApp = index
+                                }
+                            },
+                            onQuit: { animatedQuit(pid: app.id, force: isOptionPressed) }
+                        )
+
+                        if isExpanded && isChrome {
+                            inlineChromeTabsOverview(theme)
+                        }
+                    }
+                    .transition(.quitSweep)
                 }
             }
+            // Clip so the sweeping row doesn't paint outside the list bounds.
+            .clipped()
 
             SectionHeader(title: "Suggested actions").padding(.top, 14).padding(.bottom, 6)
 
@@ -80,6 +119,160 @@ struct OverviewStateView: View {
         }
         .padding(.horizontal, Metrics.windowPadding)
         .padding(.bottom, 10)
-        .onAppear { selectedApp = 0 }
+        .onAppear {
+            selectedApp = 0
+            flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+                let option = event.modifierFlags.contains(.option)
+                if self.isOptionPressed != option {
+                    self.isOptionPressed = option
+                }
+                return event
+            }
+        }
+        .onDisappear {
+            if let monitor = flagsMonitor {
+                NSEvent.removeMonitor(monitor)
+                flagsMonitor = nil
+            }
+            if expandedAppID != nil {
+                model.monitor.stopWatchingChrome()
+            }
+        }
+        // Once the model confirms the process is gone, clean up local state.
+        .onChange(of: model.apps.map { $0.id }) { _, liveIDs in
+            quittingPIDs = quittingPIDs.filter { liveIDs.contains($0) }
+        }
+    }
+
+    // MARK: - Actions
+
+    private func animatedQuit(pid: pid_t, force: Bool = false) {
+        _ = withAnimation(.quitSpring) {
+            quittingPIDs.insert(pid)
+        }
+        // Delay so the swipe animation plays out smoothly before the process
+        // terminates and system resources shift.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            model.quit(pid: pid, force: force)
+        }
+    }
+
+    @ViewBuilder
+    private func inlineChromeTabsOverview(_ theme: Theme) -> some View {
+        let tabs = model.monitor.chromeTabs
+        let attributions = model.monitor.tabAttributions
+
+        let isBlankOrNewTab = { (t: ChromeTab) -> Bool in
+            let title = t.cleanedTitle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let url = t.url.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return title == "new tab" || title.isEmpty || url.hasPrefix("chrome://newtab") || url == "about:blank"
+        }
+
+        // Prefer real content tabs; only fall back to blank tabs if the user has fewer than 5 real tabs
+        let realTabs = tabs.filter { !isBlankOrNewTab($0) }
+        let pool = realTabs.count >= 5 ? realTabs : (realTabs + tabs.filter(isBlankOrNewTab))
+
+        let sorted = pool.sorted { a, b in
+            let aBytes = attributions[a.id]?.totalBytes ?? 0
+            let bBytes = attributions[b.id]?.totalBytes ?? 0
+            if aBytes > 0 && bBytes > 0 { return aBytes > bBytes }
+            if (aBytes > 0) != (bBytes > 0) { return aBytes > 0 }
+
+            let aIsNew = isBlankOrNewTab(a)
+            let bIsNew = isBlankOrNewTab(b)
+            if aIsNew != bIsNew { return bIsNew }
+
+            // Active tabs are frontmost in user focus
+            if a.isActive != b.isActive { return a.isActive }
+
+            if a.windowIndex != b.windowIndex {
+                return a.windowIndex < b.windowIndex
+            }
+            return a.tabIndex < b.tabIndex
+        }
+        let top5 = Array(sorted.prefix(5))
+
+        VStack(alignment: .leading, spacing: 3) {
+            if tabs.isEmpty {
+                Text("Reading open tabs…")
+                    .font(Fonts.monoSmall)
+                    .foregroundStyle(theme.hint)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 4)
+            } else {
+                HStack {
+                    Spacer().frame(width: 22)
+                    Text("Top 5 memory tabs")
+                        .font(Fonts.monoTiny)
+                        .foregroundStyle(theme.textDim)
+                    Spacer()
+                    Text("Close to save RAM")
+                        .font(Fonts.monoTiny)
+                        .foregroundStyle(theme.hint)
+                }
+                .padding(.horizontal, Metrics.rowSidePadding)
+                .padding(.top, 2)
+
+                ForEach(top5) { tab in
+                    let hostColor = Color(oklch: 0.62, 0.12, Double(abs(tab.host.hashValue) % 360))
+                    let bytes = attributions[tab.id]?.totalBytes ?? 0
+
+                    HStack(spacing: 8) {
+                        Spacer().frame(width: 22)
+                        Circle().fill(tab.isActive ? hostColor : hostColor.opacity(0.45)).frame(width: 5, height: 5)
+                        Text(tab.cleanedTitle)
+                            .font(Fonts.body)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .foregroundStyle(theme.textPrimary)
+
+                        Spacer()
+
+                        Text(bytes > 0 ? String(format: "%.0f MB", Double(bytes) / 1e6) : "—")
+                            .font(Fonts.monoSmall)
+                            .foregroundStyle(bytes > 0 ? theme.textSecondary : theme.hint)
+
+                        Button {
+                            model.monitor.closeChromeTab(tab)
+                        } label: {
+                            Text("Close")
+                                .font(.system(size: 10))
+                                .foregroundStyle(theme.quitText)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(theme.quitBorder, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, Metrics.rowSidePadding)
+                    .padding(.vertical, 2)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        model.monitor.activateChromeTab(tab)
+                    }
+                }
+
+                if tabs.count > 5 {
+                    Button {
+                        model.query = "/tabs"
+                    } label: {
+                        HStack {
+                            Spacer().frame(width: 22)
+                            Text("View all \(tabs.count) tabs & memory breakdown →")
+                                .font(Fonts.monoSmall)
+                                .foregroundStyle(theme.accent)
+                            Spacer()
+                        }
+                        .padding(.horizontal, Metrics.rowSidePadding)
+                        .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+        .background(theme.trackBackground.opacity(0.4), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .padding(.horizontal, Metrics.rowSidePadding)
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 }

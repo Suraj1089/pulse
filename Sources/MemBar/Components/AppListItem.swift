@@ -1,15 +1,20 @@
 import SwiftUI
 
-/// Row with app icon, name, memory usage and an optional Quit button — used
-/// across State A, State D and the memory-chart top-users list, which each
-/// show the Quit button under different rules (never / only when selected /
-/// always), per the handoff markup.
+/// Premium minimalist app row matching the target UI:
+/// 30x30 squircle app icon, 2-line title & subtitle (e.g. "12 tabs"),
+/// formatted memory footprint, and a clean pill Quit button.
 struct AppListItem: View {
     @Environment(\.colorScheme) private var scheme
     let app: AppUsage
     var isSelected: Bool = false
-    var quitMode: QuitMode = .never
+    var quitMode: QuitMode = .always
+    var quitLabel: String = "Quit"
+    var isDestructive: Bool = false
     var showProgress: Bool = false
+    var hasExpandSlot: Bool = false
+    var isExpandable: Bool = false
+    var isExpanded: Bool = false
+    var onToggleExpand: () -> Void = {}
     var onHover: (Bool) -> Void = { _ in }
     var onQuit: () -> Void = {}
 
@@ -17,59 +22,84 @@ struct AppListItem: View {
 
     var body: some View {
         let theme = Theme(scheme: scheme)
-        let hasReason = app.reason != nil
+        let subtitleText = app.reason ?? "Active"
+
         HStack(spacing: 10) {
+            // App Icon
             if let icon = app.icon {
                 Image(nsImage: icon)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 19, height: 19)
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .frame(width: 30, height: 30)
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             } else {
                 Text(app.initial)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 19, height: 19)
-                    .background(app.color, in: RoundedRectangle(cornerRadius: 5))
+                    .frame(width: 30, height: 30)
+                    .background(app.color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             }
 
-            if let reason = app.reason {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(app.name).font(Fonts.body).foregroundStyle(theme.textPrimary).lineLimit(1)
-                    Text(reason).font(Fonts.monoSmall).foregroundStyle(theme.textDim)
+            // Name & Subtitle
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(app.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(theme.textPrimary)
+                        .lineLimit(1)
+
+                    if isExpandable {
+                        Button(action: onToggleExpand) {
+                            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(theme.textDim)
+                                .frame(width: 12, height: 12)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                Text(app.name)
-                    .font(Fonts.body)
-                    .foregroundStyle(theme.textPrimary)
+
+                Text(subtitleText)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(theme.textDim)
                     .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            if showProgress {
-                ZStack(alignment: .leading) {
-                    Capsule().fill(theme.trackBackground).frame(width: 120, height: 5)
-                    Capsule().fill(app.color).frame(width: max(2, 120 * CGFloat(app.pct / 100)), height: 5)
-                }
-                .animation(.easeOut(duration: 0.5), value: app.pct)
-            }
-
+            // Memory readout
             Text(app.memText)
-                .font(Fonts.mono)
-                .foregroundStyle(theme.textDim)
-                .frame(width: showProgress ? 52 : nil, alignment: .trailing)
+                .font(.system(size: 12.5, weight: .medium, design: .monospaced))
+                .foregroundStyle(theme.textPrimary)
+                .frame(minWidth: 54, alignment: .trailing)
 
+            // Minimalist Quit / Force Quit Pill Button
             let showQuit = quitMode == .always || (quitMode == .onSelected && isSelected)
             if showQuit {
-                QuitButton(filled: hasReason, action: onQuit)
+                Button(action: onQuit) {
+                    Text(quitLabel)
+                        .font(.system(size: isDestructive ? 10.5 : 11, weight: .medium))
+                        .foregroundStyle(isDestructive ? Color(red: 1.0, green: 0.35, blue: 0.35) : theme.textPrimary)
+                        .padding(.horizontal, isDestructive ? 7 : 0)
+                        .frame(minWidth: 46)
+                        .frame(height: 24)
+                        .background(
+                            isDestructive ? Color.red.opacity(0.14) : theme.pillBackground,
+                            in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .strokeBorder(isDestructive ? Color.red.opacity(0.35) : theme.pillBorder, lineWidth: 0.8)
+                        )
+                }
+                .buttonStyle(.plain)
+            } else {
+                Spacer().frame(width: isDestructive ? 68 : 46)
             }
         }
         .padding(.horizontal, Metrics.rowSidePadding)
-        .frame(height: hasReason ? Metrics.rowHeightWithReason : Metrics.rowHeight)
-        .background(isSelected ? theme.rowSelected : .clear, in: RoundedRectangle(cornerRadius: Metrics.rowRadius))
+        .frame(height: Metrics.rowHeight)
+        .background(isSelected ? theme.rowSelected : .clear, in: RoundedRectangle(cornerRadius: Metrics.rowRadius, style: .continuous))
         .contentShape(Rectangle())
         .onHover(perform: onHover)
-        .animation(.linear(duration: 0.14), value: isSelected)
     }
 }

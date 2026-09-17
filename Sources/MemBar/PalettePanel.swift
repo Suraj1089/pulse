@@ -5,9 +5,9 @@ import SwiftUI
 /// Per the 1g handoff notes: "NSPanel, non-activating, .floating level, 13px
 /// radius, no titlebar... Loses focus → closes."
 final class PalettePanel: NSPanel {
-    init(model: PaletteViewModel, onEscape: @escaping () -> Void, onHeightChange: @escaping (CGFloat) -> Void) {
+    init(model: PaletteViewModel, onEscape: @escaping () -> Void) {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: Metrics.windowWidth, height: Metrics.windowMinHeight),
+            contentRect: NSRect(x: 0, y: 0, width: Metrics.windowWidth, height: 490),
             styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -21,7 +21,7 @@ final class PalettePanel: NSPanel {
         hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-        let hosting = NSHostingView(rootView: CommandPaletteView(model: model, onEscape: onEscape, onHeightChange: onHeightChange))
+        let hosting = NSHostingView(rootView: CommandPaletteView(model: model, onEscape: onEscape))
         hosting.frame = NSRect(origin: .zero, size: frame.size)
         contentView = hosting
     }
