@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
+        seedStatusItemPositionOnFirstLaunch()
         setupStatusItem()
 
         cancellable = model.monitor.$pressureLevel
@@ -45,6 +46,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // MARK: - Status item
 
+    private static let statusItemAutosaveName = "PulseStatusItem"
+
+    /// macOS remembers where a status item sits under
+    /// `NSStatusItem Preferred Position <autosaveName>` — a point offset measured
+    /// from the right edge of the menu bar, so a *small* value sits close to
+    /// Control Center. Without a seed the very first launch drops Pulse into the
+    /// leftmost slot, which is exactly where a crowded bar (or the notch) swallows
+    /// it. We write the slot once, before the item exists, and never again, so a
+    /// ⌘-drag by the user is still what wins from then on.
+    private func seedStatusItemPositionOnFirstLaunch() {
+        let defaults = UserDefaults.standard
+        let didSeedKey = "PulseDidSeedStatusItemPosition"
+        guard !defaults.bool(forKey: didSeedKey) else { return }
+
+        let name = Self.statusItemAutosaveName
+        defaults.set(8.0, forKey: "NSStatusItem Preferred Position \(name)")
+        defaults.set(true, forKey: "NSStatusItem Visible \(name)")
+        defaults.set(true, forKey: didSeedKey)
+    }
+
     private func setupStatusItem() {
         // Remove any existing item first so we don't leak it when called
         // during a screen-change rebuild.
@@ -52,7 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSStatusBar.system.removeStatusItem(statusItem)
         }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.autosaveName = "PulseStatusItem"
+        statusItem.autosaveName = Self.statusItemAutosaveName
         statusItem.isVisible = true
         statusItem.button?.action = #selector(togglePanel)
         statusItem.button?.target = self

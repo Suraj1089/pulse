@@ -150,10 +150,22 @@ CommandPaletteView  switch model.state {
 ### Update Flow
 
 `UpdateChecker` (singleton `UpdateChecker.shared`):
-1. Fetches `https://pulse0.app/VERSION` (plain text, no GitHub API)
-2. Compares with `CFBundleShortVersionString`
-3. If newer: sets `checkState = .updateAvailable(latest:)` → footer pill appears
-4. `performUpdate()`: downloads `releases/latest/download/Pulse.zip`, unzips, replaces `/Applications/Pulse.app`, clears quarantine, relaunches
+1. Fetches `https://pulse0.app/VERSION` (plain text, no GitHub API). The HTTP status
+   is checked by hand — `URLSession` does not throw on 4xx — and the body must parse
+   as `N.N[.N[.N]]`, so a 404 page or SPA fallback surfaces as `.error` instead of
+   being silently read as "up to date".
+2. On failure, falls back to a `HEAD` on `github.com/Suraj1089/pulse/releases/latest`
+   and reads the tag off the redirect target (`/releases/tag/vX.Y.Z`). This is the
+   plain web endpoint, not `api.github.com`, so it is not rate limited. The fallback
+   exists because `site/VERSION` is hand-maintained and drifts; the release is truth.
+3. Compares with `CFBundleShortVersionString`
+4. If newer: sets `checkState = .updateAvailable(latest:)` → footer pill appears
+5. `performUpdate()`: downloads `releases/latest/download/Pulse.zip` (streamed to disk
+   in 64 KB chunks), unzips, clears quarantine, then stages the new bundle beside the
+   **running** bundle (`Bundle.main.bundleURL`, not a hardcoded `/Applications`) and
+   swaps it in with `replaceItemAt` so a failed copy can never leave the user with no
+   app. Relaunch is a detached `/bin/sh` that waits for this PID to exit before
+   `open`ing — `open` is a no-op while an instance of the same bundle ID is alive.
 
 ---
 
@@ -196,10 +208,10 @@ CommandPaletteView  switch model.state {
 - **Apple-minimalist UI** — vibrancy materials, OKLCH colors, SF Symbols, no custom assets beyond the app icon
 - **Single SwiftPM package** — no CocoaPods, no Carthage, no SPM plugins
 - **LSUIElement** — no Dock icon, lives only in menu bar
-- **`autosaveName = "PulseStatusItem"`** — position persists across reboots; user can ⌘-drag to reorder
+- **`autosaveName = "PulseStatusItem"`** — position persists across reboots; user can ⌘-drag to reorder. On the very first launch `seedStatusItemPositionOnFirstLaunch()` writes `NSStatusItem Preferred Position PulseStatusItem` (a point offset from the *right* edge of the menu bar, so small = near Control Center) and `NSStatusItem Visible PulseStatusItem`, guarded by the `PulseDidSeedStatusItemPosition` flag. Without it macOS drops Pulse into the leftmost slot, where a crowded bar or the notch hides it; the one-shot guard means a later ⌘-drag by the user still wins.
 
 ---
 
 ## Copyright
 
-© 2026 px0 · MIT licensed
+© 2026 pulse0.app · MIT licensed

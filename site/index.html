@@ -135,6 +135,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 24px;
     }
 
     .brand {
@@ -146,33 +147,28 @@
       font-weight: 700;
       font-size: 19px;
       letter-spacing: -0.3px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .brand-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: #111827;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      gap: 2.5px;
-      padding-bottom: 6px;
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      overflow: hidden;
+      flex-shrink: 0;
     }
-
-    .brand-icon span {
-      width: 3px;
-      background: #38bdf8;
-      border-radius: 2px;
+    .brand-icon img {
+      width: 100%;
+      height: 100%;
+      display: block;
     }
-    .brand-icon span:nth-child(1) { height: 8px; }
-    .brand-icon span:nth-child(2) { height: 13px; }
-    .brand-icon span:nth-child(3) { height: 17px; }
 
     .nav-actions {
       display: flex;
       align-items: center;
       gap: 24px;
+      flex-shrink: 0;
     }
 
     .nav-link {
@@ -180,11 +176,13 @@
       text-decoration: none;
       font-size: 14px;
       font-weight: 500;
+      white-space: nowrap;
       transition: color 0.15s;
     }
     .nav-link:hover { color: var(--text); }
 
     .btn-nav-download {
+      white-space: nowrap;
       background: #111827;
       color: #ffffff;
       padding: 8px 20px;
@@ -606,16 +604,6 @@
       align-items: center;
       gap: 6px;
     }
-    .nav-stars-pill {
-      font-size: 11px;
-      font-weight: 600;
-      background: #f3f4f6;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 1px 6px;
-      color: #4b5563;
-    }
-
     /* Responsive */
     @media (max-width: 900px) {
       .hero-container {
@@ -629,6 +617,20 @@
       .features-section { grid-template-columns: 1fr; gap: 32px; }
       .secondary-section { grid-template-columns: 1fr; gap: 36px; }
       .hero-macbook-img { max-width: 520px; margin: 0 auto; }
+    }
+
+    @media (max-width: 560px) {
+      header { padding: 18px 20px; gap: 12px; }
+      .brand { font-size: 17px; gap: 9px; }
+      .brand-icon { width: 25px; height: 25px; }
+      .nav-actions { gap: 14px; }
+      .nav-link { font-size: 13px; }
+      .btn-nav-download { padding: 7px 15px; font-size: 12.5px; }
+      .hero-container { padding: 0 20px; }
+    }
+
+    @media (max-width: 400px) {
+      .nav-link-releases { display: none; }
     }
 
     /* Site Footer */
@@ -763,16 +765,15 @@
   <header>
     <a href="#" class="brand">
       <div class="brand-icon">
-        <span></span><span></span><span></span>
+        <img src="icon-512.png" alt="Pulse icon">
       </div>
       <span>Pulse</span>
     </a>
     <div class="nav-actions">
       <a href="https://github.com/Suraj1089/pulse" target="_blank" rel="noopener" class="nav-link nav-github-link">
         GitHub
-        <span class="nav-stars-pill" id="navStarPill">★ 0</span>
       </a>
-      <a href="https://github.com/Suraj1089/pulse/releases/latest" target="_blank" rel="noopener" class="nav-link">Releases</a>
+      <a href="https://github.com/Suraj1089/pulse/releases/latest" target="_blank" rel="noopener" class="nav-link nav-link-releases">Releases</a>
       <a href="https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg" class="btn-nav-download">Download</a>
     </div>
   </header>
@@ -780,7 +781,6 @@
   <!-- Hero Section -->
   <section class="hero-container">
     <div class="hero-left">
-      <img src="icon-512.png" alt="Pulse app icon" style="width:72px;height:72px;border-radius:16px;margin-bottom:20px;display:block;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
       <h1>Keep your Mac<br>running smoothly.</h1>
 
       <p class="hero-desc">
@@ -812,11 +812,6 @@
         <a href="https://github.com/Suraj1089/pulse/releases" target="_blank" rel="noopener" class="badge-link">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           <span><span id="heroDownloadCount">0</span> downloads</span>
-        </a>
-        <span class="dot-sep">•</span>
-        <a href="https://github.com/Suraj1089/pulse" target="_blank" rel="noopener" class="badge-link">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-          <span><span id="heroStarCount">0</span> stars</span>
         </a>
         <span class="dot-sep">•</span>
         <span>Free & open source</span>
@@ -982,8 +977,8 @@
         <div class="footer-brand">
           <a href="#" class="brand">
             <div class="brand-icon">
-              <span></span><span></span><span></span>
-            </div>
+                <img src="icon-512.png" alt="Pulse icon">
+              </div>
             <span>Pulse</span>
           </a>
           <p class="footer-tagline">
@@ -1021,12 +1016,10 @@
 
       <div class="footer-bottom">
         <div class="footer-copyright">
-          © 2026 px0 · MIT licensed
+          © 2026 pulse0.app · MIT licensed
         </div>
         <div class="footer-legal">
           <span>Crafted for Mac power users</span>
-          <span class="dot-sep">•</span>
-          <a href="https://github.com/Suraj1089/pulse" target="_blank" rel="noopener">Star on GitHub</a>
         </div>
       </div>
     </div>
@@ -1078,10 +1071,6 @@
           const starsFormatted = stars >= 1000 ? (stars / 1000).toFixed(1) + 'k' : stars.toLocaleString();
           const btnStar = document.getElementById('btnStarCount');
           if (btnStar) btnStar.textContent = '★ ' + starsFormatted;
-          const navStar = document.getElementById('navStarPill');
-          if (navStar) navStar.textContent = '★ ' + starsFormatted;
-          const heroStar = document.getElementById('heroStarCount');
-          if (heroStar) heroStar.textContent = starsFormatted;
         }
       } catch (e) {
         console.debug('Failed to fetch stars', e);
