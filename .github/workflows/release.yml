@@ -2,12 +2,13 @@ name: Release Pulse
 
 on:
   push:
+    branches:
+      - main
     paths:
       - 'VERSION'
     tags:
       - 'v*'
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   build-and-release:
@@ -15,9 +16,6 @@ jobs:
     runs-on: macos-14
     permissions:
       contents: write
-
-    # Run if triggered by tag, VERSION file change, or commit message containing "release:"
-    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, 'release:') || contains(github.event.head_commit.modified, 'VERSION')
 
     steps:
       - name: Checkout Code
@@ -34,11 +32,6 @@ jobs:
           elif [ -f "VERSION" ]; then
             RAW_VER=$(tr -d '[:space:]' < VERSION)
             TAG_NAME="v$RAW_VER"
-
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag -fa "$TAG_NAME" -m "Release $TAG_NAME"
-            git push origin "$TAG_NAME" --force
           else
             RAW_VER="1.0.0"
             TAG_NAME="v1.0.0"
@@ -56,6 +49,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version_step.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           name: Pulse ${{ steps.version_step.outputs.tag }}
           files: |
             dist/*.dmg
