@@ -1,29 +1,50 @@
 import AppKit
 import Combine
 import SwiftUI
+@preconcurrency import UserNotifications
 
 /// Owns the status item, the palette panel, and the click / hotkey / focus-loss
 /// plumbing described in 1a/1g: click opens the palette anchored under the
 /// icon (right edge aligned, 6px below the menu bar); ⌘⌥M opens it screen-
 /// centered instead; losing focus closes it.
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUserNotificationCenterDelegate {
     private var statusItem: NSStatusItem!
     private var panel: PalettePanel?
     private let model = PaletteViewModel()
-    private var cancellable: AnyCancellable?
+    private var cancellables = Set<AnyCancellable>()
     private var hotKeyMonitor: Any?
+    private var hasPostedHighMemoryAlert = false
+    private var lastMemoryAlertDate: Date?
+
+    private var supportsUserNotifications: Bool {
+        Bundle.main.bundleURL.pathExtension == "app"
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        if supportsUserNotifications {
+            UNUserNotificationCenter.current().delegate = self
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        }
+        model.start()
 
         seedStatusItemPositionOnFirstLaunch()
         setupStatusItem()
 
-        cancellable = model.monitor.$pressureLevel
-            .removeDuplicates()
+        model.monitor.$memory
+            .combineLatest(model.monitor.$pressureLevel)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.updateIcon() }
+            .sink { [weak self] _ in
+                self?.updateIcon()
+                self?.evaluateMemoryAlert()
+            }
+            .store(in: &cancellables)
+
+        model.monitor.$tabAttributions
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.evaluateMemoryAlert() }
+            .store(in: &cancellables)
 
         // Recreate the status item whenever the screen configuration changes
         // (monitor connect/disconnect). Without this the item can vanish when
@@ -90,12 +111,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private var lastRenderedLevel: PressureLevel?
+    private var lastRenderedUsedFraction: Double?
 
     private func updateIcon() {
-        guard model.level != lastRenderedLevel else { return }
+        let usedFraction = model.monitor.memory?.usedFraction ?? 0
+        guard model.level != lastRenderedLevel || usedFraction != lastRenderedUsedFraction else { return }
         lastRenderedLevel = model.level
+        lastRenderedUsedFraction = usedFraction
 
-        let renderer = ImageRenderer(content: MenuBarIconView(level: model.level))
+        let renderer = ImageRenderer(content: MenuBarIconView(
+            level: model.level,
+            usedFraction: usedFraction
+        ))
         renderer.scale = 2
 
         if let rendered = renderer.nsImage {
@@ -105,6 +132,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let fallback = NSImage(systemSymbolName: "memorychip", accessibilityDescription: "Memory") ?? NSImage()
             fallback.isTemplate = true
             statusItem.button?.image = fallback
+        }
+    }
+
+    private func evaluateMemoryAlert() {
+        guard supportsUserNotifications else { return }
+        guard let snapshot = model.monitor.memory else { return }
+        let usedFraction = snapshot.usedFraction
+
+        if usedFraction < 0.80 {
+            hasPostedHighMemoryAlert = false
+            return
+        }
+
+        guard usedFraction >= 0.85,
+              !hasPostedHighMemoryAlert,
+              lastMemoryAlertDate.map({ Date().timeIntervalSince($0) >= 30 * 60 }) ?? true else { return }
+
+        hasPostedHighMemoryAlert = true
+        lastMemoryAlertDate = Date()
+
+        let content = UNMutableNotificationContent()
+        content.title = "Pulse: memory is almost full"
+        if let recommendation = model.monitor.chromeMemoryRecommendation {
+            let minutes = max(15, Int(Date().timeIntervalSince(recommendation.idleSince) / 60))
+            content.body = "\(recommendation.tab.cleanedTitle) has been idle for \(minutes)m and uses about \(Int(recommendation.attribution.totalMB)) MB. Close it to free memory."
+        } else if let app = model.monitor.topApps.first {
+            let footprint = String(format: "%.1f", app.footprintGB)
+            content.body = "Memory is \(Int(usedFraction * 100))% full. Consider quitting \(app.name), using about \(footprint) GB."
+        } else {
+            content.body = "Memory is \(Int(usedFraction * 100))% full. Consider quitting unused apps to free memory."
+        }
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "pulse-high-memory",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        Task { @MainActor [weak self] in
+            self?.openPanel(centered: false)
+            completionHandler()
         }
     }
 

@@ -207,6 +207,7 @@
 
     .hero-left {
       max-width: 480px;
+      min-width: 0;
     }
 
     h1 {
@@ -241,6 +242,7 @@
       font-family: var(--mono);
       font-size: 13.5px;
       color: #e5e7eb;
+      min-width: 0;
       overflow-x: auto;
       white-space: nowrap;
       user-select: all;
@@ -324,6 +326,15 @@
       user-select: none;
       font-size: 11px;
     }
+
+    .platform-notice {
+      display: none;
+      margin: -8px 0 18px;
+      color: #92400e;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .platform-notice.is-visible { display: block; }
 
     /* Hero MacBook Air Mockup */
     .mockup-wrapper {
@@ -612,6 +623,7 @@
         margin-bottom: 40px;
       }
       .hero-left { max-width: 100%; margin: 0 auto; }
+      .platform-notice { text-align: center; }
       .cta-row { justify-content: center; }
       .hero-badges { justify-content: center; }
       .features-section { grid-template-columns: 1fr; gap: 32px; }
@@ -626,11 +638,45 @@
       .nav-actions { gap: 14px; }
       .nav-link { font-size: 13px; }
       .btn-nav-download { padding: 7px 15px; font-size: 12.5px; }
-      .hero-container { padding: 0 20px; }
+      .hero-container {
+        padding: 0 20px;
+        margin-top: 24px;
+      }
+      h1 {
+        font-size: clamp(32px, 9vw, 38px);
+        letter-spacing: -1px;
+      }
+      .hero-desc {
+        font-size: 16px;
+      }
+      .install-box {
+        padding-left: 14px;
+      }
+      .install-text {
+        font-size: 12px;
+      }
+      .cta-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .btn-primary,
+      .btn-secondary {
+        justify-content: center;
+        min-height: 44px;
+        width: 100%;
+      }
+      .hero-badges {
+        justify-content: center;
+        flex-wrap: wrap;
+        white-space: normal;
+        row-gap: 8px;
+      }
     }
 
     @media (max-width: 400px) {
       .nav-link-releases { display: none; }
+      .nav-actions { gap: 8px; }
+      .btn-nav-download { padding-inline: 13px; }
     }
 
     /* Site Footer */
@@ -808,11 +854,15 @@
         </a>
       </div>
 
+      <p class="platform-notice" id="platformNotice" role="status" aria-live="polite"></p>
+
       <div class="hero-badges">
         <a href="https://github.com/Suraj1089/pulse/releases" target="_blank" rel="noopener" class="badge-link">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           <span><span id="heroDownloadCount">0</span> downloads</span>
         </a>
+        <span class="dot-sep">•</span>
+        <span>macOS 14+</span>
         <span class="dot-sep">•</span>
         <span>Free & open source</span>
       </div>
@@ -1026,6 +1076,27 @@
   </footer>
 
   <script>
+    function isMacDesktop() {
+      const userAgent = navigator.userAgent;
+      return /Macintosh|Mac OS X/.test(userAgent) && navigator.maxTouchPoints <= 1;
+    }
+
+    function setupDownloadLinks() {
+      const notice = document.getElementById("platformNotice");
+      if (!notice || isMacDesktop()) return;
+
+      document.querySelectorAll('a[href*=".dmg"]').forEach((link) => {
+        link.addEventListener("click", (event) => {
+          event.preventDefault();
+          notice.textContent = "Pulse is currently available for macOS 14 or later. Open this page on your Mac to download the .dmg.";
+          notice.classList.add("is-visible");
+          notice.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+      });
+    }
+
+    setupDownloadLinks();
+
     function copyInstallCmd() {
       const text = "curl -fsSL https://pulse0.app/install.sh | bash";
       navigator.clipboard.writeText(text).then(() => {
@@ -1063,8 +1134,9 @@
 
     // Fetch live GitHub Stars and Downloads
     async function fetchGitHubStats() {
+      const cacheBust = `_=${Date.now()}`;
       try {
-        const repoRes = await fetch('https://api.github.com/repos/Suraj1089/pulse');
+        const repoRes = await fetch(`https://api.github.com/repos/Suraj1089/pulse?${cacheBust}`, { cache: 'no-store' });
         if (repoRes.ok) {
           const repo = await repoRes.json();
           const stars = repo.stargazers_count ?? 0;
@@ -1077,7 +1149,7 @@
       }
 
       try {
-        const relRes = await fetch('https://api.github.com/repos/Suraj1089/pulse/releases');
+        const relRes = await fetch(`https://api.github.com/repos/Suraj1089/pulse/releases?per_page=100&${cacheBust}`, { cache: 'no-store' });
         if (relRes.ok) {
           const releases = await relRes.json();
           let totalDownloads = 0;
@@ -1107,6 +1179,7 @@
       }
     }
     fetchGitHubStats();
+    window.addEventListener('pageshow', fetchGitHubStats);
   </script>
 </body>
 </html>

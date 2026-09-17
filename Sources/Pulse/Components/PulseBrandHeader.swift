@@ -30,12 +30,22 @@ struct PulseBrandHeader: View {
                             .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.8)
                     )
 
-                // 3 memory signal bars
-                HStack(alignment: .bottom, spacing: 2.5) {
-                    Capsule().fill(theme.blueAccent).frame(width: 3.5, height: 9)
-                    Capsule().fill(theme.blueAccent).frame(width: 3.5, height: 14)
-                    Capsule().fill(theme.blueAccent).frame(width: 3.5, height: 18)
-                }
+                PulseWaveformShape()
+                    .stroke(theme.blueAccent.opacity(0.28), style: StrokeStyle(
+                        lineWidth: 2.5,
+                        lineCap: .round,
+                        lineJoin: .round
+                    ))
+                    .padding(.horizontal, 5)
+
+                PulseWaveformShape()
+                    .trim(from: 0, to: fraction)
+                    .stroke(theme.blueAccent, style: StrokeStyle(
+                        lineWidth: 2.5,
+                        lineCap: .round,
+                        lineJoin: .round
+                    ))
+                    .padding(.horizontal, 5)
             }
             .frame(width: 32, height: 32)
             .shadow(color: .black.opacity(0.12), radius: 3, y: 1)

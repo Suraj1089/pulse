@@ -81,7 +81,6 @@ struct CommandPaletteView: View {
             model.start()
             searchFocused = true
         }
-        .onDisappear { model.stop() }
         .onExitCommand(perform: onEscape)
     }
 

@@ -21,10 +21,30 @@ final class SystemMonitor: ObservableObject {
     private var fastTimer: Timer?
     private var historyTimer: Timer?
     private var chromeTimer: Timer?
+    private var chromeAlertTimer: Timer?
     private var vmTimer: Timer?
+    private var chromeIdleSince: [Int: Date] = [:]
+    private var isStarted = false
     private(set) var isPaletteVisible: Bool = false
 
+    var chromeMemoryRecommendation: (tab: ChromeTab, attribution: TabAttribution, idleSince: Date)? {
+        let now = Date()
+        return chromeTabs
+            .filter { !$0.isActive }
+            .compactMap { tab in
+                guard let idleSince = chromeIdleSince[tab.id],
+                      now.timeIntervalSince(idleSince) >= 15 * 60,
+                      let attribution = tabAttributions[tab.id],
+                      attribution.totalBytes >= 500_000_000 else { return nil }
+                return (tab: tab, attribution: attribution, idleSince: idleSince)
+            }
+            .max { $0.attribution.totalBytes < $1.attribution.totalBytes }
+    }
+
     func start() {
+        guard !isStarted else { return }
+        isStarted = true
+
         pressureMonitor.onChange = { [weak self] kernelLevel in
             guard let self else { return }
             let availLevel = self.memory.map {
@@ -45,19 +65,32 @@ final class SystemMonitor: ObservableObject {
             guard let self, !self.isPaletteVisible else { return }
             self.refreshVMStats()
         }
+        chromeAlertTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            guard let self,
+                  !self.isPaletteVisible,
+                  let memory = self.memory,
+                  memory.usedFraction >= 0.85,
+                  ChromeTabsBridge.isRunning else { return }
+            self.refreshFast()
+        }
         historyTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshHistorySample() }
     }
 
     func stop() {
+        guard isStarted else { return }
+        isStarted = false
+
         pressureMonitor.stop()
         appsMonitor.stop()
         fastTimer?.invalidate()
         historyTimer?.invalidate()
         chromeTimer?.invalidate()
+        chromeAlertTimer?.invalidate()
         vmTimer?.invalidate()
         fastTimer = nil
         historyTimer = nil
         chromeTimer = nil
+        chromeAlertTimer = nil
         vmTimer = nil
     }
 
@@ -131,7 +164,8 @@ final class SystemMonitor: ObservableObject {
 
             // 2. Fetch tabs only if Chrome watching is active (accordion expanded or Chrome state view)
             var currentTabs: [ChromeTab]? = nil
-            if self.chromeTimer != nil && ChromeTabsBridge.isRunning {
+            let shouldMonitorChromeForAlert = self.memory?.usedFraction ?? 0 >= 0.85
+            if (self.chromeTimer != nil || shouldMonitorChromeForAlert) && ChromeTabsBridge.isRunning {
                 currentTabs = ChromeTabsBridge.fetchTabs()
             }
 
@@ -155,6 +189,7 @@ final class SystemMonitor: ObservableObject {
                 self.tabAttributions = attributions
                 if let currentTabs {
                     self.chromeTabs = currentTabs
+                    self.updateChromeIdleTracking(currentTabs)
                 }
             }
         }
@@ -178,6 +213,20 @@ final class SystemMonitor: ObservableObject {
     }
 
     // MARK: - Chrome
+
+    private func updateChromeIdleTracking(_ tabs: [ChromeTab]) {
+        let now = Date()
+        let currentIDs = Set(tabs.map(\.id))
+        chromeIdleSince = chromeIdleSince.filter { currentIDs.contains($0.key) }
+
+        for tab in tabs {
+            if tab.isActive {
+                chromeIdleSince[tab.id] = nil
+            } else if chromeIdleSince[tab.id] == nil {
+                chromeIdleSince[tab.id] = now
+            }
+        }
+    }
 
     func startWatchingChrome() {
         guard chromeTimer == nil else { return }

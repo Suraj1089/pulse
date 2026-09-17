@@ -16,7 +16,11 @@ ZIP_NAME="Pulse-$VERSION.zip"
 
 echo "==> Building release binary for version $VERSION..."
 cd "$REPO_ROOT"
-swift build -c release
+ARM64_BIN_DIR=$(swift build -c release --triple arm64-apple-macosx14.0 --show-bin-path)
+X86_64_BIN_DIR=$(swift build -c release --triple x86_64-apple-macosx14.0 --show-bin-path)
+UNIVERSAL_BIN="$REPO_ROOT/.build/universal/Pulse"
+mkdir -p "$(dirname "$UNIVERSAL_BIN")"
+lipo -create "$ARM64_BIN_DIR/Pulse" "$X86_64_BIN_DIR/Pulse" -output "$UNIVERSAL_BIN"
 
 echo "==> Creating clean app bundle structure..."
 rm -rf "$DIST_DIR"
@@ -24,7 +28,7 @@ mkdir -p "$DIST_DIR"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
-cp "$REPO_ROOT/.build/release/Pulse" "$APP_BUNDLE/Contents/MacOS/Pulse"
+cp "$UNIVERSAL_BIN" "$APP_BUNDLE/Contents/MacOS/Pulse"
 chmod +x "$APP_BUNDLE/Contents/MacOS/Pulse"
 
 if [ -f "$REPO_ROOT/Sources/Pulse/Resources/Info.plist" ]; then
@@ -33,6 +37,10 @@ if [ -f "$REPO_ROOT/Sources/Pulse/Resources/Info.plist" ]; then
     plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true
     plutil -replace CFBundleVersion -string "$VERSION" "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true
 fi
+
+  if [ -f "$REPO_ROOT/Sources/Pulse/Resources/AppIcon.icns" ]; then
+    cp "$REPO_ROOT/Sources/Pulse/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+  fi
 
 echo "==> Ad-hoc code signing the application..."
 codesign --force --deep -s - "$APP_BUNDLE"
