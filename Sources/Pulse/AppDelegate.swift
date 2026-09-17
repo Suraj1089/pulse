@@ -52,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSStatusBar.system.removeStatusItem(statusItem)
         }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem.autosaveName = "PulseStatusItem"
         statusItem.isVisible = true
         statusItem.button?.action = #selector(togglePanel)
         statusItem.button?.target = self
@@ -110,8 +111,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func openPanel(centered: Bool) {
         let p = ensurePanel()
         let panelHeight: CGFloat = 490
-        if centered, let screen = NSScreen.main {
-            let frame = screen.frame
+        let isButtonVisible = statusItem.button?.window != nil && (statusItem.button?.window?.frame.minX ?? 0) > 0
+
+        if centered || !isButtonVisible, let screen = NSScreen.main {
+            let frame = screen.visibleFrame
             let origin = NSPoint(
                 x: frame.midX - Metrics.windowWidth / 2,
                 y: frame.midY - panelHeight / 2
