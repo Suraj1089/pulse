@@ -162,6 +162,14 @@ final class UpdateChecker: ObservableObject {
 
     private func installLatest() async throws {
         let destination = Bundle.main.bundleURL
+        // The version endpoint and GitHub's `latest` asset are published by
+        // separate systems. If the site gets ahead of the release, never swap
+        // in an older archive and report success: keep the current app intact
+        // and let the user retry once the release has finished publishing.
+        let expectedVersion = latestVersion.isEmpty
+            ? try await fetchLatestVersion()
+            : latestVersion
+
         // Fail before downloading 10 MB if we could never write the result —
         // e.g. running from a read-only DMG or a directory owned by root.
         try Self.verifyWritable(destination)
@@ -184,6 +192,17 @@ final class UpdateChecker: ObservableObject {
         let newApp = extracted.appendingPathComponent("Pulse.app")
         guard FileManager.default.fileExists(atPath: newApp.appendingPathComponent("Contents/MacOS").path) else {
             throw UpdateError.appNotFound
+        }
+        let infoPlist = newApp.appendingPathComponent("Contents/Info.plist")
+        let downloadedVersion = (try? PropertyListSerialization.propertyList(
+            from: Data(contentsOf: infoPlist),
+            format: nil
+        ) as? [String: Any])?["CFBundleShortVersionString"] as? String
+        guard downloadedVersion == expectedVersion else {
+            throw UpdateError.versionMismatch(
+                expected: expectedVersion,
+                downloaded: downloadedVersion ?? "unknown"
+            )
         }
 
         // 3. Clear quarantine before the swap, so the app we hand over is
@@ -321,6 +340,7 @@ final class UpdateChecker: ObservableObject {
         case notWritable(path: String)
         case commandFailed(command: String, status: Int32)
         case emptyDownload
+        case versionMismatch(expected: String, downloaded: String)
 
         var errorDescription: String? {
             switch self {
@@ -339,6 +359,8 @@ final class UpdateChecker: ObservableObject {
                 return "\(command) failed with status \(status)."
             case .emptyDownload:
                 return "Downloaded archive was empty."
+            case .versionMismatch(let expected, let downloaded):
+                return "Downloaded Pulse \(downloaded), but version \(expected) is still publishing. Try again shortly."
             }
         }
     }

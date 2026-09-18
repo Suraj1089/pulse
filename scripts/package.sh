@@ -16,7 +16,12 @@ ZIP_NAME="Pulse-$VERSION.zip"
 
 echo "==> Building release binary for version $VERSION..."
 cd "$REPO_ROOT"
+# `--show-bin-path` only reports where Swift *would* put the binary; it does
+# not build it. Build each architecture first so a clean CI runner has real
+# inputs for lipo.
+swift build -c release --triple arm64-apple-macosx14.0
 ARM64_BIN_DIR=$(swift build -c release --triple arm64-apple-macosx14.0 --show-bin-path)
+swift build -c release --triple x86_64-apple-macosx14.0
 X86_64_BIN_DIR=$(swift build -c release --triple x86_64-apple-macosx14.0 --show-bin-path)
 UNIVERSAL_BIN="$REPO_ROOT/.build/universal/Pulse"
 mkdir -p "$(dirname "$UNIVERSAL_BIN")"
