@@ -59,7 +59,7 @@ struct CommandSuggestionsView: View {
 
                                 Spacer()
 
-                                Text("↵ select")
+                                Text("⇥ complete")
                                     .font(Fonts.monoTiny)
                                     .foregroundStyle(isSelected ? theme.accent : Color.clear)
                             }

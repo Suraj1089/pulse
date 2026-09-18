@@ -903,7 +903,7 @@
       <div class="hero-badges">
         <a href="https://github.com/Suraj1089/pulse/releases" target="_blank" rel="noopener" class="badge-link">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-          <span><span id="heroDownloadCount">0</span> downloads</span>
+          <span>Latest release</span>
         </a>
         <span class="dot-sep">•</span>
         <span>macOS 14+</span>
@@ -916,7 +916,7 @@
     <div class="mockup-wrapper">
       <picture>
         <source srcset="macbook-preview.webp" type="image/webp">
-        <img src="macbook-preview.png" alt="Pulse running on macOS MacBook Air showing real-time memory monitor and command palette" class="hero-macbook-img" width="1024" height="682" loading="eager" fetchpriority="high">
+        <img src="macbook-preview.png" alt="Pulse on a MacBook, showing resident-memory apps and suggested actions in the macOS command palette" class="hero-macbook-img" width="1561" height="1008" loading="eager" fetchpriority="high">
       </picture>
     </div>
   </section>
@@ -1184,7 +1184,9 @@
       }
     });
 
-    // Fetch live GitHub Stars and Downloads
+    // Fetch the public GitHub star count. GitHub release download counts are
+    // intentionally not shown: they include updates, repeat downloads, and
+    // automated fetches, so they are not a count of people using Pulse.
     async function fetchGitHubStats() {
       const cacheBust = `_=${Date.now()}`;
       try {
@@ -1200,35 +1202,6 @@
         console.debug('Failed to fetch stars', e);
       }
 
-      try {
-        const relRes = await fetch(`https://api.github.com/repos/Suraj1089/pulse/releases?per_page=100&${cacheBust}`, { cache: 'no-store' });
-        if (relRes.ok) {
-          const releases = await relRes.json();
-          let totalDownloads = 0;
-          if (Array.isArray(releases) && releases.length > 0) {
-            const latest = releases[0];
-            const dmg = latest.assets?.find(a => a.name.endsWith('.dmg'));
-            if (dmg && dmg.browser_download_url) {
-              document.querySelectorAll('a[href*=".dmg"]').forEach(link => {
-                link.href = dmg.browser_download_url;
-              });
-            }
-
-            for (const r of releases) {
-              if (Array.isArray(r.assets)) {
-                for (const a of r.assets) {
-                  totalDownloads += (a.download_count || 0);
-                }
-              }
-            }
-          }
-          const dlFormatted = totalDownloads >= 1000 ? (totalDownloads / 1000).toFixed(1) + 'k' : totalDownloads.toLocaleString();
-          const heroDl = document.getElementById('heroDownloadCount');
-          if (heroDl) heroDl.textContent = dlFormatted;
-        }
-      } catch (e) {
-        console.debug('Failed to fetch downloads', e);
-      }
     }
     fetchGitHubStats();
     window.addEventListener('pageshow', fetchGitHubStats);

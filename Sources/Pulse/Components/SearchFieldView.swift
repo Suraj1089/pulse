@@ -8,6 +8,7 @@ struct SearchFieldView: View {
     var showKeyHints: Bool
     var isFocused: FocusState<Bool>.Binding
     var onSubmit: () -> Void = {}
+    var onTab: () -> Bool = { false }
 
     var body: some View {
         let theme = Theme(scheme: scheme)
@@ -26,7 +27,8 @@ struct SearchFieldView: View {
                 SearchFieldRepresentable(
                     text: $query,
                     isFocused: isFocused.wrappedValue,
-                    onSubmit: onSubmit
+                    onSubmit: onSubmit,
+                    onTab: onTab
                 )
                 .frame(height: 22)
             }
@@ -76,9 +78,10 @@ struct SearchFieldRepresentable: NSViewRepresentable {
     @Binding var text: String
     var isFocused: Bool
     var onSubmit: () -> Void
+    var onTab: () -> Bool
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, onSubmit: onSubmit)
+        Coordinator(text: $text, onSubmit: onSubmit, onTab: onTab)
     }
 
     func makeNSView(context: Context) -> NoAutoFillTextField {
@@ -109,10 +112,12 @@ struct SearchFieldRepresentable: NSViewRepresentable {
     class Coordinator: NSObject, NSTextFieldDelegate {
         @Binding var text: String
         var onSubmit: () -> Void
+        var onTab: () -> Bool
 
-        init(text: Binding<String>, onSubmit: @escaping () -> Void) {
+        init(text: Binding<String>, onSubmit: @escaping () -> Void, onTab: @escaping () -> Bool) {
             self._text = text
             self.onSubmit = onSubmit
+            self.onTab = onTab
         }
 
         func controlTextDidChange(_ obj: Notification) {
@@ -125,6 +130,9 @@ struct SearchFieldRepresentable: NSViewRepresentable {
             if commandSelector == #selector(NSResponder.insertNewline(_:)) {
                 onSubmit()
                 return true
+            }
+            if commandSelector == #selector(NSResponder.insertTab(_:)) {
+                return onTab()
             }
             return false
         }

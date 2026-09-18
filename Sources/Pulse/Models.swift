@@ -186,7 +186,7 @@ struct SlashCommand: Identifiable, Equatable {
         SlashCommand(
             name: "/tabs",
             trigger: "/tabs",
-            description: "Review & close heavy Google Chrome tabs",
+            description: "Review open Google Chrome tabs",
             iconName: "globe",
             example: "/tabs",
             template: "/tabs"

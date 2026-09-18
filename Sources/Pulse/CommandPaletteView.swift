@@ -22,7 +22,8 @@ struct CommandPaletteView: View {
                 query: $model.query,
                 showKeyHints: model.showKeyHints,
                 isFocused: $searchFocused,
-                onSubmit: handleSearchSubmit
+                onSubmit: handleSearchSubmit,
+                onTab: completeCommandSuggestion
             )
 
             ScrollView(showsIndicators: false) {
@@ -115,5 +116,17 @@ struct CommandPaletteView: View {
         default:
             break
         }
+    }
+
+    /// Accept the top slash-command suggestion without running it. This keeps
+    /// Tab predictable: `/hel` becomes `/help`, while Return remains the
+    /// command-selection key.
+    private func completeCommandSuggestion() -> Bool {
+        guard case .commandSuggestions(let filter) = model.state,
+              let command = model.matchingCommands(for: filter).first else {
+            return false
+        }
+        model.query = command.template
+        return true
     }
 }
