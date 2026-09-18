@@ -1,12 +1,9 @@
 import SwiftUI
 
-/// Detailed per-tab and process breakdown for Google Chrome.
-/// Attributes memory honest to tabs via burst-pairing with OOPIF subframe support.
+/// A compact, read-only per-tab memory list for Google Chrome.
 struct ChromeTabsStateView: View {
     @Environment(\.colorScheme) private var scheme
     @ObservedObject var model: PaletteViewModel
-    @State private var selectedTabID: Int?
-    @State private var expandedTabID: Int?
 
     private var chromeApp: RunningAppUsage? {
         model.monitor.topApps.first { $0.bundleIdentifier == ChromeTabsBridge.bundleIdentifier }
@@ -57,18 +54,6 @@ struct ChromeTabsStateView: View {
             }
             return a.tabIndex < b.tabIndex
         }
-    }
-
-    private var largestTabBytes: UInt64 {
-        attributions.values.map { $0.totalBytes }.max() ?? 1
-    }
-
-    private var measuredCount: Int {
-        tabs.filter { (attributions[$0.id]?.totalBytes ?? 0) > 0 }.count
-    }
-
-    private var backgroundTabCount: Int {
-        tabs.filter { !$0.isActive }.count
     }
 
     var body: some View {
@@ -124,36 +109,19 @@ struct ChromeTabsStateView: View {
                     .padding(.bottom, 10)
             }
 
-            // Section Header: Top 5 memory-heavy tabs
-            HStack {
-                SectionHeader(title: "Top 5 memory-heavy tabs")
-                Spacer()
-                Text("Close tabs to reclaim RAM")
-                    .font(Fonts.monoTiny)
-                    .foregroundStyle(theme.hint)
+            if let recommendation = model.monitor.chromeMemoryRecommendation {
+                reviewRecommendation(recommendation, theme: theme)
+                    .padding(.horizontal, Metrics.rowSidePadding)
+                    .padding(.bottom, 10)
             }
+
+            SectionHeader(title: "Memory-heavy tabs")
             .padding(.bottom, 4)
 
-            // Tab rows: Top 5 most memory consuming tabs
+            // Keep this list deliberately scannable: title and memory only.
             VStack(spacing: 1) {
                 ForEach(Array(sortedTabs.prefix(5))) { tab in
-                    let attr = attributions[tab.id]
-                    let isSelected = selectedTabID == tab.id
-                    let isExpanded = expandedTabID == tab.id
-
-                    VStack(spacing: 0) {
-                        tabRow(
-                            tab: tab,
-                            attr: attr,
-                            isSelected: isSelected,
-                            isExpanded: isExpanded,
-                            theme: theme
-                        )
-
-                        if isExpanded, let attr, attr.processCount > 1 {
-                            tabDetailBreakdown(attr, theme: theme)
-                        }
-                    }
+                    tabRow(tab: tab, memoryBytes: attributions[tab.id]?.totalBytes ?? 0, theme: theme)
                 }
             }
 
@@ -168,32 +136,6 @@ struct ChromeTabsStateView: View {
                 .padding(.top, 4)
             }
 
-            // Aggregate subframes callout
-            aggregateSubframesCallout(theme)
-                .padding(.top, 10)
-
-            // Close background tabs action
-            if backgroundTabCount > 0 {
-                Button {
-                    model.monitor.closeBackgroundChromeTabs()
-                } label: {
-                    HStack(spacing: 10) {
-                        Text("→").font(.system(size: 13)).foregroundStyle(theme.textMuted)
-                        Text("Close \(backgroundTabCount) background tab\(backgroundTabCount == 1 ? "" : "s")")
-                            .font(Fonts.body).foregroundStyle(theme.textSecondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text("↵").font(Fonts.monoSmall).foregroundStyle(theme.hint)
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(theme.border, lineWidth: 1))
-                    }
-                    .padding(.horizontal, Metrics.rowSidePadding)
-                    .frame(height: 38)
-                    .background(theme.rowSelected.opacity(0.6), in: RoundedRectangle(cornerRadius: Metrics.rowRadius))
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 8)
-            }
-
             // Non-closeable browser overhead footer
             if let dist = distribution, dist.overheadBytes > 0 {
                 HStack {
@@ -201,7 +143,7 @@ struct ChromeTabsStateView: View {
                         .font(Fonts.monoTiny)
                         .foregroundStyle(theme.hint)
                     Spacer()
-                    Text(String(format: "%.1f GB · not closeable", dist.overheadGB))
+                    Text(String(format: "%.1f GB resident · not tied to a tab", dist.overheadGB))
                         .font(Fonts.monoTiny)
                         .foregroundStyle(theme.hint)
                 }
@@ -260,6 +202,40 @@ struct ChromeTabsStateView: View {
     }
 
     @ViewBuilder
+    private func reviewRecommendation(
+        _ recommendation: (tab: ChromeTab, attribution: TabAttribution, idleSince: Date),
+        theme: Theme
+    ) -> some View {
+        let minutes = max(15, Int(Date().timeIntervalSince(recommendation.idleSince) / 60))
+        Button {
+            model.monitor.activateChromeTab(recommendation.tab)
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(theme.accent)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Review this idle tab")
+                        .font(Fonts.bodyStrong)
+                        .foregroundStyle(theme.textPrimary)
+                    Text("\(recommendation.tab.cleanedTitle) · \(minutes)m idle · \(Int(recommendation.attribution.totalMB)) MB")
+                        .font(Fonts.monoTiny)
+                        .foregroundStyle(theme.textDim)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Text("Open")
+                    .font(Fonts.monoSmall)
+                    .foregroundStyle(theme.accent)
+            }
+            .padding(.horizontal, Metrics.rowSidePadding)
+            .padding(.vertical, 8)
+            .background(theme.rowSelected.opacity(0.55), in: RoundedRectangle(cornerRadius: Metrics.rowRadius))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
     private func bandPill(label: String, count: Int?, color: Color, theme: Theme) -> some View {
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 5, height: 5)
@@ -277,179 +253,23 @@ struct ChromeTabsStateView: View {
     // MARK: - Tab Row
 
     @ViewBuilder
-    private func tabRow(
-        tab: ChromeTab,
-        attr: TabAttribution?,
-        isSelected: Bool,
-        isExpanded: Bool,
-        theme: Theme
-    ) -> some View {
-        let hostColor = Color(oklch: 0.62, 0.12, Double(abs(tab.host.hashValue) % 360))
-        let totalBytes = attr?.totalBytes ?? 0
-        let fraction = largestTabBytes > 0 ? Double(totalBytes) / Double(largestTabBytes) : 0
-
+    private func tabRow(tab: ChromeTab, memoryBytes: UInt64, theme: Theme) -> some View {
         HStack(spacing: 8) {
-            // Expand arrow for tabs with multiple subframes
-            if let attr, attr.processCount > 1 {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        expandedTabID = (expandedTabID == tab.id) ? nil : tab.id
-                    }
-                } label: {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(theme.textDim)
-                        .frame(width: 12, height: 12)
-                }
-                .buttonStyle(.plain)
-            } else {
-                Spacer().frame(width: 12)
-            }
-
-            // Host dot
-            Circle()
-                .fill(tab.isActive ? hostColor : hostColor.opacity(0.45))
-                .frame(width: 6, height: 6)
-
-            // Title & metadata
-            VStack(alignment: .leading, spacing: 2) {
-                Text(tab.cleanedTitle)
-                    .font(Fonts.body)
-                    .foregroundStyle(theme.textPrimary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-
-                HStack(spacing: 4) {
-                    Text(tab.isActive ? "\(tab.host) · active" : tab.host)
-                        .font(Fonts.monoSmall)
-                        .foregroundStyle(theme.textDim)
-
-                    if let attr {
-                        if attr.embedCount > 0 {
-                            Text("· \(attr.processCount) procs (\(attr.embedCount) subframes)")
-                                .font(Fonts.monoTiny)
-                                .foregroundStyle(theme.hint)
-                        } else {
-                            Text("· 1 proc")
-                                .font(Fonts.monoTiny)
-                                .foregroundStyle(theme.hint)
-                        }
-                        if attr.isShared {
-                            Text("· shared")
-                                .font(Fonts.monoTiny)
-                                .foregroundStyle(theme.hint)
-                        }
-                    } else {
-                        Text("· not measured yet")
-                            .font(Fonts.monoTiny)
-                            .foregroundStyle(theme.hint)
-                    }
-                }
-            }
+            Text(tab.cleanedTitle)
+                .font(Fonts.body)
+                .foregroundStyle(theme.textPrimary)
+                .lineLimit(1)
+                .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                // Activate tab in Chrome on click
-                model.monitor.activateChromeTab(tab)
-            }
 
-            // Relative memory bar
-            if totalBytes > 0 {
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(theme.trackBackground)
-                        .frame(width: 56, height: 4)
-                    Capsule()
-                        .fill(hostColor)
-                        .frame(width: max(3, 56 * CGFloat(fraction)), height: 4)
-                }
-            }
-
-            // Memory readout
-            Text(formattedMemory(bytes: totalBytes))
+            Text(formattedMemory(bytes: memoryBytes))
                 .font(Fonts.mono)
-                .foregroundStyle(totalBytes > 0 ? theme.textPrimary : theme.hint)
+                .foregroundStyle(memoryBytes > 0 ? theme.textPrimary : theme.hint)
                 .frame(width: 58, alignment: .trailing)
-
-            // Close button on hover
-            if isSelected {
-                Button {
-                    model.monitor.closeChromeTab(tab)
-                } label: {
-                    Text("Close")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(theme.quitText)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(theme.quitBorder, lineWidth: 1))
-                }
-                .buttonStyle(.plain)
-            } else {
-                Spacer().frame(width: 44)
-            }
         }
         .padding(.horizontal, Metrics.rowSidePadding)
-        .frame(height: Metrics.rowHeightWithReason)
-        .background(
-            isSelected ? theme.rowSelected : .clear,
-            in: RoundedRectangle(cornerRadius: Metrics.rowRadius, style: .continuous)
-        )
-        .contentShape(Rectangle())
-        .onHover { hovering in
-            if hovering && selectedTabID != tab.id { selectedTabID = tab.id }
-        }
-    }
-
-    // MARK: - Detail Subframe Breakdown
-
-    @ViewBuilder
-    private func tabDetailBreakdown(_ attr: TabAttribution, theme: Theme) -> some View {
-        VStack(spacing: 3) {
-            ForEach(Array(attr.renderers.enumerated()), id: \.element.pid) { idx, r in
-                HStack {
-                    Spacer().frame(width: 26)
-                    Text(idx == 0 ? "Main frame" : "Subframe / OOPIF")
-                        .font(Fonts.monoTiny)
-                        .foregroundStyle(theme.textDim)
-                    Text("PID \(r.pid)")
-                        .font(Fonts.monoTiny)
-                        .foregroundStyle(theme.hint)
-                    Spacer()
-                    Text(String(format: "%.1f MB", r.footprintMB))
-                        .font(Fonts.monoTiny)
-                        .foregroundStyle(theme.textSecondary)
-                    Spacer().frame(width: 48)
-                }
-                .padding(.vertical, 1)
-            }
-        }
-        .padding(.vertical, 4)
-        .background(theme.trackBackground.opacity(0.4), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .padding(.horizontal, Metrics.rowSidePadding)
-    }
-
-    @ViewBuilder
-    private func aggregateSubframesCallout(_ theme: Theme) -> some View {
-        let totalSubframeBytes = attributions.values.reduce(UInt64(0)) { $0 + $1.embedBytes }
-        let totalSubframeProcs = attributions.values.reduce(0) { $0 + $1.embedCount }
-
-        if totalSubframeProcs > 0 {
-            HStack {
-                Image(systemName: "square.stack.3d.up")
-                    .font(.system(size: 11))
-                    .foregroundStyle(theme.hint)
-                Text("Embeds & subframes across tabs")
-                    .font(Fonts.monoSmall)
-                    .foregroundStyle(theme.textDim)
-                Spacer()
-                Text(String(format: "≈%.1f MB · %d process%@", Double(totalSubframeBytes) / 1e6, totalSubframeProcs, totalSubframeProcs == 1 ? "" : "es"))
-                    .font(Fonts.monoSmall)
-                    .foregroundStyle(theme.textSecondary)
-            }
-            .padding(.horizontal, Metrics.rowSidePadding)
-            .padding(.vertical, 6)
-            .background(theme.trackBackground.opacity(0.5), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-        }
+        .frame(height: 42)
+        .background(theme.rowSelected.opacity(0.35), in: RoundedRectangle(cornerRadius: Metrics.rowRadius, style: .continuous))
     }
 
     private func formattedMemory(bytes: UInt64) -> String {
@@ -464,8 +284,8 @@ struct ChromeTabsStateView: View {
     private var chromeSummary: String {
         guard let chromeApp else { return "\(tabs.count) tab\(tabs.count == 1 ? "" : "s")" }
         return String(
-            format: "%.1f GB · %d process%@ · %d tab%@",
-            chromeApp.footprintGB,
+            format: "%.1f GB resident · %d process%@ · %d tab%@",
+            chromeApp.residentGB,
             chromeApp.processCount, chromeApp.processCount == 1 ? "" : "es",
             tabs.count, tabs.count == 1 ? "" : "s"
         )

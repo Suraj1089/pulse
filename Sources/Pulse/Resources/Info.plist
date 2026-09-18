@@ -19,6 +19,6 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Pulse reads open tab titles from Google Chrome to show a per-tab breakdown, and can close tabs you choose from there.</string>
+	<string>Pulse reads open tab titles from Google Chrome to show a per-tab memory breakdown and suggest tabs you may want to review.</string>
 </dict>
 </plist>

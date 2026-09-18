@@ -127,30 +127,30 @@ final class ChromeProcessInventory {
                 kind: meta.kind,
                 clientID: meta.clientID,
                 launchTicks: meta.launchTicks,
-                footprintBytes: sample.physFootprintBytes
+                footprintBytes: sample.residentBytes
             )
             helpers.append(helper)
 
             switch meta.kind {
             case .renderer:
                 rendererCount += 1
-                if sample.physFootprintBytes > largestRenderer {
-                    largestRenderer = sample.physFootprintBytes
+                if sample.residentBytes > largestRenderer {
+                    largestRenderer = sample.residentBytes
                 }
-                let mb = sample.physFootprintBytes / 1_000_000
+                let mb = sample.residentBytes / 1_000_000
                 if mb > 180 { high += 1 }
                 else if mb >= 60 { med += 1 }
                 else { low += 1 }
             case .extensionRenderer:
                 extCount += 1
-                extBytes += sample.physFootprintBytes
+                extBytes += sample.residentBytes
             case .gpu, .network, .utility, .other:
                 overheadCount += 1
-                overheadBytes += sample.physFootprintBytes
+                overheadBytes += sample.residentBytes
             }
         }
 
-        let totalBytes = samples.reduce(UInt64(0)) { $0 + $1.physFootprintBytes }
+        let totalBytes = samples.reduce(UInt64(0)) { $0 + $1.residentBytes }
         let dist = ChromeDistribution(
             totalFootprintBytes: totalBytes,
             totalProcessCount: samples.count,

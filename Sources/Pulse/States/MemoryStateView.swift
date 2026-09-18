@@ -12,18 +12,17 @@ struct MemoryStateView: View {
 
     private var topApps: [AppUsage] {
         let apps = Array(model.monitor.topApps.prefix(5))
-        let maxBytes = apps.map(\.footprintBytes).max() ?? 1
+        let maxBytes = apps.map(\.residentBytes).max() ?? 1
         return apps.map { app in
-            let pct = maxBytes == 0 ? 0 : Double(app.footprintBytes) / Double(maxBytes) * 100
-            return AppUsage(app: app, pct: pct)
+            let pct = maxBytes == 0 ? 0 : Double(app.residentBytes) / Double(maxBytes) * 100
+            return AppUsage(app: app, reason: app.residentDescription, pct: pct)
         }
     }
 
     private var recommendations: [String] {
         var lines: [String] = []
-        if let heaviest = model.monitor.topApps.first, model.totalGB > 0 {
-            let pct = Int((heaviest.footprintGB / model.totalGB * 100).rounded())
-            lines.append("\(heaviest.name) is using \(pct)% of total memory.")
+        if let heaviest = model.monitor.topApps.first {
+            lines.append("\(heaviest.name) has the largest resident-memory use.")
         }
         if let idle = model.monitor.topApps.first(where: { app in
             guard let idleSince = app.idleSince else { return false }
@@ -64,7 +63,7 @@ struct MemoryStateView: View {
             PressureHistoryChart(model: model).padding(.top, 20)
             CompositionChart(model: model)
 
-            SectionHeader(title: "Top memory users").padding(.top, 20).padding(.bottom, 6)
+            SectionHeader(title: "Top resident-memory apps").padding(.top, 20).padding(.bottom, 6)
             VStack(spacing: 0) {
                 ForEach(Array(topApps.enumerated()), id: \.element.id) { index, app in
                     AppListItem(app: app, isSelected: selectedApp == index, quitMode: .never, showProgress: true, onHover: { hovering in

@@ -23,7 +23,7 @@ final class SystemMonitor: ObservableObject {
     private var chromeTimer: Timer?
     private var chromeAlertTimer: Timer?
     private var vmTimer: Timer?
-    private var chromeIdleSince: [Int: Date] = [:]
+    private var chromeIdleSince: [String: Date] = [:]
     private var isStarted = false
     private(set) var isPaletteVisible: Bool = false
 
@@ -32,7 +32,7 @@ final class SystemMonitor: ObservableObject {
         return chromeTabs
             .filter { !$0.isActive }
             .compactMap { tab in
-                guard let idleSince = chromeIdleSince[tab.id],
+                guard let idleSince = chromeIdleSince[tab.idleKey],
                       now.timeIntervalSince(idleSince) >= 15 * 60,
                       let attribution = tabAttributions[tab.id],
                       attribution.totalBytes >= 500_000_000 else { return nil }
@@ -185,6 +185,10 @@ final class SystemMonitor: ObservableObject {
                 }
 
                 self.topApps = self.appsMonitor.aggregate(processes: processes)
+                // This state drives the tabs screen. It must be refreshed from
+                // NSWorkspace on the main thread; otherwise `/tabs` can claim
+                // Chrome is closed while its processes are visible elsewhere.
+                self.chromeIsRunning = ChromeTabsBridge.isRunning
                 self.chromeDistribution = distribution
                 self.tabAttributions = attributions
                 if let currentTabs {
@@ -216,14 +220,14 @@ final class SystemMonitor: ObservableObject {
 
     private func updateChromeIdleTracking(_ tabs: [ChromeTab]) {
         let now = Date()
-        let currentIDs = Set(tabs.map(\.id))
-        chromeIdleSince = chromeIdleSince.filter { currentIDs.contains($0.key) }
+        let currentKeys = Set(tabs.map(\.idleKey))
+        chromeIdleSince = chromeIdleSince.filter { currentKeys.contains($0.key) }
 
         for tab in tabs {
             if tab.isActive {
-                chromeIdleSince[tab.id] = nil
-            } else if chromeIdleSince[tab.id] == nil {
-                chromeIdleSince[tab.id] = now
+                chromeIdleSince[tab.idleKey] = nil
+            } else if chromeIdleSince[tab.idleKey] == nil {
+                chromeIdleSince[tab.idleKey] = now
             }
         }
     }
@@ -250,24 +254,9 @@ final class SystemMonitor: ObservableObject {
         refreshFast()
     }
 
-    func closeChromeTab(_ tab: ChromeTab) {
-        workQueue.async { [weak self] in
-            ChromeTabsBridge.closeTab(id: tab.id)
-            DispatchQueue.main.async { self?.refreshChrome() }
-        }
-    }
-
     func activateChromeTab(_ tab: ChromeTab) {
         workQueue.async {
             ChromeTabsBridge.activateTab(id: tab.id)
-        }
-    }
-
-    func closeBackgroundChromeTabs() {
-        let tabs = chromeTabs
-        workQueue.async { [weak self] in
-            ChromeTabsBridge.closeBackgroundTabs(tabs)
-            DispatchQueue.main.async { self?.refreshChrome() }
         }
     }
 

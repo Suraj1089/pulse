@@ -29,7 +29,7 @@ struct DiagnosisStateView: View {
         for app in model.monitor.topApps.prefix(2) {
             let processWord = app.processCount == 1 ? "process" : "processes"
             points.append(DiagnosisPoint(
-                text: "\(app.name) is using \(String(format: "%.1f", app.footprintGB)) GB across \(app.processCount) \(processWord).",
+                text: "\(app.name) has \(String(format: "%.1f", app.residentGB)) GB of resident memory across \(app.processCount) \(processWord).",
                 emphasized: false,
                 dimmed: false
             ))
@@ -37,7 +37,7 @@ struct DiagnosisStateView: View {
 
         if let idle = idleHeavyApp, let idleSince = idle.idleSince {
             points.append(DiagnosisPoint(
-                text: "\(idle.name) is using \(String(format: "%.1f", idle.footprintGB)) GB and has been \(Formatters.idleDuration(since: idleSince)).",
+                text: "\(idle.name) has been \(Formatters.idleDuration(since: idleSince)); quitting it may reduce memory pressure.",
                 emphasized: false,
                 dimmed: false
             ))
@@ -53,7 +53,7 @@ struct DiagnosisStateView: View {
             candidates.insert(idle, at: 0)
         }
         return candidates.prefix(3).map { app in
-            RecommendedAction(title: "Quit \(app.name)", freesGB: app.footprintGB) {
+            RecommendedAction(title: "Quit \(app.name)", detail: "May reduce pressure") {
                 model.quit(pid: app.pid)
             }
         }

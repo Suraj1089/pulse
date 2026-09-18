@@ -60,6 +60,12 @@ struct ChromeTab: Identifiable, Equatable {
 
         return t
     }
+
+    /// Suitable for an idle-time hint. Chrome's AppleScript tab ID can change
+    /// while the tab remains open, so it must not be used for elapsed time.
+    var idleKey: String {
+        "\(url)\u{1F}\(cleanedTitle)"
+    }
 }
 
 /// Talks to Google Chrome via AppleScript with stable tab IDs.
@@ -80,23 +86,6 @@ enum ChromeTabsBridge {
         return parse(raw)
     }
 
-    /// Closes a tab by its stable ID (immune to index shifts).
-    static func closeTab(id: Int) {
-        let source = """
-        tell application "Google Chrome"
-            repeat with w in windows
-                repeat with t in tabs of w
-                    if (id of t) is \(id) then
-                        close t
-                        return
-                    end if
-                end repeat
-            end repeat
-        end tell
-        """
-        run(source)
-    }
-
     /// Activates a tab in Google Chrome and brings Chrome frontmost.
     static func activateTab(id: Int) {
         let source = """
@@ -114,13 +103,6 @@ enum ChromeTabsBridge {
         end tell
         """
         run(source)
-    }
-
-    /// Closes all background tabs by ID.
-    static func closeBackgroundTabs(_ tabs: [ChromeTab]) {
-        for tab in tabs where !tab.isActive {
-            closeTab(id: tab.id)
-        }
     }
 
     static func quit() {

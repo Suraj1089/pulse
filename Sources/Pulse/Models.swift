@@ -58,7 +58,7 @@ enum PressureLevel: String, Equatable {
     }
 }
 
-/// A running app row: real icon, real name, real memory footprint. `hue`
+/// A running app row: real icon, real name, and resident memory. `hue`
 /// only backs the monogram-tile fallback for the rare app with no icon.
 struct AppUsage: Identifiable {
     let id: pid_t
@@ -74,7 +74,7 @@ struct AppUsage: Identifiable {
         self.id = app.pid
         self.name = app.name
         self.icon = app.icon
-        self.memGB = app.footprintGB
+        self.memGB = app.residentGB
         self.reason = reason
         self.pct = pct
         self.hue = Self.hue(for: app.bundleIdentifier ?? app.name)
@@ -113,10 +113,8 @@ struct MemorySegment: Identifiable {
 struct RecommendedAction: Identifiable {
     let id = UUID()
     let title: String
-    let freesGB: Double?
+    let detail: String?
     var perform: () -> Void = {}
-
-    var freesText: String? { freesGB.map { "frees ~" + String(format: "%.1f", $0) + " GB" } }
 }
 
 struct DiagnosisPoint: Identifiable {
@@ -133,11 +131,11 @@ extension MemorySnapshot {
         func pct(_ bytes: UInt64) -> Double { Double(bytes) / Double(total) * 100 }
         let freeColor: Color = scheme == .dark ? .white.opacity(0.16) : .black.opacity(0.16)
         return [
-            MemorySegment(label: "App memory", gb: Double(appBytes) / 1e9, pct: pct(appBytes), color: Color(oklch: 0.62, 0.12, 250)),
-            MemorySegment(label: "Wired", gb: Double(wiredBytes) / 1e9, pct: pct(wiredBytes), color: Color(oklch: 0.62, 0.12, 290)),
-            MemorySegment(label: "Compressed", gb: Double(compressedBytes) / 1e9, pct: pct(compressedBytes), color: Color(oklch: 0.72, 0.14, 85)),
-            MemorySegment(label: "Cached", gb: Double(cachedBytes) / 1e9, pct: pct(cachedBytes), color: Color(oklch: 0.64, 0.13, 150)),
-            MemorySegment(label: "Free", gb: Double(freeBytes) / 1e9, pct: pct(freeBytes), color: freeColor),
+            MemorySegment(label: "App memory", gb: Double(appBytes) / 1_073_741_824, pct: pct(appBytes), color: Color(oklch: 0.62, 0.12, 250)),
+            MemorySegment(label: "Wired", gb: Double(wiredBytes) / 1_073_741_824, pct: pct(wiredBytes), color: Color(oklch: 0.62, 0.12, 290)),
+            MemorySegment(label: "Compressed", gb: Double(compressedBytes) / 1_073_741_824, pct: pct(compressedBytes), color: Color(oklch: 0.72, 0.14, 85)),
+            MemorySegment(label: "Cached", gb: Double(cachedBytes) / 1_073_741_824, pct: pct(cachedBytes), color: Color(oklch: 0.64, 0.13, 150)),
+            MemorySegment(label: "Free", gb: Double(freeBytes) / 1_073_741_824, pct: pct(freeBytes), color: freeColor),
         ]
     }
 }

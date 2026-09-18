@@ -2,15 +2,15 @@ import AppKit
 
 /// A regular (Dock-visible) app plus every helper/renderer process that
 /// shares its bundle path — e.g. Chrome's many `Google Chrome Helper`
-/// processes are folded into one "Chrome" entry, matching how Activity
-/// Monitor groups multi-process apps.
+/// processes are folded into one "Chrome" entry. App rows use resident
+/// memory, while per-tab diagnostics retain process-footprint measurements.
 struct RunningAppUsage: Identifiable {
     var id: pid_t { pid }
     let pid: pid_t
     let name: String
     let bundleIdentifier: String?
     let icon: NSImage?
-    let footprintBytes: UInt64
+    let residentBytes: UInt64
     let processCount: Int
     let isFrontmost: Bool
     /// When this app was last frontmost (or when we started observing, if
@@ -19,7 +19,12 @@ struct RunningAppUsage: Identifiable {
     /// launched monitor won't yet know an app has been idle for hours.
     let idleSince: Date?
 
-    var footprintGB: Double { Double(footprintBytes) / 1_000_000_000 }
+    var residentGB: Double { Double(residentBytes) / 1_073_741_824 }
+
+    var residentDescription: String {
+        guard processCount > 1 else { return "1 process" }
+        return "\(processCount) processes"
+    }
 
     var initial: String { String(name.first ?? "?").uppercased() }
 }
@@ -108,7 +113,7 @@ final class RunningAppsMonitor {
             let pid = app.processIdentifier
             guard let matched = appProcesses[pid], !matched.isEmpty else { return nil }
 
-            let totalBytes = matched.reduce(UInt64(0)) { $0 + $1.physFootprintBytes }
+            let totalResidentBytes = matched.reduce(UInt64(0)) { $0 + $1.residentBytes }
             let isFrontmost = pid == frontmostPID
 
             let cachedIcon: NSImage?
@@ -127,14 +132,14 @@ final class RunningAppsMonitor {
                 name: app.localizedName ?? app.bundleIdentifier ?? "Unknown",
                 bundleIdentifier: app.bundleIdentifier,
                 icon: cachedIcon,
-                footprintBytes: totalBytes,
+                residentBytes: totalResidentBytes,
                 processCount: matched.count,
                 isFrontmost: isFrontmost,
                 idleSince: isFrontmost ? nil : (lastActivation[pid] ?? monitorStartDate)
             )
         }
 
-        return usages.sorted { $0.footprintBytes > $1.footprintBytes }
+        return usages.sorted { $0.residentBytes > $1.residentBytes }
     }
 
     func pruneCaches() {

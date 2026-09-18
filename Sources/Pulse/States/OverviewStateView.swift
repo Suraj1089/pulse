@@ -24,7 +24,7 @@ struct OverviewStateView: View {
             .filter { !$0.isFrontmost }
             .prefix(2)
             .map { app in
-                RecommendedAction(title: "Quit \(app.name)", freesGB: app.footprintGB) {
+                RecommendedAction(title: "Quit \(app.name)", detail: "May reduce pressure") {
                     animatedQuit(pid: app.pid)
                 }
             }
@@ -33,15 +33,14 @@ struct OverviewStateView: View {
     var body: some View {
         let theme = Theme(scheme: scheme)
         VStack(alignment: .leading, spacing: 0) {
-            // Section Header matching screenshot: Top Memory Usage & RAM
             HStack {
-                Text("Top Memory Usage")
+                Text("Top Resident-Memory Apps")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(theme.textPrimary)
 
                 Spacer()
 
-                Text("RAM")
+                Text("RESIDENT")
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundStyle(theme.textDim)
 
@@ -201,25 +200,18 @@ struct OverviewStateView: View {
                     .padding(.vertical, 4)
             } else {
                 HStack {
-                    Spacer().frame(width: 22)
-                    Text("Top 5 memory tabs")
+                    Text("Top 5 Chrome tabs")
                         .font(Fonts.monoTiny)
                         .foregroundStyle(theme.textDim)
                     Spacer()
-                    Text("Close to save RAM")
-                        .font(Fonts.monoTiny)
-                        .foregroundStyle(theme.hint)
                 }
                 .padding(.horizontal, Metrics.rowSidePadding)
                 .padding(.top, 2)
 
                 ForEach(top5) { tab in
-                    let hostColor = Color(oklch: 0.62, 0.12, Double(abs(tab.host.hashValue) % 360))
                     let bytes = attributions[tab.id]?.totalBytes ?? 0
 
                     HStack(spacing: 8) {
-                        Spacer().frame(width: 22)
-                        Circle().fill(tab.isActive ? hostColor : hostColor.opacity(0.45)).frame(width: 5, height: 5)
                         Text(tab.cleanedTitle)
                             .font(Fonts.body)
                             .lineLimit(1)
@@ -232,24 +224,9 @@ struct OverviewStateView: View {
                             .font(Fonts.monoSmall)
                             .foregroundStyle(bytes > 0 ? theme.textSecondary : theme.hint)
 
-                        Button {
-                            model.monitor.closeChromeTab(tab)
-                        } label: {
-                            Text("Close")
-                                .font(.system(size: 10))
-                                .foregroundStyle(theme.quitText)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(theme.quitBorder, lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
                     }
                     .padding(.horizontal, Metrics.rowSidePadding)
                     .padding(.vertical, 2)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        model.monitor.activateChromeTab(tab)
-                    }
                 }
 
                 if tabs.count > 5 {
@@ -257,8 +234,7 @@ struct OverviewStateView: View {
                         model.query = "/tabs"
                     } label: {
                         HStack {
-                            Spacer().frame(width: 22)
-                            Text("View all \(tabs.count) tabs & memory breakdown →")
+                            Text("View all \(tabs.count) tabs →")
                                 .font(Fonts.monoSmall)
                                 .foregroundStyle(theme.accent)
                             Spacer()

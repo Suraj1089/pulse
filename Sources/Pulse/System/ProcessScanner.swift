@@ -1,12 +1,15 @@
 import Darwin
 import Foundation
 
-/// One running process's identity and resident memory, read via `libproc`.
+/// One running process's identity plus resident and footprint measurements,
+/// read via `libproc`.
 struct ProcessSample {
     let pid: pid_t
     let executablePath: String?
-    /// `ri_phys_footprint` — the same "real memory" figure Activity Monitor's
-    /// Memory column shows (distinct from, and more accurate than, RSS).
+    /// `ri_resident_size` — physical pages currently resident for this process.
+    let residentBytes: UInt64
+    /// `ri_phys_footprint` — useful for ranking a process, but process
+    /// footprints can share pages and must not be added up as physical RAM.
     let physFootprintBytes: UInt64
 }
 
@@ -26,7 +29,7 @@ enum ProcessScanner {
         }
 
         return pids.compactMap { pid in
-            guard let footprint = physFootprint(of: pid) else { return nil }
+            guard let memory = memoryInfo(of: pid) else { return nil }
             let execPath: String?
             if let cached = pathCache[pid] {
                 execPath = cached
@@ -35,7 +38,7 @@ enum ProcessScanner {
                 if let p { pathCache[pid] = p }
                 execPath = p
             }
-            return ProcessSample(pid: pid, executablePath: execPath, physFootprintBytes: footprint)
+            return ProcessSample(pid: pid, executablePath: execPath, residentBytes: memory.residentBytes, physFootprintBytes: memory.physFootprintBytes)
         }
     }
 
@@ -68,7 +71,7 @@ enum ProcessScanner {
         }
     }
 
-    private static func physFootprint(of pid: pid_t) -> UInt64? {
+    private static func memoryInfo(of pid: pid_t) -> (residentBytes: UInt64, physFootprintBytes: UInt64)? {
         var info = rusage_info_v4()
         let result = withUnsafeMutablePointer(to: &info) { infoPtr -> Int32 in
             infoPtr.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { reboundPtr in
@@ -76,6 +79,6 @@ enum ProcessScanner {
             }
         }
         guard result == 0 else { return nil }
-        return info.ri_phys_footprint
+        return (info.ri_resident_size, info.ri_phys_footprint)
     }
 }

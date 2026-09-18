@@ -57,6 +57,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             object: nil
         )
 
+        let workspaceNotifications = NSWorkspace.shared.notificationCenter
+        workspaceNotifications.addObserver(
+            self,
+            selector: #selector(workspaceAppsDidChange),
+            name: NSWorkspace.didLaunchApplicationNotification,
+            object: nil
+        )
+        workspaceNotifications.addObserver(
+            self,
+            selector: #selector(workspaceAppsDidChange),
+            name: NSWorkspace.didTerminateApplicationNotification,
+            object: nil
+        )
+
         registerHotKeyMonitor()
     }
 
@@ -74,15 +88,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     /// from the right edge of the menu bar, so a *small* value sits close to
     /// Control Center. Without a seed the very first launch drops Pulse into the
     /// leftmost slot, which is exactly where a crowded bar (or the notch) swallows
-    /// it. We write the slot once, before the item exists, and never again, so a
-    /// ⌘-drag by the user is still what wins from then on.
+    /// it. We repair a missing preference from older builds, but never overwrite
+    /// a slot that macOS has already persisted after a user ⌘-drag.
     private func seedStatusItemPositionOnFirstLaunch() {
         let defaults = UserDefaults.standard
         let didSeedKey = "PulseDidSeedStatusItemPosition"
-        guard !defaults.bool(forKey: didSeedKey) else { return }
-
         let name = Self.statusItemAutosaveName
-        defaults.set(8.0, forKey: "NSStatusItem Preferred Position \(name)")
+        let positionKey = "NSStatusItem Preferred Position \(name)"
+        guard !defaults.bool(forKey: didSeedKey) || defaults.object(forKey: positionKey) == nil else { return }
+
+        defaults.set(8.0, forKey: positionKey)
         defaults.set(true, forKey: "NSStatusItem Visible \(name)")
         defaults.set(true, forKey: didSeedKey)
     }
@@ -108,6 +123,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.setupStatusItem()
         }
+    }
+
+    /// A newly launched menu-bar app can make macOS reflow extras. Rebuild only
+    /// if Pulse has actually been evicted; a visible user-positioned item stays
+    /// untouched.
+    @objc private func workspaceAppsDidChange(_ notification: Notification) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            self?.restoreStatusItemIfNeeded()
+        }
+    }
+
+    private func restoreStatusItemIfNeeded() {
+        guard statusItem.button?.window == nil else { return }
+        seedStatusItemPositionOnFirstLaunch()
+        setupStatusItem()
     }
 
     private var lastRenderedLevel: PressureLevel?
@@ -158,8 +188,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             let minutes = max(15, Int(Date().timeIntervalSince(recommendation.idleSince) / 60))
             content.body = "\(recommendation.tab.cleanedTitle) has been idle for \(minutes)m and uses about \(Int(recommendation.attribution.totalMB)) MB. Close it to free memory."
         } else if let app = model.monitor.topApps.first {
-            let footprint = String(format: "%.1f", app.footprintGB)
-            content.body = "Memory is \(Int(usedFraction * 100))% full. Consider quitting \(app.name), using about \(footprint) GB."
+            content.body = "Memory is \(Int(usedFraction * 100))% full. Consider quitting \(app.name) to reduce memory pressure."
         } else {
             content.body = "Memory is \(Int(usedFraction * 100))% full. Consider quitting unused apps to free memory."
         }

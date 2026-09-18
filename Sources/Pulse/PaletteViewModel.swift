@@ -78,10 +78,10 @@ final class PaletteViewModel: ObservableObject {
                 if tabCount > 0 {
                     reason = "\(tabCount) tab\(tabCount == 1 ? "" : "s")"
                 } else {
-                    reason = "\(app.processCount) process\(app.processCount == 1 ? "" : "es")"
+                    reason = app.residentDescription
                 }
             } else if app.processCount > 1 {
-                reason = "\(app.processCount) processes"
+                reason = app.residentDescription
             } else {
                 reason = "Active"
             }

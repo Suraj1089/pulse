@@ -87,7 +87,7 @@ struct CommandPaletteView: View {
     private var footerItems: [String] {
         switch model.state {
         case .chromeTabs:
-            return ["↑↓ navigate", "↵ close tab", "esc close"]
+            return ["click a tab to open it in Chrome", "esc close"]
         case .quitCommand(_, let isForce):
             return isForce ? ["↑↓ select", "↵ force quit (SIGKILL)", "esc close"] : ["↑↓ select", "↵ quit app", "esc close"]
         case .commandSuggestions:

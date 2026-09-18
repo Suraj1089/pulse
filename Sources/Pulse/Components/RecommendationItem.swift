@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Row with an arrow, a recommendation title, an optional "frees ~N GB" hint,
+/// Row with an arrow, a recommendation title, an optional pressure-reduction hint,
 /// and a "↵" badge on the currently selected row.
 struct RecommendationItem: View {
     @Environment(\.colorScheme) private var scheme
@@ -21,8 +21,8 @@ struct RecommendationItem: View {
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            if let frees = action.freesText {
-                Text(frees)
+            if let detail = action.detail {
+                Text(detail)
                     .font(Fonts.monoSmall)
                     .foregroundStyle(theme.textDim)
             }
