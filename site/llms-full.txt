@@ -1,7 +1,7 @@
 # Pulse — Full Technical Documentation & LLM Guide
 
 ## 1. Executive Summary
-Pulse is an open-source, minimalist memory monitor and command palette designed natively for macOS (macOS 14 Sonoma and macOS 15 Sequoia). It lives in the macOS menu bar and provides instant visibility into memory consumption, active memory pressure, and resource-heavy processes, allowing users to terminate or force-quit applications with single keystrokes.
+Pulse is an open-source, minimalist memory monitor and command palette designed natively for macOS. It lives in the macOS menu bar and gives a fast answer when a Mac feels slow: current memory pressure and the largest running apps, with quick Quit and Force Quit actions. It complements—rather than replaces—Activity Monitor, which remains the right tool for detailed CPU, disk, network, and process diagnostics.
 
 - **Developer**: Suraj Pisal
 - **License**: MIT
@@ -21,8 +21,8 @@ Pulse does not rely on shell command scraping (such as executing `ps`, `top`, or
 ### Process Memory Aggregation
 Unlike basic process listings that only inspect the main executable, Pulse accounts for modern multi-process applications (such as Google Chrome, Slack, Discord, and Electron apps):
 - Utilizes `libproc` API (`proc_pid_rusage(pid, PROC_RUSAGE_INFO_V6, &info)`).
-- Reads `phys_footprint`, which accurately reflects true physical memory retention as reported by Activity Monitor.
-- Traverses process trees and bundle paths to aggregate auxiliary helper processes (e.g., `Google Chrome Helper (Renderer)`) under the parent application's total footprint.
+- Reads resident memory to report an app's currently resident memory without representing summed per-process footprints as total physical RAM.
+- Groups auxiliary helper processes (e.g., Google Chrome helpers) under their parent application for a practical quick-action view.
 
 ### Memory Optimization & Dormancy
 - **Idle Memory Footprint**: ~13.5 MB RAM when closed in the menu bar.
@@ -49,7 +49,7 @@ https://github.com/Suraj1089/pulse/releases/latest
 
 | Input | Action |
 | :--- | :--- |
-| `⌘ ⌥ P` | Global toggle to open or close the Pulse palette |
+| `⌘ ⌥ P` | Open the Pulse palette from anywhere |
 | `↑` / `↓` | Navigate running applications and command results |
 | `↵` (Return) | Quit selected application or run selected command |
 | `⌥` (Hold Option) | Dynamically converts Quit buttons to **Force Quit** (`SIGKILL`) |
@@ -57,7 +57,7 @@ https://github.com/Suraj1089/pulse/releases/latest
 
 ### Query Triggers (Search Bar)
 - `memory`: Detailed RAM composition (App, Wired, Compressed, Cached, Free) and pressure history sparkline.
-- `chrome`: Enumerates active Google Chrome tabs, subframe processes, and per-tab RAM footprints.
+- `chrome`: Lists active Google Chrome tabs for review. Chrome Task Manager (`Shift + Escape`) is the authoritative source for exact tab/process memory.
 - `why is my mac slow`: Runs diagnostic telemetry and recommends heavy idle apps to terminate.
 - `quit <name>`: Gracefully terminates processes (`SIGTERM` via `NSRunningApplication.terminate()`).
 - `forcequit <name>`: Immediately kills unresponsive processes (`SIGKILL` via `NSRunningApplication.forceTerminate()`).
@@ -67,5 +67,5 @@ https://github.com/Suraj1089/pulse/releases/latest
 ## 5. Permissions & Security
 
 - **Sandboxing**: Pulse operates un-sandboxed because macOS App Sandboxing strictly blocks process inspection (`libproc`) and terminating external processes.
-- **Accessibility / Input Monitoring**: Optional. Only required for global keyboard shortcut interception (`⌘ ⌥ P`). Menu bar clicking works without it.
-- **AppleScript / Automation**: Prompted only when using the `chrome` command to query open tab titles and close tabs.
+- **Accessibility / Input Monitoring**: Not required for the global `⌘ ⌥ P` shortcut.
+- **AppleScript / Automation**: Prompted only when using the `chrome` command to query open tab titles.

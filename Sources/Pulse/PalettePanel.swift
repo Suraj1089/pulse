@@ -5,7 +5,10 @@ import SwiftUI
 /// Per the 1g handoff notes: "NSPanel, non-activating, .floating level, 13px
 /// radius, no titlebar... Loses focus → closes."
 final class PalettePanel: NSPanel {
+    private let onEscape: () -> Void
+
     init(model: PaletteViewModel, onEscape: @escaping () -> Void) {
+        self.onEscape = onEscape
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: Metrics.windowWidth, height: 490),
             styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
@@ -28,4 +31,11 @@ final class PalettePanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    /// Text fields can consume Escape before SwiftUI's `onExitCommand` sees it.
+    /// Catch the native cancel action at the panel responder level so Esc always
+    /// dismisses the palette, regardless of which control is focused.
+    override func cancelOperation(_ sender: Any?) {
+        onEscape()
+    }
 }

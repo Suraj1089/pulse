@@ -17,12 +17,6 @@ struct UpdateStateView: View {
 
             // Current version card
             HStack(spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(theme.accent)
-                    .frame(width: 36, height: 36)
-                    .background(theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Pulse")
                         .font(.system(size: 13, weight: .semibold))

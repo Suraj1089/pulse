@@ -1,8 +1,15 @@
 # Pulse
 
-> Minimalist, high-performance macOS memory monitor and command palette.
+> A lightweight macOS memory monitor for quickly understanding why a Mac feels slow and deciding which app to close.
 
-Pulse is an open-source native macOS menu bar utility built in SwiftUI that provides real-time system memory monitoring, Chrome tab inspection, and instant process quitting. It runs with an ultra-lightweight ~13.5 MB background RAM footprint and zero idle CPU usage.
+Pulse is an open-source native macOS menu bar utility built in SwiftUI. It shows real-time system memory pressure and the largest running apps, then lets users quit or force quit an app quickly. It is designed for the moment a Mac feels slow—not as a replacement for Activity Monitor's deep CPU, disk, network, and process diagnostics.
+
+## When Pulse Is Useful
+- A Mac feels slow and you want a fast view of memory pressure.
+- You want to identify the largest running apps by resident memory and quit one without opening a full system utility.
+- You want to open Pulse from anywhere with `Command + Option + P`.
+
+For exact Chrome tab/process memory, Chrome's built-in Task Manager (`Shift + Escape`) is the authoritative source. Pulse lists open Chrome tabs but does not invent unreliable per-tab RAM totals.
 
 ## Quick Installation
 Run in terminal:
@@ -14,10 +21,10 @@ https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg
 ## Core Capabilities
 - **Real-Time Memory Telemetry**: Direct kernel page reading via Mach host statistics (`host_statistics64`), identical to `vm_stat`.
 - **System Memory Pressure**: Hardware pressure source monitoring (`DispatchSource.makeMemoryPressureSource`) tracking Low, Medium, and High pressure states.
-- **Process Memory Aggregation**: Deep memory accounting using `proc_pid_rusage` (`phys_footprint`) that sums nested helper and renderer processes under their parent application.
-- **Google Chrome Tab Inspection**: Derives per-tab memory consumption and enables closing heavy tabs directly from the command palette.
+- **Process Memory Aggregation**: Uses `proc_pid_rusage` resident-memory measurements to group helper processes under their parent application without presenting summed process footprints as total system RAM.
+- **Google Chrome Tab Inspection**: Lists open tabs for review. Exact per-tab/process memory is available in Chrome Task Manager (`Shift + Escape`).
 - **Instant Force Quit**: Holding the ⌥ Option key dynamically converts Quit actions into kernel-level `SIGKILL` (`NSRunningApplication.forceTerminate()`).
-- **Minimal Overhead**: Dormant in the menu bar using only ~13.5 MB RAM; completely prevents the macOS AutoFill daemon process from spawning.
+- **Minimal Overhead**: Designed to stay out of the way as a native menu-bar app.
 
 ## Key Links & Resources
 - Website: https://pulse0.app

@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pulse — Lightweight macOS Memory Monitor & Command Palette</title>
-  <meta name="description" content="Pulse is a lightweight macOS memory monitor and command palette for your menu bar. View real-time RAM pressure, inspect Chrome tabs, and force quit heavy processes.">
-  <meta name="keywords" content="macOS memory monitor, mac RAM monitor, menu bar memory monitor, mac force quit, mac command palette, pulse mac, mac activity monitor alternative, free RAM mac">
+  <title>Pulse — macOS Memory Monitor for a Slow Mac</title>
+  <meta name="description" content="Mac feels slow? Pulse is a lightweight macOS memory monitor that shows memory pressure and lets you quickly quit memory-heavy apps from your menu bar.">
+  <meta name="keywords" content="why is my Mac slow, macOS memory monitor, mac RAM monitor, menu bar memory monitor, mac force quit, mac command palette, Pulse mac, mac activity monitor alternative">
   <meta name="author" content="Suraj Pisal">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
   <link rel="canonical" href="https://pulse0.app/">
@@ -13,8 +13,8 @@
   <!-- Open Graph / Facebook / LinkedIn -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://pulse0.app/">
-  <meta property="og:title" content="Pulse — Lightweight macOS Memory Monitor & Command Palette">
-  <meta property="og:description" content="A clean, lightweight memory monitor and command palette for macOS. Track memory pressure, inspect runaway processes, and free RAM instantly.">
+  <meta property="og:title" content="Pulse — macOS Memory Monitor for a Slow Mac">
+  <meta property="og:description" content="When your Mac feels slow, see memory pressure and quickly quit memory-heavy apps from your menu bar.">
   <meta property="og:image" content="https://pulse0.app/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -23,8 +23,8 @@
   <!-- Twitter / X Cards -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="https://pulse0.app/">
-  <meta name="twitter:title" content="Pulse — Lightweight macOS Memory Monitor & Command Palette">
-  <meta name="twitter:description" content="A clean, lightweight memory monitor and command palette for macOS. Track memory pressure, inspect runaway processes, and free RAM instantly.">
+  <meta name="twitter:title" content="Pulse — macOS Memory Monitor for a Slow Mac">
+  <meta name="twitter:description" content="When your Mac feels slow, see memory pressure and quickly quit memory-heavy apps from your menu bar.">
   <meta name="twitter:image" content="https://pulse0.app/og-image.png">
 
   <!-- LLMs.txt Discovery -->
@@ -48,10 +48,10 @@
       "price": "0",
       "priceCurrency": "USD"
     },
-    "description": "A lightweight memory monitor and command palette for macOS. Track real-time memory pressure, inspect runaway processes, and free RAM instantly.",
+    "description": "A lightweight macOS memory monitor and command palette for identifying memory pressure and quickly quitting memory-heavy apps.",
     "url": "https://pulse0.app",
     "downloadUrl": "https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg",
-    "softwareVersion": "1.0.0",
+    "softwareVersion": "1.0.23",
     "author": {
       "@type": "Person",
       "name": "Suraj Pisal",
@@ -66,6 +66,14 @@
     "@context": "https://schema.org",
     "@type": "FAQPage",
     "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Why does my Mac feel slow, and can Pulse help?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "A Mac can feel slow when memory pressure is high or an app is using substantial resident memory. Pulse gives you a quick menu-bar view of memory pressure and the largest running apps, so you can decide what to quit. For detailed CPU, disk, or process diagnostics, use macOS Activity Monitor."
+        }
+      },
       {
         "@type": "Question",
         "name": "What is Pulse for macOS?",
@@ -496,6 +504,54 @@
       flex-shrink: 0;
     }
 
+    /* Slow Mac explainer */
+    .slow-mac-section {
+      max-width: 760px;
+      margin: 0 auto 100px;
+      padding: 0 32px;
+    }
+    .slow-mac-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--surface);
+      padding: 34px 38px;
+    }
+    .section-kicker {
+      margin: 0 0 10px;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 0.12em;
+    }
+    .slow-mac-card h2 {
+      margin: 0 0 12px;
+      color: var(--text);
+      font-size: 28px;
+      line-height: 1.18;
+      letter-spacing: -0.6px;
+    }
+    .slow-mac-card p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+    .slow-mac-card .slow-mac-note {
+      margin-top: 14px;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .slow-mac-card kbd {
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: #fff;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.9em;
+      padding: 2px 5px;
+      white-space: nowrap;
+    }
+
     /* Keyboard Shortcuts Table */
     .shortcuts-section {
       max-width: 720px;
@@ -615,6 +671,7 @@
       .hero-badges { justify-content: center; }
       .features-section { grid-template-columns: 1fr; gap: 32px; }
       .secondary-section { grid-template-columns: 1fr; gap: 36px; }
+      .slow-mac-card { padding: 28px; }
       .hero-macbook-img { max-width: 520px; margin: 0 auto; }
     }
 
@@ -957,6 +1014,15 @@
     </div>
   </section>
 
+  <section class="slow-mac-section" id="slow-mac">
+    <div class="slow-mac-card">
+      <p class="section-kicker">WHEN YOUR MAC FEELS SLOW</p>
+      <h2>Find the app using memory—then act.</h2>
+      <p>High memory pressure can make macOS feel sluggish. Pulse opens with <kbd>⌘ ⌥ P</kbd>, shows your current memory pressure and the largest running apps, then lets you quit an app without digging through Activity Monitor.</p>
+      <p class="slow-mac-note">Pulse is built for a fast decision. Use Activity Monitor when you need detailed CPU, disk, network, or process diagnostics.</p>
+    </div>
+  </section>
+
   <!-- Keyboard Shortcuts Section -->
   <section class="shortcuts-section" id="shortcuts">
     <h2>Keyboard Shortcuts</h2>
@@ -967,7 +1033,7 @@
         <div class="shortcut-key">
           <span class="key-badge">⌘ ⌥ P</span>
         </div>
-        <div class="shortcut-desc">Toggle palette from anywhere (global)</div>
+        <div class="shortcut-desc">Open Pulse from anywhere (global)</div>
       </div>
 
       <div class="shortcut-row">
