@@ -437,32 +437,19 @@
     .menubar-zoom-card {
       background: #0f1115;
       border-radius: 18px;
-      padding: 12px 12px 0;
+      padding: 0;
       border: 1px solid #232730;
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
       overflow: hidden;
+      aspect-ratio: 16 / 9;
     }
 
-    .menubar-zoom-screen {
-      border-radius: 10px 10px 0 0;
-      background: linear-gradient(180deg, #cfd5de 0%, #68788e 100%);
-      min-height: 220px;
-      position: relative;
-    }
-
-    .menubar-zoom-bar {
-      height: 38px;
-      background: rgba(255, 255, 255, 0.78);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      padding: 0 22px;
-      gap: 16px;
-      font-size: 13px;
-      font-weight: 500;
-      color: #111827;
+    .menubar-demo-video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #0f1115;
     }
 
     .secondary-content h2 {
@@ -929,17 +916,10 @@
   <!-- Secondary Highlight Section -->
   <section class="secondary-section">
     <div class="menubar-zoom-card">
-      <div class="menubar-zoom-screen">
-        <div class="menubar-zoom-bar">
-          <div class="menubar-pulse-icon">
-            <span></span><span></span><span></span>
-          </div>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="6" width="18" height="12" rx="2"></rect><line x1="23" y1="11" x2="23" y2="13"></line></svg>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          <span>Mon 9 Sep 9:41</span>
-        </div>
-      </div>
+      <video class="menubar-demo-video" autoplay muted loop playsinline preload="metadata" poster="pulse-demo-poster.webp" aria-label="Pulse menu bar app demonstration">
+        <source src="pulse-demo.webm" type="video/webm">
+        <source src="pulse-demo.mp4" type="video/mp4">
+      </video>
     </div>
 
     <div class="secondary-content">
@@ -1096,6 +1076,12 @@
     }
 
     setupDownloadLinks();
+
+    const demoVideo = document.querySelector('.menubar-demo-video');
+    if (demoVideo && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      demoVideo.removeAttribute('autoplay');
+      demoVideo.pause();
+    }
 
     function copyInstallCmd() {
       const text = "curl -fsSL https://pulse0.app/install.sh | bash";
