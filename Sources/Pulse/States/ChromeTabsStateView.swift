@@ -1,20 +1,14 @@
 import SwiftUI
 
-/// A compact, read-only per-tab memory list for Google Chrome.
+/// A compact, read-only list of Chrome tabs. Stable Chrome does not expose a
+/// trustworthy per-tab physical-memory API to another macOS app, so Pulse
+/// deliberately avoids inventing per-tab totals.
 struct ChromeTabsStateView: View {
     @Environment(\.colorScheme) private var scheme
     @ObservedObject var model: PaletteViewModel
 
     private var chromeApp: RunningAppUsage? {
         model.monitor.topApps.first { $0.bundleIdentifier == ChromeTabsBridge.bundleIdentifier }
-    }
-
-    private var distribution: ChromeDistribution? {
-        model.monitor.chromeDistribution
-    }
-
-    private var attributions: [Int: TabAttribution] {
-        model.monitor.tabAttributions
     }
 
     private var tabs: [ChromeTab] {
@@ -27,23 +21,12 @@ struct ChromeTabsStateView: View {
         return title == "new tab" || title.isEmpty || url.hasPrefix("chrome://newtab") || url == "about:blank"
     }
 
-    /// Sorted: measured tabs first (highest footprint first), then unmeasured,
-    /// with "New Tab" sorting last regardless, and active tabs first.
+    /// Active tabs first, with New Tab last, then normal tab-strip order.
     private var sortedTabs: [ChromeTab] {
         tabs.sorted { a, b in
             let aIsNew = isBlankOrNewTab(a)
             let bIsNew = isBlankOrNewTab(b)
             if aIsNew != bIsNew { return bIsNew }
-
-            let aBytes = attributions[a.id]?.totalBytes ?? 0
-            let bBytes = attributions[b.id]?.totalBytes ?? 0
-
-            if aBytes > 0 && bBytes > 0 {
-                return aBytes > bBytes
-            }
-            if (aBytes > 0) != (bBytes > 0) {
-                return aBytes > 0
-            }
 
             // Active tabs are frontmost in user focus
             if a.isActive != b.isActive { return a.isActive }
@@ -102,53 +85,28 @@ struct ChromeTabsStateView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 10)
 
-            // Process Distribution Breakdown (Phase 1.2)
-            if let dist = distribution {
-                distributionBands(dist, theme: theme)
-                    .padding(.horizontal, Metrics.rowSidePadding)
-                    .padding(.bottom, 10)
-            }
+            memoryAvailabilityNote(theme)
+                .padding(.horizontal, Metrics.rowSidePadding)
+                .padding(.bottom, 10)
 
-            if let recommendation = model.monitor.chromeMemoryRecommendation {
-                reviewRecommendation(recommendation, theme: theme)
-                    .padding(.horizontal, Metrics.rowSidePadding)
-                    .padding(.bottom, 10)
-            }
-
-            SectionHeader(title: "Memory-heavy tabs")
+            SectionHeader(title: "Open tabs")
             .padding(.bottom, 4)
 
-            // Keep this list deliberately scannable: title and memory only.
             VStack(spacing: 1) {
                 ForEach(Array(sortedTabs.prefix(5))) { tab in
-                    tabRow(tab: tab, memoryBytes: attributions[tab.id]?.totalBytes ?? 0, theme: theme)
+                    tabRow(tab: tab, theme: theme)
                 }
             }
 
             if tabs.count > 5 {
                 HStack {
-                    Text("+ \(tabs.count - 5) other low-memory tabs")
+                    Text("+ \(tabs.count - 5) more tabs")
                         .font(Fonts.monoTiny)
                         .foregroundStyle(theme.hint)
                     Spacer()
                 }
                 .padding(.horizontal, Metrics.rowSidePadding)
                 .padding(.top, 4)
-            }
-
-            // Non-closeable browser overhead footer
-            if let dist = distribution, dist.overheadBytes > 0 {
-                HStack {
-                    Text("Browser overhead (GPU, network, audio, browser)")
-                        .font(Fonts.monoTiny)
-                        .foregroundStyle(theme.hint)
-                    Spacer()
-                    Text(String(format: "%.1f GB resident · not tied to a tab", dist.overheadGB))
-                        .font(Fonts.monoTiny)
-                        .foregroundStyle(theme.hint)
-                }
-                .padding(.horizontal, Metrics.rowSidePadding)
-                .padding(.top, 10)
             }
 
             Spacer(minLength: 0)
@@ -189,71 +147,28 @@ struct ChromeTabsStateView: View {
     }
 
     @ViewBuilder
-    private func distributionBands(_ dist: ChromeDistribution, theme: Theme) -> some View {
+    private func memoryAvailabilityNote(_ theme: Theme) -> some View {
         HStack(spacing: 8) {
-            bandPill(label: ">180MB", count: dist.highCount, color: Color(oklch: 0.62, 0.16, 25), theme: theme)
-            bandPill(label: "60-180MB", count: dist.mediumCount, color: Color(oklch: 0.72, 0.14, 85), theme: theme)
-            bandPill(label: "<60MB", count: dist.lowCount, color: Color(oklch: 0.64, 0.13, 150), theme: theme)
-            if dist.extensionCount > 0 {
-                bandPill(label: "\(dist.extensionCount) ext", count: nil, color: theme.textDim, theme: theme)
-            }
-            Spacer()
-        }
-    }
-
-    @ViewBuilder
-    private func reviewRecommendation(
-        _ recommendation: (tab: ChromeTab, attribution: TabAttribution, idleSince: Date),
-        theme: Theme
-    ) -> some View {
-        let minutes = max(15, Int(Date().timeIntervalSince(recommendation.idleSince) / 60))
-        Button {
-            model.monitor.activateChromeTab(recommendation.tab)
-        } label: {
-            HStack(spacing: 9) {
-                Image(systemName: "clock.arrow.circlepath")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(theme.accent)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Review this idle tab")
-                        .font(Fonts.bodyStrong)
-                        .foregroundStyle(theme.textPrimary)
-                    Text("\(recommendation.tab.cleanedTitle) · \(minutes)m idle · \(Int(recommendation.attribution.totalMB)) MB")
-                        .font(Fonts.monoTiny)
-                        .foregroundStyle(theme.textDim)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 0)
-                Text("Open")
-                    .font(Fonts.monoSmall)
-                    .foregroundStyle(theme.accent)
-            }
-            .padding(.horizontal, Metrics.rowSidePadding)
-            .padding(.vertical, 8)
-            .background(theme.rowSelected.opacity(0.55), in: RoundedRectangle(cornerRadius: Metrics.rowRadius))
-        }
-        .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private func bandPill(label: String, count: Int?, color: Color, theme: Theme) -> some View {
-        HStack(spacing: 4) {
-            Circle().fill(color).frame(width: 5, height: 5)
-            if let count {
-                Text("\(count) \(label)").font(Fonts.monoTiny).foregroundStyle(theme.textDim)
-            } else {
-                Text(label).font(Fonts.monoTiny).foregroundStyle(theme.textDim)
-            }
+            Image(systemName: "info.circle")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(theme.textDim)
+            Text("Exact tab memory: Chrome Task Manager")
+                .font(Fonts.monoTiny)
+                .foregroundStyle(theme.textDim)
+            Spacer(minLength: 0)
+            Text("⇧ esc")
+                .font(Fonts.monoTiny)
+                .foregroundStyle(theme.accent)
         }
         .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(theme.trackBackground, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .padding(.vertical, 6)
+        .background(theme.trackBackground, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 
     // MARK: - Tab Row
 
     @ViewBuilder
-    private func tabRow(tab: ChromeTab, memoryBytes: UInt64, theme: Theme) -> some View {
+    private func tabRow(tab: ChromeTab, theme: Theme) -> some View {
         HStack(spacing: 8) {
             Text(tab.cleanedTitle)
                 .font(Fonts.body)
@@ -262,23 +177,14 @@ struct ChromeTabsStateView: View {
                 .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(formattedMemory(bytes: memoryBytes))
-                .font(Fonts.mono)
-                .foregroundStyle(memoryBytes > 0 ? theme.textPrimary : theme.hint)
-                .frame(width: 58, alignment: .trailing)
+            Text("Unavailable")
+                .font(Fonts.monoTiny)
+                .foregroundStyle(theme.hint)
+                .frame(width: 76, alignment: .trailing)
         }
         .padding(.horizontal, Metrics.rowSidePadding)
         .frame(height: 42)
         .background(theme.rowSelected.opacity(0.35), in: RoundedRectangle(cornerRadius: Metrics.rowRadius, style: .continuous))
-    }
-
-    private func formattedMemory(bytes: UInt64) -> String {
-        guard bytes > 0 else { return "—" }
-        let mb = Double(bytes) / 1_000_000
-        if mb >= 1000 {
-            return String(format: "%.1f GB", Double(bytes) / 1_073_741_824)
-        }
-        return String(format: "%.0f MB", mb)
     }
 
     private var chromeSummary: String {

@@ -61,7 +61,7 @@ Open the `.dmg` and drag **Pulse** to your `/Applications` folder.
 
 | Shortcut | Action |
 | :--- | :--- |
-| **`⌘⌥P`** | Toggle command palette from anywhere (global) |
+| **`⌘⌥P`** | Open Pulse from anywhere (global) |
 | **`↑` / `↓`** | Navigate running apps and suggestions |
 | **`↵` (Return)** | Quit selected application or run command |
 | **`⌥` (Hold Option)** | Switch Quit buttons to **Force Quit** (`SIGKILL`) |
@@ -84,7 +84,7 @@ Type in the palette search bar to run instant diagnostics and filters:
 
 Pulse runs locally on your Mac with **zero telemetry** and **zero data collection**. It requests standard macOS permissions only when necessary:
 
-- **Accessibility / Input Monitoring**: Required for the global `⌘⌥P` hotkey. *(Optional: clicking the menu bar icon works without any permissions!)*
+- **No special permission is required** for the global `⌘⌥P` hotkey. *(Clicking the menu bar icon works too.)*
 - **Automation (AppleScript)**: Requested only when running the `chrome` command to inspect open tabs.
 
 ---

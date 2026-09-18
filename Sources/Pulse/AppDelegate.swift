@@ -1,19 +1,21 @@
 import AppKit
+import Carbon.HIToolbox
 import Combine
 import SwiftUI
 @preconcurrency import UserNotifications
 
 /// Owns the status item, the palette panel, and the click / hotkey / focus-loss
 /// plumbing described in 1a/1g: click opens the palette anchored under the
-/// icon (right edge aligned, 6px below the menu bar); ⌘⌥M opens it screen-
-/// centered instead; losing focus closes it.
+/// icon (right edge aligned, 6px below the menu bar); ⌘⌥P opens it screen-
+/// centered from anywhere; losing focus closes it.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUserNotificationCenterDelegate {
     private var statusItem: NSStatusItem!
     private var panel: PalettePanel?
     private let model = PaletteViewModel()
     private var cancellables = Set<AnyCancellable>()
-    private var hotKeyMonitor: Any?
+    private var registeredHotKey: EventHotKeyRef?
+    private var hotKeyHandler: EventHandlerRef?
     private var hasPostedHighMemoryAlert = false
     private var lastMemoryAlertDate: Date?
 
@@ -71,7 +73,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             object: nil
         )
 
-        registerHotKeyMonitor()
+        registerGlobalOpenHotKey()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let hotKeyHandler { RemoveEventHandler(hotKeyHandler) }
+        if let registeredHotKey { UnregisterEventHotKey(registeredHotKey) }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -275,17 +282,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         closePanel()
     }
 
-    // MARK: - Hotkey
+    // MARK: - Global hotkey
 
-    /// Best-effort: `addGlobalMonitorForEvents` only fires while the app has
-    /// Accessibility/Input-Monitoring permission; without it, ⌘⌥M simply won't
-    /// register and the status-item click remains the primary way in.
-    private func registerHotKeyMonitor() {
-        hotKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, event.modifierFlags.contains([.command, .option]) else { return }
-            let char = event.charactersIgnoringModifiers?.lowercased()
-            guard char == "p" || char == "m" else { return }
-            DispatchQueue.main.async { self.openPanel(centered: true) }
+    /// A registered Carbon hotkey is delivered by macOS even while another app
+    /// is frontmost. Unlike an NSEvent global monitor, it does not require the
+    /// user to grant Pulse Accessibility or Input Monitoring permission.
+    private func registerGlobalOpenHotKey() {
+        let hotKeyID = EventHotKeyID(signature: 0x50756C73, id: 1) // "Puls"
+        let eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+
+        let handlerStatus = InstallEventHandler(
+            GetApplicationEventTarget(),
+            { _, _, userData in
+                guard let userData else { return noErr }
+                let delegate = Unmanaged<AppDelegate>.fromOpaque(userData).takeUnretainedValue()
+                DispatchQueue.main.async { delegate.openPanel(centered: true) }
+                return noErr
+            },
+            1,
+            [eventType],
+            Unmanaged.passUnretained(self).toOpaque(),
+            &hotKeyHandler
+        )
+
+        guard handlerStatus == noErr else { return }
+
+        let registerStatus = RegisterEventHotKey(
+            UInt32(kVK_ANSI_P),
+            UInt32(cmdKey | optionKey),
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &registeredHotKey
+        )
+
+        if registerStatus != noErr, let hotKeyHandler {
+            RemoveEventHandler(hotKeyHandler)
+            self.hotKeyHandler = nil
         }
     }
 }
