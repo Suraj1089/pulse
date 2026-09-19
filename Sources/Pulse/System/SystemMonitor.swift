@@ -6,6 +6,7 @@ final class SystemMonitor: ObservableObject {
     @Published private(set) var memory: MemorySnapshot?
     @Published private(set) var pressureLevel: PressureLevel = .low
     @Published private(set) var topApps: [RunningAppUsage] = []
+    @Published private(set) var leftoverBackgroundGroups: [LeftoverBackgroundGroup] = []
     @Published private(set) var pressureSamples: [Double] = []
     @Published private(set) var chromeTabs: [ChromeTab] = []
     @Published private(set) var chromeIsRunning = false
@@ -185,6 +186,7 @@ final class SystemMonitor: ObservableObject {
                 }
 
                 self.topApps = self.appsMonitor.aggregate(processes: processes)
+                self.leftoverBackgroundGroups = self.appsMonitor.leftoverBackgroundGroups(processes: processes)
                 // This state drives the tabs screen. It must be refreshed from
                 // NSWorkspace on the main thread; otherwise `/tabs` can claim
                 // Chrome is closed while its processes are visible elsewhere.
@@ -252,6 +254,13 @@ final class SystemMonitor: ObservableObject {
     func quit(pid: pid_t, force: Bool = false) {
         appsMonitor.terminate(pid: pid, force: force)
         refreshFast()
+    }
+
+    func stopLeftoverProcesses(_ group: LeftoverBackgroundGroup) {
+        appsMonitor.terminateLeftovers(group)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.refreshFast()
+        }
     }
 
     func activateChromeTab(_ tab: ChromeTab) {

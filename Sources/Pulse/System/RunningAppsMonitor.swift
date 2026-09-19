@@ -1,4 +1,25 @@
 import AppKit
+import Darwin
+
+struct LeftoverBackgroundGroup: Identifiable {
+    struct ProcessIdentity {
+        let pid: pid_t
+        let executablePath: String
+    }
+
+    var id: String { bundlePath }
+    let appName: String
+    let bundlePath: String
+    let processes: [ProcessIdentity]
+    let totalFootprintBytes: UInt64
+
+    var processCount: Int { processes.count }
+
+    var footprintDescription: String {
+        let gb = Double(totalFootprintBytes) / 1_073_741_824
+        return gb >= 1 ? String(format: "%.1f GB footprint", gb) : String(format: "%.0f MB footprint", gb * 1024)
+    }
+}
 
 /// A regular (Dock-visible) app plus every helper/renderer process that
 /// shares its bundle path — e.g. Chrome's many `Google Chrome Helper`
@@ -36,6 +57,8 @@ struct RunningAppUsage: Identifiable {
 /// `NSWorkspace` activation notifications so we can report genuine (if
 /// session-bounded) idle durations.
 final class RunningAppsMonitor {
+    private static let leftoverMinimumAge: TimeInterval = 5 * 60 * 60
+    private static let leftoverMinimumFootprint: UInt64 = 500_000_000
     private static let excludedBundleIdentifiers: Set<String> = [
         "com.apple.finder"
     ]
@@ -169,6 +192,58 @@ final class RunningAppsMonitor {
         }
 
         return usages.sorted { $0.residentBytes > $1.residentBytes }
+    }
+
+    /// Finds resource-heavy helpers left behind after their owning app exits.
+    /// Requiring an app-bundle path, PPID 1, a long lifetime, a large physical
+    /// footprint, and no live owner avoids treating normal launch agents or
+    /// menu-bar apps as leftovers.
+    func leftoverBackgroundGroups(processes: [ProcessSample]) -> [LeftoverBackgroundGroup] {
+        let now = Date()
+        let runningBundlePaths = Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleURL?.path })
+
+        let candidates = processes.compactMap { process -> (String, LeftoverBackgroundGroup.ProcessIdentity, UInt64)? in
+            guard process.physFootprintBytes >= Self.leftoverMinimumFootprint,
+                  let executablePath = process.executablePath,
+                  let bundlePath = Self.owningAppBundlePath(for: executablePath),
+                  !runningBundlePaths.contains(bundlePath),
+                  let identity = ProcessScanner.identity(of: process.pid),
+                  identity.parentPID == 1,
+                  now.timeIntervalSince(identity.startDate) >= Self.leftoverMinimumAge
+            else { return nil }
+
+            return (
+                bundlePath,
+                .init(pid: process.pid, executablePath: executablePath),
+                process.physFootprintBytes
+            )
+        }
+
+        return Dictionary(grouping: candidates, by: \.0)
+            .map { bundlePath, entries in
+                LeftoverBackgroundGroup(
+                    appName: URL(fileURLWithPath: bundlePath).deletingPathExtension().lastPathComponent,
+                    bundlePath: bundlePath,
+                    processes: entries.map(\.1),
+                    totalFootprintBytes: entries.reduce(UInt64(0)) { $0 + $1.2 }
+                )
+            }
+            .sorted { $0.totalFootprintBytes > $1.totalFootprintBytes }
+    }
+
+    func terminateLeftovers(_ group: LeftoverBackgroundGroup) {
+        for process in group.processes {
+            // Re-check the executable path so a recycled PID can never target
+            // an unrelated process after the recommendation was rendered.
+            guard ProcessScanner.path(of: process.pid) == process.executablePath else { continue }
+            _ = Darwin.kill(process.pid, SIGTERM)
+        }
+    }
+
+    private static func owningAppBundlePath(for executablePath: String) -> String? {
+        guard let marker = executablePath.range(of: ".app/") else { return nil }
+        let slashIndex = executablePath.index(before: marker.upperBound)
+        return String(executablePath[..<slashIndex])
     }
 
     func pruneCaches() {

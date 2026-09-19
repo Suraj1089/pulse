@@ -38,8 +38,26 @@ enum ProcessScanner {
                 if let p { pathCache[pid] = p }
                 execPath = p
             }
-            return ProcessSample(pid: pid, executablePath: execPath, residentBytes: memory.residentBytes, physFootprintBytes: memory.physFootprintBytes)
+            return ProcessSample(
+                pid: pid,
+                executablePath: execPath,
+                residentBytes: memory.residentBytes,
+                physFootprintBytes: memory.physFootprintBytes
+            )
         }
+    }
+
+    static func identity(of pid: pid_t) -> (parentPID: pid_t, startDate: Date)? {
+        var info = proc_bsdinfo()
+        let expectedSize = MemoryLayout<proc_bsdinfo>.stride
+        let bytesRead = withUnsafeMutablePointer(to: &info) { pointer in
+            proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, pointer, Int32(expectedSize))
+        }
+        guard bytesRead == expectedSize, info.pbi_start_tvsec > 0 else { return nil }
+        return (
+            parentPID: pid_t(info.pbi_ppid),
+            startDate: Date(timeIntervalSince1970: TimeInterval(info.pbi_start_tvsec))
+        )
     }
 
     private static func allPIDs() -> [pid_t] {
@@ -61,7 +79,7 @@ enum ProcessScanner {
         return result
     }
 
-    private static func path(of pid: pid_t) -> String? {
+    static func path(of pid: pid_t) -> String? {
         let maxLen = 4 * Int(MAXPATHLEN)
         return withUnsafeTemporaryAllocation(of: CChar.self, capacity: maxLen) { buffer in
             guard let base = buffer.baseAddress else { return nil }

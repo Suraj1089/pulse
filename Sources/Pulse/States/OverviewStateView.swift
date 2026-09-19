@@ -21,6 +21,15 @@ struct OverviewStateView: View {
 
     private var suggestedActions: [RecommendedAction] {
         let now = Date()
+        let leftoverActions = model.monitor.leftoverBackgroundGroups.map { group in
+            let processWord = group.processCount == 1 ? "process" : "processes"
+            return RecommendedAction(
+                title: "Stop \(group.processCount) leftover \(group.appName) background \(processWord)",
+                detail: group.footprintDescription
+            ) {
+                model.monitor.stopLeftoverProcesses(group)
+            }
+        }
         let backgroundApps = model.monitor.topApps.filter { !$0.isFrontmost }
         let longIdleApps = backgroundApps.filter { app in
             guard let idleSince = app.idleSince else { return false }
@@ -30,7 +39,7 @@ struct OverviewStateView: View {
             ? longIdleApps
             : longIdleApps + backgroundApps.filter { app in !longIdleApps.contains(where: { $0.pid == app.pid }) }
 
-        return candidates.prefix(2).map { app in
+        let appActions = candidates.map { app in
                 let isLongIdle = app.idleSince.map {
                     now.timeIntervalSince($0) >= RunningAppUsage.recommendedQuitIdleInterval
                 } ?? false
@@ -41,6 +50,7 @@ struct OverviewStateView: View {
                     animatedQuit(pid: app.pid)
                 }
             }
+        return Array((leftoverActions + appActions).prefix(2))
     }
 
     var body: some View {
