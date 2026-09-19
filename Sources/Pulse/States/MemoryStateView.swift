@@ -26,7 +26,7 @@ struct MemoryStateView: View {
         }
         if let idle = model.monitor.topApps.first(where: { app in
             guard let idleSince = app.idleSince else { return false }
-            return Date().timeIntervalSince(idleSince) >= 15 * 60
+            return Date().timeIntervalSince(idleSince) >= RunningAppUsage.recommendedQuitIdleInterval
         }), let idleSince = idle.idleSince {
             lines.append("Consider quitting \(idle.name) — \(Formatters.idleDuration(since: idleSince)).")
         }

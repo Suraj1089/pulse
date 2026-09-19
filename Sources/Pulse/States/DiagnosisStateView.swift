@@ -7,12 +7,10 @@ struct DiagnosisStateView: View {
     @ObservedObject var model: PaletteViewModel
     @State private var selectedAction = 0
 
-    private var idleThreshold: TimeInterval { 15 * 60 }
-
     private var idleHeavyApp: RunningAppUsage? {
         model.monitor.topApps.first { app in
             guard let idleSince = app.idleSince else { return false }
-            return Date().timeIntervalSince(idleSince) >= idleThreshold
+            return Date().timeIntervalSince(idleSince) >= RunningAppUsage.recommendedQuitIdleInterval
         }
     }
 

@@ -5,6 +5,8 @@ import AppKit
 /// processes are folded into one "Chrome" entry. App rows use resident
 /// memory, while per-tab diagnostics retain process-footprint measurements.
 struct RunningAppUsage: Identifiable {
+    static let recommendedQuitIdleInterval: TimeInterval = 5 * 60 * 60
+
     var id: pid_t { pid }
     let pid: pid_t
     let name: String
@@ -34,13 +36,17 @@ struct RunningAppUsage: Identifiable {
 /// `NSWorkspace` activation notifications so we can report genuine (if
 /// session-bounded) idle durations.
 final class RunningAppsMonitor {
-    private var lastActivation: [pid_t: Date] = [:]
+    private static let excludedBundleIdentifiers: Set<String> = [
+        "com.apple.finder"
+    ]
+
+    private var idleSinceByPID: [pid_t: Date] = [:]
+    private var firstSeenByPID: [pid_t: Date] = [:]
     private var iconCache: [pid_t: NSImage] = [:]
-    private var monitorStartDate = Date()
     private var activationObserver: NSObjectProtocol?
+    private var deactivationObserver: NSObjectProtocol?
 
     func start() {
-        monitorStartDate = Date()
         activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
@@ -49,7 +55,17 @@ final class RunningAppsMonitor {
             guard let self,
                   let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
             else { return }
-            self.lastActivation[app.processIdentifier] = Date()
+            self.idleSinceByPID[app.processIdentifier] = nil
+        }
+        deactivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didDeactivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            else { return }
+            self.idleSinceByPID[app.processIdentifier] = Date()
         }
     }
 
@@ -57,7 +73,11 @@ final class RunningAppsMonitor {
         if let activationObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
         }
+        if let deactivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(deactivationObserver)
+        }
         activationObserver = nil
+        deactivationObserver = nil
         iconCache.removeAll()
     }
 
@@ -68,10 +88,19 @@ final class RunningAppsMonitor {
     /// on a background queue and hop back to main before calling this.
     func aggregate(processes: [ProcessSample]) -> [RunningAppUsage] {
         let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
-        let regularApps = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
+        let regularApps = NSWorkspace.shared.runningApplications.filter { app in
+            app.activationPolicy == .regular &&
+                !Self.excludedBundleIdentifiers.contains(app.bundleIdentifier ?? "")
+        }
 
         // Clean icon cache of terminated apps if it grows too large
         let currentPIDs = Set(regularApps.map(\.processIdentifier))
+        let now = Date()
+        for pid in currentPIDs where firstSeenByPID[pid] == nil {
+            firstSeenByPID[pid] = now
+        }
+        firstSeenByPID = firstSeenByPID.filter { currentPIDs.contains($0.key) }
+        idleSinceByPID = idleSinceByPID.filter { currentPIDs.contains($0.key) }
         if iconCache.count > regularApps.count + 20 {
             iconCache = iconCache.filter { currentPIDs.contains($0.key) }
         }
@@ -135,7 +164,7 @@ final class RunningAppsMonitor {
                 residentBytes: totalResidentBytes,
                 processCount: matched.count,
                 isFrontmost: isFrontmost,
-                idleSince: isFrontmost ? nil : (lastActivation[pid] ?? monitorStartDate)
+                idleSince: isFrontmost ? nil : (idleSinceByPID[pid] ?? firstSeenByPID[pid])
             )
         }
 
@@ -145,6 +174,8 @@ final class RunningAppsMonitor {
     func pruneCaches() {
         let livePIDs = Set(NSWorkspace.shared.runningApplications.map(\.processIdentifier))
         iconCache = iconCache.filter { livePIDs.contains($0.key) }
+        firstSeenByPID = firstSeenByPID.filter { livePIDs.contains($0.key) }
+        idleSinceByPID = idleSinceByPID.filter { livePIDs.contains($0.key) }
     }
 
     private static func downsampleIcon(_ original: NSImage, targetSize: NSSize = NSSize(width: 30, height: 30)) -> NSImage {

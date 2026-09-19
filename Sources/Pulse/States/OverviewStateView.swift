@@ -20,11 +20,24 @@ struct OverviewStateView: View {
     }
 
     private var suggestedActions: [RecommendedAction] {
-        model.monitor.topApps
-            .filter { !$0.isFrontmost }
-            .prefix(2)
-            .map { app in
-                RecommendedAction(title: "Quit \(app.name)", detail: "May reduce pressure") {
+        let now = Date()
+        let backgroundApps = model.monitor.topApps.filter { !$0.isFrontmost }
+        let longIdleApps = backgroundApps.filter { app in
+            guard let idleSince = app.idleSince else { return false }
+            return now.timeIntervalSince(idleSince) >= RunningAppUsage.recommendedQuitIdleInterval
+        }
+        let candidates = model.level == .low
+            ? longIdleApps
+            : longIdleApps + backgroundApps.filter { app in !longIdleApps.contains(where: { $0.pid == app.pid }) }
+
+        return candidates.prefix(2).map { app in
+                let isLongIdle = app.idleSince.map {
+                    now.timeIntervalSince($0) >= RunningAppUsage.recommendedQuitIdleInterval
+                } ?? false
+                let detail = isLongIdle
+                    ? app.idleSince.map { Formatters.idleDuration(since: $0) }
+                    : "May reduce pressure"
+                return RecommendedAction(title: "Quit \(app.name)", detail: detail) {
                     animatedQuit(pid: app.pid)
                 }
             }
@@ -95,7 +108,7 @@ struct OverviewStateView: View {
 
             SectionHeader(title: "Suggested actions").padding(.top, 14).padding(.bottom, 6)
 
-            if model.level == .low || suggestedActions.isEmpty {
+            if suggestedActions.isEmpty {
                 HStack(spacing: 10) {
                     Text("→").font(.system(size: 13)).foregroundStyle(theme.hint)
                     Text("Nothing to do — you have headroom")
