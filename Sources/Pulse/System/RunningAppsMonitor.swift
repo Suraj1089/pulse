@@ -52,6 +52,23 @@ struct RunningAppUsage: Identifiable {
     var initial: String { String(name.first ?? "?").uppercased() }
 }
 
+/// AppKit-derived data captured on the main thread, before memory attribution
+/// is calculated on Pulse's utility queue.
+struct RunningAppsWorkspaceSnapshot {
+    struct App {
+        let pid: pid_t
+        let name: String
+        let bundleIdentifier: String?
+        let bundlePath: String?
+        let icon: NSImage?
+        let isFrontmost: Bool
+        let idleSince: Date?
+    }
+
+    let apps: [App]
+    let runningBundlePaths: Set<String>
+}
+
 /// Aggregates `NSWorkspace.runningApplications` with real per-process memory
 /// from `ProcessScanner`, and tracks how recently each app was frontmost via
 /// `NSWorkspace` activation notifications so we can report genuine (if
@@ -104,14 +121,12 @@ final class RunningAppsMonitor {
         iconCache.removeAll()
     }
 
-    /// Must be called on the main thread — it reads `NSWorkspace`/
-    /// `NSRunningApplication`, neither of which is documented as safe off
-    /// it (unlike `processes`, which is pure libproc and fine from
-    /// anywhere). Callers should fetch `processes` via `ProcessScanner`
-    /// on a background queue and hop back to main before calling this.
-    func aggregate(processes: [ProcessSample]) -> [RunningAppUsage] {
+    /// Must be called on the main thread. It makes the narrow AppKit snapshot
+    /// needed to do the CPU-heavy process attribution without blocking input.
+    func workspaceSnapshot() -> RunningAppsWorkspaceSnapshot {
         let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
-        let regularApps = NSWorkspace.shared.runningApplications.filter { app in
+        let runningApps = NSWorkspace.shared.runningApplications
+        let regularApps = runningApps.filter { app in
             app.activationPolicy == .regular &&
                 !Self.excludedBundleIdentifiers.contains(app.bundleIdentifier ?? "")
         }
@@ -128,6 +143,41 @@ final class RunningAppsMonitor {
             iconCache = iconCache.filter { currentPIDs.contains($0.key) }
         }
 
+        let apps = regularApps.map { app -> RunningAppsWorkspaceSnapshot.App in
+            let pid = app.processIdentifier
+            let icon: NSImage?
+            if let cached = iconCache[pid] {
+                icon = cached
+            } else if let raw = app.icon {
+                let downsampled = Self.downsampleIcon(raw)
+                iconCache[pid] = downsampled
+                icon = downsampled
+            } else {
+                icon = nil
+            }
+
+            return .init(
+                pid: pid,
+                name: app.localizedName ?? app.bundleIdentifier ?? "Unknown",
+                bundleIdentifier: app.bundleIdentifier,
+                bundlePath: app.bundleURL?.path,
+                icon: icon,
+                isFrontmost: pid == frontmostPID,
+                idleSince: pid == frontmostPID ? nil : (idleSinceByPID[pid] ?? firstSeenByPID[pid])
+            )
+        }
+
+        return RunningAppsWorkspaceSnapshot(
+            apps: apps,
+            runningBundlePaths: Set(runningApps.compactMap { $0.bundleURL?.path })
+        )
+    }
+
+    /// Uses only value snapshots, so it is safe to run on the utility queue.
+    func aggregate(
+        processes: [ProcessSample],
+        workspace: RunningAppsWorkspaceSnapshot
+    ) -> [RunningAppUsage] {
         // Fast index: PID -> ProcessSample
         var procByPID: [pid_t: ProcessSample] = [:]
         procByPID.reserveCapacity(processes.count)
@@ -135,15 +185,15 @@ final class RunningAppsMonitor {
             procByPID[proc.pid] = proc
         }
 
-        let appPrefixes: [(pid: pid_t, prefix: String)] = regularApps.compactMap { app in
-            guard let url = app.bundleURL else { return nil }
-            return (app.processIdentifier, url.path + "/")
+        let appPrefixes: [(pid: pid_t, prefix: String)] = workspace.apps.compactMap { app in
+            guard let bundlePath = app.bundlePath else { return nil }
+            return (app.pid, bundlePath + "/")
         }
 
         // Map app PID to all its processes (main + helpers)
         var appProcesses: [pid_t: [ProcessSample]] = [:]
-        for app in regularApps {
-            let pid = app.processIdentifier
+        for app in workspace.apps {
+            let pid = app.pid
             if let mainProc = procByPID[pid] {
                 appProcesses[pid] = [mainProc]
             } else {
@@ -161,33 +211,21 @@ final class RunningAppsMonitor {
             }
         }
 
-        let usages: [RunningAppUsage] = regularApps.compactMap { app in
-            let pid = app.processIdentifier
+        let usages: [RunningAppUsage] = workspace.apps.compactMap { app in
+            let pid = app.pid
             guard let matched = appProcesses[pid], !matched.isEmpty else { return nil }
 
             let totalResidentBytes = matched.reduce(UInt64(0)) { $0 + $1.residentBytes }
-            let isFrontmost = pid == frontmostPID
-
-            let cachedIcon: NSImage?
-            if let icon = iconCache[pid] {
-                cachedIcon = icon
-            } else if let raw = app.icon {
-                let downsampled = Self.downsampleIcon(raw)
-                iconCache[pid] = downsampled
-                cachedIcon = downsampled
-            } else {
-                cachedIcon = nil
-            }
 
             return RunningAppUsage(
                 pid: pid,
-                name: app.localizedName ?? app.bundleIdentifier ?? "Unknown",
+                name: app.name,
                 bundleIdentifier: app.bundleIdentifier,
-                icon: cachedIcon,
+                icon: app.icon,
                 residentBytes: totalResidentBytes,
                 processCount: matched.count,
-                isFrontmost: isFrontmost,
-                idleSince: isFrontmost ? nil : (idleSinceByPID[pid] ?? firstSeenByPID[pid])
+                isFrontmost: app.isFrontmost,
+                idleSince: app.idleSince
             )
         }
 
@@ -198,9 +236,14 @@ final class RunningAppsMonitor {
     /// Requiring an app-bundle path, PPID 1, a long lifetime, a large physical
     /// footprint, and no live owner avoids treating normal launch agents or
     /// menu-bar apps as leftovers.
-    func leftoverBackgroundGroups(processes: [ProcessSample]) -> [LeftoverBackgroundGroup] {
+    /// This deliberately uses only process samples and an already-captured
+    /// workspace snapshot, so the potentially slow `proc_pidinfo` calls stay
+    /// off the main thread.
+    func leftoverBackgroundGroups(
+        processes: [ProcessSample],
+        runningBundlePaths: Set<String>
+    ) -> [LeftoverBackgroundGroup] {
         let now = Date()
-        let runningBundlePaths = Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleURL?.path })
 
         let candidates = processes.compactMap { process -> (String, LeftoverBackgroundGroup.ProcessIdentity, UInt64)? in
             guard process.physFootprintBytes >= Self.leftoverMinimumFootprint,

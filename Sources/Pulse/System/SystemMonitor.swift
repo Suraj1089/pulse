@@ -147,10 +147,25 @@ final class SystemMonitor: ObservableObject {
     }
 
     private func refreshFast() {
+        // `NSWorkspace` is main-thread-only. Take its tiny snapshot before the
+        // expensive libproc work begins; never make the UI wait for the scan.
+        let workspaceSnapshot = appsMonitor.workspaceSnapshot()
+        let isWatchingChrome = chromeTimer != nil
+        let shouldMonitorChromeForAlert = memory?.usedFraction ?? 0 >= 0.85
+        let chromeIsRunning = ChromeTabsBridge.isRunning
+
         workQueue.async { [weak self] in
             guard let self else { return }
             let snapshot = MemoryStats.snapshot()
             let processes = ProcessScanner.allProcesses()
+            let leftoverGroups = self.appsMonitor.leftoverBackgroundGroups(
+                processes: processes,
+                runningBundlePaths: workspaceSnapshot.runningBundlePaths
+            )
+            let topApps = self.appsMonitor.aggregate(
+                processes: processes,
+                workspace: workspaceSnapshot
+            )
 
             // 1. Inspect Chrome processes
             let chromeSamples = processes.filter { proc in
@@ -165,8 +180,7 @@ final class SystemMonitor: ObservableObject {
 
             // 2. Fetch tabs only if Chrome watching is active (accordion expanded or Chrome state view)
             var currentTabs: [ChromeTab]? = nil
-            let shouldMonitorChromeForAlert = self.memory?.usedFraction ?? 0 >= 0.85
-            if (self.chromeTimer != nil || shouldMonitorChromeForAlert) && ChromeTabsBridge.isRunning {
+            if (isWatchingChrome || shouldMonitorChromeForAlert) && chromeIsRunning {
                 currentTabs = ChromeTabsBridge.fetchTabs()
             }
 
@@ -185,12 +199,12 @@ final class SystemMonitor: ObservableObject {
                     self.pressureLevel = kernelLevel.combined(with: availLevel)
                 }
 
-                self.topApps = self.appsMonitor.aggregate(processes: processes)
-                self.leftoverBackgroundGroups = self.appsMonitor.leftoverBackgroundGroups(processes: processes)
+                self.topApps = topApps
+                self.leftoverBackgroundGroups = leftoverGroups
                 // This state drives the tabs screen. It must be refreshed from
                 // NSWorkspace on the main thread; otherwise `/tabs` can claim
                 // Chrome is closed while its processes are visible elsewhere.
-                self.chromeIsRunning = ChromeTabsBridge.isRunning
+                self.chromeIsRunning = chromeIsRunning
                 self.chromeDistribution = distribution
                 self.tabAttributions = attributions
                 if let currentTabs {
@@ -257,9 +271,12 @@ final class SystemMonitor: ObservableObject {
     }
 
     func stopLeftoverProcesses(_ group: LeftoverBackgroundGroup) {
-        appsMonitor.terminateLeftovers(group)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.refreshFast()
+        workQueue.async { [weak self] in
+            guard let self else { return }
+            self.appsMonitor.terminateLeftovers(group)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.refreshFast()
+            }
         }
     }
 

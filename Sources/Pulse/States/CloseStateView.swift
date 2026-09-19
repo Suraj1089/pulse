@@ -54,7 +54,7 @@ struct CloseStateView: View {
                 .clipped()
             }
 
-            if ChromeTabsBridge.isRunning {
+            if model.monitor.chromeIsRunning {
                 SectionHeader(title: "Browser tabs").padding(.top, 18).padding(.bottom, 6)
                 HStack(spacing: 10) {
                     Text("C")
