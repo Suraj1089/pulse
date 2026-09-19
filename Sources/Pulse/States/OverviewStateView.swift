@@ -131,7 +131,9 @@ struct OverviewStateView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(suggestedActions.enumerated()), id: \.element.id) { index, action in
                         RecommendationItem(action: action, isSelected: hoveredAction == index) { hovering in
-                            hoveredAction = hovering ? index : (hoveredAction == index ? nil : hoveredAction)
+                            let nextSelection = hovering ? index : (hoveredAction == index ? nil : hoveredAction)
+                            guard hoveredAction != nextSelection else { return }
+                            hoveredAction = nextSelection
                         }
                     }
                 }

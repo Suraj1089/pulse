@@ -111,10 +111,20 @@ struct MemorySegment: Identifiable {
 /// A suggested/recommended action row. `perform` is wired by whichever state
 /// view builds the list — e.g. `{ model.quit(pid: app.pid) }`.
 struct RecommendedAction: Identifiable {
-    let id = UUID()
+    /// Must remain stable while a palette state is visible. A new UUID on
+    /// every body evaluation makes SwiftUI tear down and recreate the row's
+    /// tracking area on each hover event.
+    let id: String
     let title: String
     let detail: String?
     var perform: () -> Void = {}
+
+    init(id: String? = nil, title: String, detail: String?, perform: @escaping () -> Void = {}) {
+        self.id = id ?? title
+        self.title = title
+        self.detail = detail
+        self.perform = perform
+    }
 }
 
 struct DiagnosisPoint: Identifiable {
