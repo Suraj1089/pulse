@@ -1,10 +1,11 @@
 import AppKit
 
-/// Bottom strip: caret position, language, indentation, and Pulse's own
+/// Bottom strip: git branch, caret position, language, indentation, and Pulse's own
 /// memory and CPU next to whatever the terminal is running.
 final class StatusBarView: NSView {
     static let height: CGFloat = 24
 
+    private let branch = StatusBarView.makeLabel()
     private let position = StatusBarView.makeLabel()
     private let language = StatusBarView.makeLabel()
     private let indentation = StatusBarView.makeLabel()
@@ -13,7 +14,8 @@ final class StatusBarView: NSView {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        let left = NSStackView(views: [position, language, indentation, encoding])
+        branch.isHidden = true
+        let left = NSStackView(views: [branch, position, language, indentation, encoding])
         left.spacing = 16
         let stack = NSStackView(views: [left, NSView(), resources])
         stack.orientation = .horizontal
@@ -50,6 +52,11 @@ final class StatusBarView: NSView {
     func showDocument(languageName: String?, visible: Bool) {
         language.stringValue = languageName ?? "Plain Text"
         for label in [position, language, indentation, encoding] { label.isHidden = !visible }
+    }
+
+    func showBranch(_ name: String?) {
+        branch.stringValue = name.map { "⎇ " + $0 } ?? ""
+        branch.isHidden = name == nil
     }
 
     func showResources(_ snapshot: ResourceSnapshot) {

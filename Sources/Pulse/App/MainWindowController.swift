@@ -91,6 +91,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             if let url = document?.url { self.sidebar.fileTree.reveal(url) }
         }
         editor.onSessionChange = { [weak self] in self?.scheduleSessionSave() }
+        editor.onDidSave = { [weak self] in self?.sidebar.sourceControl.refresh() }
+        sidebar.sourceControl.onOpenFile = { [weak self] url in self?.editor.open(url) }
         editor.onOpenRequest = { [weak self] in self?.openDocument(nil) }
         editor.onOpenRecent = { [weak self] url in self?.open([url]) }
         editor.setRecents(RecentFolders.all)
@@ -137,6 +139,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         sidebar.searchPanel.root = url
         sidebar.searchPanel.index = fileIndex
         sidebar.searchPanel.clear()
+        sidebar.sourceControl.root = url
+        showBranch()
         editor.terminalDirectory = url
         titleBar.searchField.title = url?.lastPathComponent ?? "Search"
         if let url {
@@ -215,6 +219,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         sidebar.fileTree.refresh()
         fileIndex?.invalidate()
         editor.reloadChangedDocuments()
+        showBranch()
+        sidebar.sourceControl.refresh()
         resources.start()
     }
 
@@ -270,6 +276,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         sidebar.showFiles()
     }
 
+    @objc func showSourceControl(_ sender: Any?) {
+        if sidebarItem.isCollapsed { sidebarItem.animator().isCollapsed = false }
+        sidebar.showSourceControl()
+    }
+
+    /// Reads .git/HEAD; no process. Runs on folder change and app activation.
+    private func showBranch() {
+        let branch = root.flatMap(GitStatus.repositoryRoot).flatMap(GitStatus.branch)
+        editor.statusBar.showBranch(branch)
+    }
+
     @objc func toggleTerminal(_ sender: Any?) { editor.toggleTerminal() }
     @objc func killTerminal(_ sender: Any?) { editor.killTerminal() }
     @objc func toggleComment(_ sender: Any?) { editor.textView.toggleLineComment() }
@@ -314,7 +331,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             return hasDocument
         case #selector(nextTab(_:)), #selector(previousTab(_:)):
             return editor.documents.count > 1
-        case #selector(findInProject(_:)), #selector(showGoToFile(_:)):
+        case #selector(findInProject(_:)), #selector(showGoToFile(_:)), #selector(showSourceControl(_:)):
             return root != nil
         default:
             return true
@@ -324,34 +341,40 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     // MARK: Palette commands
 
     private func paletteCommands() -> [PaletteCommand] {
+        // Shortcut labels come from the live menu, so they follow rebinding.
+        func command(_ title: String, _ action: Selector, to target: AnyObject? = nil) -> PaletteCommand {
+            PaletteCommand(title: title, shortcut: KeyBindings.display(for: action)) { [weak self] in
+                NSApp.sendAction(action, to: target ?? self, from: nil)
+            }
+        }
         var commands: [PaletteCommand] = [
-            PaletteCommand(title: "File: New File", shortcut: "⌘N") { [weak self] in self?.newFile(nil) },
-            PaletteCommand(title: "File: Open…", shortcut: "⌘O") { [weak self] in self?.openDocument(nil) },
-            PaletteCommand(title: "File: Save", shortcut: "⌘S") { [weak self] in self?.saveDocument(nil) },
-            PaletteCommand(title: "File: Save As…", shortcut: "⇧⌘S") { [weak self] in self?.saveDocumentAs(nil) },
-            PaletteCommand(title: "File: Save All", shortcut: "⌥⌘S") { [weak self] in self?.saveAllDocuments(nil) },
-            PaletteCommand(title: "File: Close Tab", shortcut: "⌘W") { [weak self] in self?.closeTab(nil) },
-            PaletteCommand(title: "File: Toggle Autosave", shortcut: "") { [weak self] in self?.toggleAutosave(nil) },
-            PaletteCommand(title: "File: Reveal in Finder", shortcut: "") { [weak self] in self?.revealInFinder(nil) },
-            PaletteCommand(title: "File: Copy Path", shortcut: "") { [weak self] in self?.copyFilePath(nil) },
-            PaletteCommand(title: "Go: Go to File", shortcut: "⌘P") { [weak self] in self?.showGoToFile(nil) },
-            PaletteCommand(title: "Go: Go to Line", shortcut: "⌘L") { [weak self] in self?.showGoToLine(nil) },
-            PaletteCommand(title: "Go: Next Tab", shortcut: "⇧⌘]") { [weak self] in self?.nextTab(nil) },
-            PaletteCommand(title: "Go: Previous Tab", shortcut: "⇧⌘[") { [weak self] in self?.previousTab(nil) },
-            PaletteCommand(title: "Search: Find in Project", shortcut: "⇧⌘F") { [weak self] in self?.findInProject(nil) },
-            PaletteCommand(title: "Edit: Toggle Line Comment", shortcut: "⌘/") { [weak self] in self?.toggleComment(nil) },
-            PaletteCommand(title: "Edit: Indent Lines", shortcut: "⌘]") { [weak self] in self?.indentLines(nil) },
-            PaletteCommand(title: "Edit: Outdent Lines", shortcut: "⌘[") { [weak self] in self?.outdentLines(nil) },
-            PaletteCommand(title: "View: Toggle Sidebar", shortcut: "⌃⌘S") { [weak self] in
-                self?.splitController.toggleSidebar(nil)
-            },
-            PaletteCommand(title: "View: Show Files", shortcut: "⇧⌘E") { [weak self] in self?.showFiles(nil) },
-            PaletteCommand(title: "View: Toggle Word Wrap", shortcut: "⌥⌘W") { [weak self] in self?.toggleWordWrap(nil) },
-            PaletteCommand(title: "View: Zoom In", shortcut: "⌘+") { [weak self] in self?.zoomIn(nil) },
-            PaletteCommand(title: "View: Zoom Out", shortcut: "⌘−") { [weak self] in self?.zoomOut(nil) },
-            PaletteCommand(title: "View: Reset Zoom", shortcut: "⌘0") { [weak self] in self?.resetZoom(nil) },
-            PaletteCommand(title: "Terminal: Toggle Terminal", shortcut: "⌃`") { [weak self] in self?.toggleTerminal(nil) },
-            PaletteCommand(title: "Terminal: Kill Terminal", shortcut: "") { [weak self] in self?.killTerminal(nil) },
+            command("File: New File", #selector(newFile(_:))),
+            command("File: Open…", #selector(openDocument(_:))),
+            command("File: Save", #selector(saveDocument(_:))),
+            command("File: Save As…", #selector(saveDocumentAs(_:))),
+            command("File: Save All", #selector(saveAllDocuments(_:))),
+            command("File: Close Tab", #selector(closeTab(_:))),
+            command("File: Toggle Autosave", #selector(toggleAutosave(_:))),
+            command("File: Reveal in Finder", #selector(revealInFinder(_:))),
+            command("File: Copy Path", #selector(copyFilePath(_:))),
+            command("Go: Go to File", #selector(showGoToFile(_:))),
+            command("Go: Go to Line", #selector(showGoToLine(_:))),
+            command("Go: Next Tab", #selector(nextTab(_:))),
+            command("Go: Previous Tab", #selector(previousTab(_:))),
+            command("Search: Find in Project", #selector(findInProject(_:))),
+            command("Edit: Toggle Line Comment", #selector(toggleComment(_:))),
+            command("Edit: Indent Lines", #selector(indentLines(_:))),
+            command("Edit: Outdent Lines", #selector(outdentLines(_:))),
+            command("View: Toggle Sidebar", #selector(NSSplitViewController.toggleSidebar(_:)), to: splitController),
+            command("View: Show Files", #selector(showFiles(_:))),
+            command("View: Show Source Control", #selector(showSourceControl(_:))),
+            command("View: Toggle Word Wrap", #selector(toggleWordWrap(_:))),
+            command("View: Zoom In", #selector(zoomIn(_:))),
+            command("View: Zoom Out", #selector(zoomOut(_:))),
+            command("View: Reset Zoom", #selector(resetZoom(_:))),
+            command("Terminal: Toggle Terminal", #selector(toggleTerminal(_:))),
+            command("Terminal: Kill Terminal", #selector(killTerminal(_:))),
+            command("Preferences: Keyboard Shortcuts", #selector(AppDelegate.showKeyboardShortcuts(_:)), to: NSApp.delegate as AnyObject?),
         ]
         for url in RecentFolders.all.prefix(5) where url != root {
             commands.append(PaletteCommand(title: "Open Recent: \(url.lastPathComponent)", shortcut: "") { [weak self] in

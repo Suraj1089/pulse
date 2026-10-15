@@ -53,6 +53,10 @@ enum Theme {
     static let number = dynamic(light: 0x3B2CC0, dark: 0xD9C674)
     static let attribute = dynamic(light: 0x7A4A1E, dark: 0xEFA25E)
 
+    static let gitModified = dynamic(light: 0x895503, dark: 0xE2C08D)
+    static let gitAdded = dynamic(light: 0x587C0C, dark: 0x81B88B)
+    static let gitDeleted = dynamic(light: 0xAD0707, dark: 0xC74E39)
+
     static func color(for kind: TokenKind) -> NSColor {
         switch kind {
         case .keyword: return keyword

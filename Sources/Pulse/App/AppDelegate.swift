@@ -46,6 +46,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowController.showWindow(nil)
     }
 
+    @objc func showKeyboardShortcuts(_ sender: Any?) {
+        ShortcutsPanel.show()
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

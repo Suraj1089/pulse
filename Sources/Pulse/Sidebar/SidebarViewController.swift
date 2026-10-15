@@ -1,10 +1,11 @@
 import AppKit
 
-/// Files and Search, switched by a small segmented control in the header
+/// Files, Search and Source Control, switched by a small segmented control in the header
 /// row level with the tabs.
 final class SidebarViewController: NSViewController {
     let fileTree = FileTreeController()
     let searchPanel = SearchPanelController()
+    let sourceControl = SourceControlPanel()
 
     private let modeControl = NSSegmentedControl()
     private let container = NSView()
@@ -12,12 +13,14 @@ final class SidebarViewController: NSViewController {
     override func loadView() {
         let root = NSView()
 
-        modeControl.segmentCount = 2
+        modeControl.segmentCount = 3
         modeControl.trackingMode = .selectOne
         modeControl.setImage(NSImage(systemSymbolName: "folder", accessibilityDescription: "Files"), forSegment: 0)
         modeControl.setImage(NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Search"), forSegment: 1)
         modeControl.setToolTip("Files", forSegment: 0)
+        modeControl.setImage(NSImage(systemSymbolName: "arrow.triangle.branch", accessibilityDescription: "Source Control"), forSegment: 2)
         modeControl.setToolTip("Search (⇧⌘F)", forSegment: 1)
+        modeControl.setToolTip("Source Control (⌃⇧G)", forSegment: 2)
         modeControl.selectedSegment = 0
         modeControl.controlSize = .small
         modeControl.target = self
@@ -40,6 +43,7 @@ final class SidebarViewController: NSViewController {
 
         addChild(fileTree)
         addChild(searchPanel)
+        addChild(sourceControl)
         display(fileTree)
     }
 
@@ -51,7 +55,11 @@ final class SidebarViewController: NSViewController {
     }
 
     @objc private func modeChanged() {
-        modeControl.selectedSegment == 0 ? showFiles() : showSearch(seed: nil)
+        switch modeControl.selectedSegment {
+        case 1: showSearch(seed: nil)
+        case 2: showSourceControl()
+        default: showFiles()
+        }
     }
 
     func showFiles() {
@@ -63,5 +71,10 @@ final class SidebarViewController: NSViewController {
         modeControl.selectedSegment = 1
         display(searchPanel)
         searchPanel.focus(with: seed)
+    }
+
+    func showSourceControl() {
+        modeControl.selectedSegment = 2
+        display(sourceControl)
     }
 }

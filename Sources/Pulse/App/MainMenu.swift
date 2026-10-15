@@ -13,6 +13,7 @@ enum MainMenu {
         let window = windowMenu()
         main.addItem(submenu(window))
         NSApp.windowsMenu = window
+        KeyBindings.register(main)
         return main
     }
 
@@ -33,6 +34,8 @@ enum MainMenu {
     private static func appMenu() -> NSMenu {
         let menu = NSMenu(title: "Pulse")
         menu.addItem(item("About Pulse", #selector(NSApplication.orderFrontStandardAboutPanel(_:))))
+        menu.addItem(.separator())
+        menu.addItem(item("Keyboard Shortcuts…", #selector(AppDelegate.showKeyboardShortcuts(_:)), "k", [.command, .option]))
         menu.addItem(.separator())
         let services = NSMenu(title: "Services")
         let servicesItem = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
@@ -101,6 +104,7 @@ enum MainMenu {
         menu.addItem(item("Command Palette…", #selector(MainWindowController.showCommandPalette(_:)), "p", [.command, .shift]))
         menu.addItem(.separator())
         menu.addItem(item("Show Files", #selector(MainWindowController.showFiles(_:)), "e", [.command, .shift]))
+        menu.addItem(item("Show Source Control", #selector(MainWindowController.showSourceControl(_:)), "g", [.control, .shift]))
         menu.addItem(item("Toggle Sidebar", #selector(NSSplitViewController.toggleSidebar(_:)), "s", [.command, .control]))
         menu.addItem(item("Show Terminal", #selector(MainWindowController.toggleTerminal(_:)), "`", [.control]))
         menu.addItem(item("Kill Terminal", #selector(MainWindowController.killTerminal(_:))))

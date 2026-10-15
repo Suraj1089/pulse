@@ -12,6 +12,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     var onActiveDocumentChange: ((Document?) -> Void)?
     var onSessionChange: (() -> Void)?
+    var onDidSave: (() -> Void)?
     var onOpenRequest: (() -> Void)?
     var onOpenRecent: ((URL) -> Void)?
 
@@ -319,6 +320,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             onActiveDocumentChange?(document)
         }
         onSessionChange?()
+        onDidSave?()
         return true
     }
 
