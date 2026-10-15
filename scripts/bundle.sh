@@ -19,6 +19,8 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/Pulse" "$APP/Contents/MacOS/Pulse"
 cp Sources/Pulse/Resources/Info.plist "$APP/Contents/Info.plist"
 cp Sources/Pulse/Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# The `pulse` terminal command (linked into PATH by the app or Homebrew).
+install -m 755 Sources/Pulse/Resources/pulse "$APP/Contents/Resources/pulse"
 if [ -f VERSION ]; then
     plutil -replace CFBundleShortVersionString -string "$(tr -d '[:space:]' < VERSION)" "$APP/Contents/Info.plist"
 fi

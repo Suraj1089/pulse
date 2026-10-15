@@ -63,11 +63,18 @@ final class StatusBarView: NSView {
         branch.isHidden = name == nil
     }
 
-    /// A problem worth surfacing without a dialog, such as a bad keybindings.json.
-    func showMessage(_ text: String?) {
+    /// A message without a dialog: a problem such as a bad keybindings.json
+    /// (orange, stays until cleared), or a note that clears itself.
+    func showMessage(_ text: String?, isWarning: Bool = true) {
         message.stringValue = text ?? ""
         message.toolTip = text
         message.isHidden = text == nil
+        message.textColor = isWarning ? .systemOrange : .secondaryLabelColor
+        if let text, !isWarning {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+                if self?.message.stringValue == text { self?.showMessage(nil) }
+            }
+        }
     }
 
     func showResources(_ snapshot: ResourceSnapshot) {

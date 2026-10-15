@@ -46,7 +46,7 @@ curl -fsSL https://pulse0.app/install.sh | bash
 
 Or download [Pulse.dmg](https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg) and drag Pulse to Applications.
 
-Open a folder from the terminal with `open -a Pulse .`
+Open a folder from the terminal with `pulse .` (or `pulse file.swift src/`), like VS Code's `code .`. Pulse links the `pulse` command into a folder on your PATH the first time it runs; if that needs a password, use Pulse › Install 'pulse' Command. Homebrew installs it with the cask.
 
 Pulse checks for a new release once a day and shows an **Update** button at the top right when one is available; it installs the update and reopens with your tabs. Pulse › Check for Updates… checks right away. Every change merged to `main` is released automatically.
 

@@ -1,0 +1,29 @@
+#!/bin/sh
+# pulse: open files and folders in Pulse from a terminal, like VS Code's `code`.
+#   pulse               open Pulse
+#   pulse .             open the current folder
+#   pulse a.swift src/  open files and folders (a missing file is created)
+# Installed as a link to this file inside Pulse.app; the app is found from it,
+# so the command keeps working when the app is moved or updated.
+set -e
+
+self=$(realpath "$0")
+app=${self%/Contents/Resources/pulse}
+
+case "${1:-}" in
+    -h|--help) sed -n '2,5s/^# \{0,1\}//p' "$self"; exit 0 ;;
+    -v|--version) /usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist"; exit 0 ;;
+esac
+
+for path in "$@"; do
+    if [ ! -e "$path" ]; then
+        dir=$(dirname "$path")
+        if [ ! -d "$dir" ]; then
+            echo "pulse: $dir: no such folder" >&2
+            exit 1
+        fi
+        : > "$path"
+    fi
+done
+
+exec open -a "$app" "$@"

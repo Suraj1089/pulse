@@ -76,6 +76,10 @@ Every push to `main` that passes CI (build, `swift test`, memory budget) is rele
 - An update downloads that release's `Pulse.zip`, checks the bundle id and version, quits Pulse, swaps the bundle in place and reopens it (tabs and unsaved text come back through session recovery). If the app's folder isn't writable, it offers the releases page.
 - `site/VERSION` and the site's `softwareVersion` are not updated per release; downloads don't depend on them.
 
+## The `pulse` terminal command
+
+`Sources/Pulse/Resources/pulse` is a shell script copied into `Pulse.app/Contents/Resources/` by `bundle.sh` and `package.sh`; it finds the app from its own real path and runs `open -a`. `App/CommandLineTool.swift` links it as `pulse` into the first writable, non-system folder on the user's PATH (read once from the login shell): automatically on the first launch of a release build, or from Pulse › Install 'pulse' Command, which falls back to `/usr/local/bin` with the macOS administrator prompt. It never replaces a different program named `pulse`, re-points links left at a moved or deleted Pulse.app, and never edits shell profiles. The Homebrew cask declares it with `binary`.
+
 ## Copyright
 
 © 2026 pulse0.app · MIT licensed

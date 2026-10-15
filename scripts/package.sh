@@ -49,6 +49,8 @@ fi
   if [ -f "$REPO_ROOT/Sources/Pulse/Resources/AppIcon.icns" ]; then
     cp "$REPO_ROOT/Sources/Pulse/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
   fi
+# The `pulse` terminal command (linked into PATH by the app or Homebrew).
+install -m 755 "$REPO_ROOT/Sources/Pulse/Resources/pulse" "$APP_BUNDLE/Contents/Resources/pulse"
 
 echo "==> Ad-hoc code signing the application..."
 codesign --force --deep -s - "$APP_BUNDLE"
@@ -101,6 +103,7 @@ cask "pulse" do
   homepage "https://github.com/Suraj1089/pulse"
 
   app "Pulse.app"
+  binary "#{appdir}/Pulse.app/Contents/Resources/pulse"
 
   zap trash: [
     "~/Library/Preferences/app.pulse.plist",

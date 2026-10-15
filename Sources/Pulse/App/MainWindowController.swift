@@ -234,6 +234,43 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     // MARK: App activation
 
+    // MARK: Terminal command
+
+    /// Release builds: once, without asking (see CommandLineTool).
+    func installCommandLineToolIfNeeded() {
+        CommandLineTool.installAutomaticallyIfNeeded { [weak self] outcome in
+            if case .installed(let folder) = outcome {
+                self?.editor.statusBar.showMessage("Installed the pulse command in \(folder). Run “pulse .” in a terminal.", isWarning: false)
+            }
+        }
+    }
+
+    @objc func installCommandLineTool(_ sender: Any?) {
+        CommandLineTool.install { [weak self] outcome in
+            if case .needsPassword = outcome {
+                CommandLineTool.installWithPassword { self?.report(outcome: $0) }
+            } else {
+                self?.report(outcome: outcome)
+            }
+        }
+    }
+
+    private func report(outcome: CommandLineTool.Outcome) {
+        guard let window else { return }
+        let alert = NSAlert()
+        switch outcome {
+        case .installed(let folder), .alreadyInstalled(let folder):
+            alert.messageText = "The pulse command is installed"
+            alert.informativeText = "It's in \(folder). Open a new terminal and run “pulse .” to open a folder, or “pulse file.swift” to open a file."
+        case .unavailable(let reason):
+            alert.messageText = "Couldn't install the pulse command"
+            alert.informativeText = reason
+        case .needsPassword:
+            return
+        }
+        alert.beginSheetModal(for: window)
+    }
+
     // MARK: Updates
 
     /// At launch and on activation; Updater limits real checks to once a day.
@@ -466,6 +503,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("Terminal: Kill Terminal", #selector(killTerminal(_:))),
             command("Preferences: Open Keyboard Shortcuts", #selector(openKeyboardShortcuts(_:))),
             command("Pulse: Check for Updates", #selector(checkForUpdates(_:))),
+            command("Shell Command: Install 'pulse' Command in PATH", #selector(installCommandLineTool(_:))),
             command("Preferences: Open Keyboard Shortcuts (JSON)", #selector(openKeyboardShortcutsJSON(_:))),
         ]
         for url in RecentFolders.all.prefix(5) where url != root {

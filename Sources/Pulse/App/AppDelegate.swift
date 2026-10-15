@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
+        controller.installCommandLineToolIfNeeded()
 
         // Used by scripts/memory-check.sh to measure the terminal scenario.
         if ProcessInfo.processInfo.environment["PULSE_OPEN_TERMINAL"] == "1" {
