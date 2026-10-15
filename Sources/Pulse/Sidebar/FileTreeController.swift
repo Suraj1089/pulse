@@ -9,6 +9,11 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
     private let header = NSTextField(labelWithString: "")
     private let cellID = NSUserInterfaceItemIdentifier("FileCell")
 
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        outline.sizeLastColumnToFit()
+    }
+
     override func loadView() {
         let container = NSView()
 

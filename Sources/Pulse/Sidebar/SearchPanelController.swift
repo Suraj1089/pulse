@@ -24,6 +24,11 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
     private var results: [SearchFileResult] = []
     private var items: [ObjectIdentifier: [MatchItem]] = [:]
 
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        outline.sizeLastColumnToFit()
+    }
+
     override func loadView() {
         let container = NSView()
 

@@ -6,6 +6,10 @@ import AppKit
 /// manager. Switching tabs swaps the layout manager onto another document's
 /// text storage, so each extra open file costs roughly its own text.
 final class EditorViewController: NSViewController, NSTextViewDelegate {
+    /// Large but finite. `CGFloat.greatestFiniteMagnitude` makes every line
+    /// fragment ~1e308 pt wide, which breaks glyph drawing.
+    private static let unbounded: CGFloat = 10_000_000
+
     var onActiveDocumentChange: ((Document?) -> Void)?
     var onSessionChange: (() -> Void)?
     var onOpenRequest: (() -> Void)?
@@ -22,7 +26,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private let editorArea = NSView()
     private let scrollView = NSScrollView()
     private let layoutManager = NSLayoutManager()
-    private let textContainer = NSTextContainer(size: NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude))
+    private let textContainer = NSTextContainer(size: NSSize(width: EditorViewController.unbounded, height: EditorViewController.unbounded))
     private let emptyStorage = NSTextStorage()
     private(set) var textView: CodeTextView!
     private var ruler: LineNumberRuler!
@@ -118,7 +122,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     private func configure(_ textView: CodeTextView) {
         textView.minSize = .zero
-        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.maxSize = NSSize(width: EditorViewController.unbounded, height: EditorViewController.unbounded)
         textView.isVerticallyResizable = true
         textView.isRichText = false
         textView.importsGraphics = false
@@ -150,14 +154,14 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     func applyWrap() {
         if EditorViewController.wrapLines {
             textContainer.widthTracksTextView = true
-            textContainer.containerSize = NSSize(width: scrollView.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+            textContainer.containerSize = NSSize(width: scrollView.contentSize.width, height: EditorViewController.unbounded)
             textView.isHorizontallyResizable = false
             textView.autoresizingMask = [.width]
             textView.setFrameSize(NSSize(width: scrollView.contentSize.width, height: textView.frame.height))
             scrollView.hasHorizontalScroller = false
         } else {
             textContainer.widthTracksTextView = false
-            textContainer.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+            textContainer.containerSize = NSSize(width: EditorViewController.unbounded, height: EditorViewController.unbounded)
             textView.isHorizontallyResizable = true
             textView.autoresizingMask = []
             scrollView.hasHorizontalScroller = true
@@ -221,6 +225,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         textView.setSelectedRange(selection)
         scrollView.contentView.scroll(to: document.scrollPoint)
         scrollView.reflectScrolledClipView(scrollView.contentView)
+        textView.needsDisplay = true
         highlightNow()
         refreshChrome()
         view.window?.makeFirstResponder(textView)
@@ -474,6 +479,27 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     @objc private func didScroll() {
         ruler.needsDisplay = true
         if (activeDocument?.length ?? 0) > SyntaxHighlighter.fullPassLimit { scheduleHighlight(after: 0.05) }
+    }
+
+    private func colorSample() -> String {
+        guard let storage = layoutManager.textStorage, storage.length > 0 else { return "none" }
+        return String(describing: storage.attribute(.foregroundColor, at: 0, effectiveRange: nil))
+    }
+
+    /// Prints text-view geometry; used by scripts/screenshot.sh in CI.
+    func dumpLayout() {
+        layoutManager.ensureLayout(for: textContainer)
+        let lines = [
+            "storage length: \(layoutManager.textStorage?.length ?? -1), glyphs: \(layoutManager.numberOfGlyphs)",
+            "textView frame: \(textView.frame), hidden: \(textView.isHidden), superview: \(String(describing: textView.superview))",
+            "visibleRect: \(textView.visibleRect), clip bounds: \(scrollView.contentView.bounds)",
+            "container size: \(textContainer.size), usedRect: \(layoutManager.usedRect(for: textContainer))",
+            "first fragment: \(layoutManager.numberOfGlyphs > 0 ? layoutManager.lineFragmentRect(forGlyphAt: 0, effectiveRange: nil) : .zero)",
+            "scrollView hidden: \(scrollView.isHidden), frame: \(scrollView.frame), emptyState hidden: \(emptyState.isHidden)",
+            "text color sample: \(colorSample())",
+        ]
+        print("PULSE_LAYOUT " + lines.joined(separator: "\nPULSE_LAYOUT "))
+        fflush(stdout)
     }
 
     // MARK: NSTextViewDelegate

@@ -32,6 +32,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if ProcessInfo.processInfo.environment["PULSE_OPEN_TERMINAL"] == "1" {
             controller.editor.showTerminal()
         }
+        if ProcessInfo.processInfo.environment["PULSE_DEBUG_LAYOUT"] == "1" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { controller.editor.dumpLayout() }
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
