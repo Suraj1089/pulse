@@ -111,6 +111,7 @@
     --tabbar: 36px;
     --status: 26px;
     --gutter: 64px;
+    --col: 1120px;           /* centered editor column, gutter included */
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -161,9 +162,6 @@
     background: var(--chrome); border-bottom: 1px solid var(--border);
     font: 500 12.5px/1 var(--font-code);
   }
-  .lights { display: flex; gap: 8px; flex: none; }
-  .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
-  .lights i:nth-child(1) { background: #ff5f57; } .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
   .brand { display: flex; align-items: center; gap: 8px; color: var(--fg); font-weight: 500; flex: none; }
   .brand:hover { text-decoration: none; }
   .brand svg { width: 18px; height: 18px; }
@@ -235,13 +233,12 @@
   }
   .tab:hover { color: var(--fg); text-decoration: none; }
   .tab.active { background: var(--bg); color: var(--fg); box-shadow: inset 0 2px 0 var(--accent); margin-bottom: -1px; }
-  .tab .x { color: var(--faint); font-size: 13px; visibility: hidden; }
-  .tab.active .x { visibility: visible; }
 
   /* ---------- a "file" ---------- */
   .file { border-bottom: 1px solid var(--border); }
   .crumbs {
     display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    max-width: var(--col); margin-inline: auto;
     padding: 10px max(16px, env(safe-area-inset-right, 0px)) 0 var(--gutter);
     font: 400 11.5px/1.4 var(--font-code); color: var(--faint);
   }
@@ -252,7 +249,7 @@
     padding-block: 22px 56px;
     padding-left: var(--gutter);
     padding-right: max(16px, env(safe-area-inset-right, 0px));
-    max-width: 1120px;
+    max-width: var(--col); margin-inline: auto;
   }
   .src > * { position: relative; counter-increment: ln; margin: 0; }
   .src > * + * { margin-top: 18px; }
@@ -411,6 +408,7 @@
   /* footer */
   .foot {
     display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px;
+    max-width: var(--col); margin-inline: auto;
     padding-block: 22px 28px; padding-left: var(--gutter); padding-right: max(16px, env(safe-area-inset-right, 0px));
     font: 400 12px/1.6 var(--font-code); color: var(--muted);
   }
@@ -430,7 +428,6 @@
   }
   .status .grow { flex: 1; }
   .status b { color: var(--fg); font-weight: 500; }
-  .status .live::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); margin-right: 7px; vertical-align: 1px; }
 
   /* ---------- command palette ---------- */
   .palette-scrim { position: fixed; inset: 0; z-index: 60; background: var(--scrim); display: flex; justify-content: center; align-items: flex-start; padding: calc(80px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); }
@@ -445,6 +442,19 @@
   .palette li.sel { background: var(--select); }
   .palette li mark { background: none; color: var(--accent); font-weight: 600; }
   .palette .empty { padding: 14px 12px; color: var(--muted); font: 400 13px/1.4 var(--font-code); }
+
+  /* ---------- centered composition ----------
+     Lines stay full width so the line numbers keep to the gutter;
+     the text inside each line is centered. */
+  .src > h1, .src > h2, .src > .md-h, .src > .comment, .src > .caption { text-align: center; max-width: none; }
+  .src > h1 { font-size: clamp(32px, 6vw, 68px); }
+  .src > .lede, .src > .prose, .src > .note { text-align: center; max-width: none; padding-inline: max(0px, calc((100% - 62ch) / 2)); }
+  .src > .cta { justify-content: center; }
+  .src > .term, .src > .split, .src > .symbols, .src > .arch, .src > .install { max-width: none; }
+  .src > .window, .src > .faq { margin-inline: auto; }
+  .src > .window { margin-top: 40px !important; }
+  .src > .json { width: fit-content; max-width: 100%; margin-inline: auto; }
+  .split { align-items: center; }
 
   /* ---------- responsive ---------- */
   @media (max-width: 860px) {
@@ -471,7 +481,6 @@
 </head>
 <body>
 <header class="titlebar">
-  <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
   <a class="brand" href="#readme" aria-label="Pulse home">
     <img src="/icon-512.png" alt="" width="20" height="20">
     <span>Pulse</span>
@@ -517,14 +526,14 @@
 
   <div class="main">
     <nav class="tabs" id="tabs" aria-label="Sections">
-      <a class="tab" href="#readme" data-file="readme">README.md <span class="x" aria-hidden="true">×</span></a>
-      <a class="tab" href="#memory" data-file="memory">memory-check.log <span class="x" aria-hidden="true">×</span></a>
-      <a class="tab" href="#features" data-file="features">Features.swift <span class="x" aria-hidden="true">×</span></a>
-      <a class="tab" href="#left-out" data-file="left-out">.gitignore <span class="x" aria-hidden="true">×</span></a>
-      <a class="tab" href="#architecture" data-file="architecture">ARCHITECTURE.md <span class="x" aria-hidden="true">×</span></a>
-      <a class="tab" href="#shortcuts" data-file="shortcuts">keybindings.json <span class="x" aria-hidden="true">×</span></a>
-      <a class="tab" href="#install" data-file="install">install.sh <span class="x" aria-hidden="true">×</span></a>
-      <a class="tab" href="#faq" data-file="faq">FAQ.md <span class="x" aria-hidden="true">×</span></a>
+      <a class="tab" href="#readme" data-file="readme">README.md</a>
+      <a class="tab" href="#memory" data-file="memory">memory-check.log</a>
+      <a class="tab" href="#features" data-file="features">Features.swift</a>
+      <a class="tab" href="#left-out" data-file="left-out">.gitignore</a>
+      <a class="tab" href="#architecture" data-file="architecture">ARCHITECTURE.md</a>
+      <a class="tab" href="#shortcuts" data-file="shortcuts">keybindings.json</a>
+      <a class="tab" href="#install" data-file="install">install.sh</a>
+      <a class="tab" href="#faq" data-file="faq">FAQ.md</a>
     </nav>
 
     <main>
@@ -532,9 +541,8 @@
       <section class="file" id="readme" data-file="readme" data-lang="Markdown">
         <div class="crumbs">pulse0.app <span>›</span> <b>README.md</b></div>
         <div class="src">
-          <div class="md-h"><span class="k">#</span> Pulse</div>
-          <h1>A code editor that stays under <span class="n">100&nbsp;MB</span>.</h1>
-          <p class="lede">A native macOS editor written in Swift and AppKit. <b>Files, tabs, search, a command palette and a terminal.</b> No Electron, no web view, no extensions, nothing running while you read.</p>
+          <h1>A lightweight, <span class="n">native</span> code editor for macOS.</h1>
+          <p class="lede">Written in Swift and AppKit. <b>Files, tabs, search, a command palette and a terminal.</b> No Electron, no web view, nothing running while you read.</p>
           <div class="cta">
             <a class="btn primary" href="https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg">
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m0 0L4.5 6.5M8 10l3.5-3.5M3 13h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -545,12 +553,11 @@
               <button type="button" data-copy="curl -fsSL https://pulse0.app/install.sh | bash" aria-label="Copy install command">Copy</button>
             </div>
           </div>
-          <div class="comment">&lt;!-- Free and open source · macOS 14 or later · Apple silicon and Intel --&gt;</div>
           <figure class="window nogutter">
             <img class="shot-light" src="/screenshot-light.png" alt="The Pulse editor window: a file tree on the left, tabs across the top, Swift code with syntax highlighting, and a terminal panel at the bottom." width="1180" height="760">
             <img class="shot-dark" src="/screenshot-dark.png" alt="The Pulse editor window in dark mode: a file tree, tabs, highlighted Swift code and a terminal panel." width="1180" height="760">
           </figure>
-          <p class="caption">↑ A real screenshot from CI: four files, the project tree and a terminal open. Status bar reads Pulse 30 MB.</p>
+          <p class="caption">A real screenshot from CI: four files, the project tree and a terminal open. Status bar reads Pulse 30 MB.</p>
         </div>
       </section>
 
@@ -558,7 +565,7 @@
       <section class="file" id="memory" data-file="memory" data-lang="Log">
         <div class="crumbs">pulse0.app <span>›</span> scripts <span>›</span> <b>memory-check.log</b></div>
         <div class="src">
-          <div class="md-h"><span class="c">// Measured, not promised</span></div>
+          <div class="md-h"><span class="c">// Memory check, run on every commit</span></div>
           <h2>Small enough to forget it’s open.</h2>
           <p class="prose">Every commit is built and launched on a Mac in CI. If any scenario crosses 100&nbsp;MB, the build fails.</p>
           <div class="term">
@@ -605,11 +612,11 @@
               <p>Open a project, browse it in the sidebar, keep many files open. Folders load only when you expand them.</p>
             </div>
             <div class="sym">
-              <div class="sig"><span class="k">func</span> <span class="t">highlight</span>(<span class="a">_</span> lang: <span class="t">Language</span>)</div>
+              <div class="sig"><span class="k">func</span> <span class="t">highlight</span>(<span class="a">_</span> language: <span class="t">Language</span>)</div>
               <p>Swift, TypeScript, Python, Go, Rust, C, Java, Kotlin, Ruby, shell, HTML, CSS, JSON, YAML, TOML, Markdown, SQL.</p>
             </div>
             <div class="sym">
-              <div class="sig"><span class="k">func</span> <span class="t">searchProject</span>(<span class="s">"query"</span>)</div>
+              <div class="sig"><span class="k">func</span> <span class="t">searchProject</span>(<span class="a">_</span> query: <span class="t">String</span>)</div>
               <p>The standard macOS find and replace bar in each file, and search across the project, using ripgrep when it’s installed.</p>
             </div>
             <div class="sym">
@@ -621,7 +628,7 @@
               <p>Your login shell in a panel under the editor. It isn’t created until you first open it.</p>
             </div>
             <div class="sym">
-              <div class="sig"><span class="k">func</span> <span class="t">autosave</span>(after: <span class="n">1.0</span>)</div>
+              <div class="sig"><span class="k">func</span> <span class="t">autosave</span>(after delay: <span class="t">TimeInterval</span> = <span class="n">1</span>)</div>
               <p>Files save a second after you stop typing. Quit any time: your folder, tabs and unsaved buffers come back.</p>
             </div>
           </div>
@@ -632,13 +639,13 @@
       <section class="file" id="left-out" data-file="left-out" data-lang="Ignore">
         <div class="crumbs">pulse0.app <span>›</span> <b>.gitignore</b></div>
         <div class="src">
-          <div class="md-h"><span class="c"># Left out, on purpose</span></div>
+          <div class="md-h"><span class="c"># Features Pulse skips</span></div>
           <div class="split">
             <div style="display:grid;gap:16px">
-              <h2>Not missing. Left out.</h2>
+              <h2>Left out on purpose.</h2>
               <p class="prose" style="margin:0">Each of these is a reason other editors use hundreds of megabytes, run background processes, or slow down over time. Pulse is for the edits you make all day, not for replacing an IDE.</p>
             </div>
-            <div class="code" role="list"><span class="row" role="listitem">extensions/      <span class="c"># no extension host process</span></span><span class="row" role="listitem">git-ui/          <span class="c"># use the terminal or your Git app</span></span><span class="row" role="listitem">debugger/        <span class="c"># use Xcode or your IDE</span></span><span class="row" role="listitem">ai/              <span class="c"># none, and no account</span></span><span class="row" role="listitem">telemetry/       <span class="c"># no network requests at all</span></span><span class="row" role="listitem">*.electron       <span class="c"># native AppKit only</span></span></div>
+            <div class="code" role="list"><span class="row" role="listitem">extensions/      <span class="c"># no extension host process</span></span><span class="row" role="listitem">git-ui/          <span class="c"># use the terminal or your Git app</span></span><span class="row" role="listitem">debugger/        <span class="c"># use Xcode or your IDE</span></span><span class="row" role="listitem">ai/              <span class="c"># none, and no account</span></span><span class="row" role="listitem">telemetry/       <span class="c"># no network requests at all</span></span></div>
           </div>
         </div>
       </section>
@@ -711,19 +718,16 @@
     </main>
 
     <footer class="foot">
-      <div>© 2026 Pulse · MIT License · Made by <a href="https://github.com/Suraj1089">Suraj Pisal</a></div>
+      <div>© 2026 Pulse · MIT License</div>
       <nav aria-label="Footer">
         <a href="https://github.com/Suraj1089/pulse">GitHub</a>
         <a href="https://github.com/Suraj1089/pulse/releases">Releases</a>
-        <a href="/llms.txt">llms.txt</a>
-        <a href="/install.sh">install.sh</a>
       </nav>
     </footer>
   </div>
 </div>
 
 <div class="status" role="status" aria-live="off">
-  <span class="live"><b>main</b></span>
   <span id="st-file">README.md</span>
   <span id="st-lang" class="hide-sm">Markdown</span>
   <span class="hide-sm">Spaces: 4</span>
