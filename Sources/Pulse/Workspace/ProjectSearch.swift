@@ -106,7 +106,7 @@ final class ProjectSearch {
                 }
                 result.matches.append(ProjectSearch.match(line: line, text: text, query: query, caseSensitive: caseSensitive))
                 total += 1
-                if total >= maxMatches { truncated = true; break }
+                if total >= ProjectSearch.maxMatches { truncated = true; break }
             }
             completion(order.compactMap { byPath[$0] }, truncated)
         }

@@ -154,7 +154,7 @@ final class CommandPalette: NSObject, NSTextFieldDelegate, NSTableViewDataSource
         let query = field.stringValue
         if query.hasPrefix(">") {
             let text = query.dropFirst().trimmingCharacters(in: .whitespaces)
-            rows = commands().compactMap { command in
+            rows = commands().compactMap { command -> (Fuzzy.Score, PaletteRow)? in
                 guard let score = Fuzzy.score(text, in: command.title) else { return nil }
                 return (score, PaletteRow(title: command.title, detail: command.shortcut, matched: score.positions, run: command.run))
             }
