@@ -6,7 +6,7 @@ struct TabInfo {
     let isDirty: Bool
 }
 
-/// A flat row of tabs drawn in the window's title-bar band. Empty space in
+/// A flat row of tabs just below the title bar. Empty space in
 /// the bar drags the window, like a normal title bar.
 final class TabBarView: NSView {
     static let height: CGFloat = 38
@@ -36,26 +36,13 @@ final class TabBarView: NSView {
 
     override func layout() {
         super.layout()
-        let leading = leadingInset()
-        let available = max(0, bounds.width - leading - 8)
+        let available = max(0, bounds.width - 8)
         let width = items.isEmpty ? 0 : min(200, max(96, available / CGFloat(items.count)))
-        var x = leading
+        var x: CGFloat = 0
         for item in items {
             item.frame = NSRect(x: x, y: 0, width: width, height: bounds.height)
             x += width
         }
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        needsLayout = true
-    }
-
-    /// Keeps tabs clear of the traffic lights when the sidebar is collapsed.
-    private func leadingInset() -> CGFloat {
-        guard window != nil, window?.styleMask.contains(.fullScreen) == false else { return 0 }
-        let originInWindow = convert(NSPoint.zero, to: nil).x
-        return originInWindow < 78 ? 78 - originInWindow : 0
     }
 
     override func draw(_ dirtyRect: NSRect) {

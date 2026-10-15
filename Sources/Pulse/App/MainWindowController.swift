@@ -7,6 +7,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     private let sidebar = SidebarViewController()
     let editor = EditorViewController()
     private let palette = CommandPalette()
+    private let titleBar = TitleBarView()
     private let resources = ResourceMonitor()
     private var sidebarItem: NSSplitViewItem!
 
@@ -38,7 +39,26 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         splitController.addSplitViewItem(editorItem)
         splitController.splitView.autosaveName = "PulseSidebarSplit"
 
-        window.contentViewController = splitController
+        // Title strip on top, sidebar + editor below it.
+        let content = NSViewController()
+        content.view = NSView()
+        content.addChild(splitController)
+        let splitView = splitController.view
+        [titleBar, splitView].forEach {
+            $0.translatesAutoresizingMaskIntoConstraints = false
+            content.view.addSubview($0)
+        }
+        NSLayoutConstraint.activate([
+            titleBar.topAnchor.constraint(equalTo: content.view.topAnchor),
+            titleBar.leadingAnchor.constraint(equalTo: content.view.leadingAnchor),
+            titleBar.trailingAnchor.constraint(equalTo: content.view.trailingAnchor),
+            titleBar.heightAnchor.constraint(equalToConstant: TitleBarView.height),
+            splitView.topAnchor.constraint(equalTo: titleBar.bottomAnchor),
+            splitView.leadingAnchor.constraint(equalTo: content.view.leadingAnchor),
+            splitView.trailingAnchor.constraint(equalTo: content.view.trailingAnchor),
+            splitView.bottomAnchor.constraint(equalTo: content.view.bottomAnchor),
+        ])
+        window.contentViewController = content
         window.setContentSize(NSSize(width: 1180, height: 760))
         window.minSize = NSSize(width: 640, height: 420)
         if !window.setFrameUsingName("PulseMainWindow") { window.center() }
@@ -77,6 +97,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
         resources.onUpdate = { [weak self] snapshot in self?.editor.statusBar.showResources(snapshot) }
 
+        titleBar.searchField.onClick = { [weak self] in
+            guard let self else { return }
+            if self.root == nil { self.showCommandPalette(nil) } else { self.showGoToFile(nil) }
+        }
+
         palette.commands = { [weak self] in self?.paletteCommands() ?? [] }
         palette.files = { [weak self] completion in
             guard let index = self?.fileIndex else { completion([]); return }
@@ -113,6 +138,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         sidebar.searchPanel.index = fileIndex
         sidebar.searchPanel.clear()
         editor.terminalDirectory = url
+        titleBar.searchField.title = url?.lastPathComponent ?? "Search"
         if let url {
             RecentFolders.add(url)
             NSDocumentController.shared.noteNewRecentDocumentURL(url)

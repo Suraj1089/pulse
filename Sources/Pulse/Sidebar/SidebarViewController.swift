@@ -1,7 +1,7 @@
 import AppKit
 
-/// Files and Search, switched by a small segmented control that sits in the
-/// title-bar band next to the traffic lights.
+/// Files and Search, switched by a small segmented control in the header
+/// row level with the tabs.
 final class SidebarViewController: NSViewController {
     let fileTree = FileTreeController()
     let searchPanel = SearchPanelController()
