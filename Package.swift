@@ -31,6 +31,13 @@ let package = Package(
                     "-Xlinker", "Sources/Pulse/Resources/Info.plist",
                 ])
             ]
-        )
+        ),
+        // End-to-end tests: they drive the real window controller, editor,
+        // sidebar and palette in-process against temporary fixture folders.
+        .testTarget(
+            name: "PulseTests",
+            dependencies: ["Pulse"],
+            path: "Tests/PulseTests"
+        ),
     ]
 )

@@ -14,10 +14,11 @@ struct SessionState: Codable {
     var active: Int?
     var terminalOpen: Bool
 
-    private static var fileURL: URL {
+    /// Settable so tests never read or overwrite the real session.
+    static var fileURL: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return base.appendingPathComponent("Pulse", isDirectory: true).appendingPathComponent("session.json")
-    }
+    }()
 
     static func load() -> SessionState? {
         guard let data = try? Data(contentsOf: fileURL) else { return nil }
