@@ -18,3 +18,15 @@ jobs:
 
       - name: Memory budget (fails above 100 MB)
         run: ./scripts/memory-check.sh dist/Pulse.app
+
+      - name: Screenshots
+        if: always()
+        continue-on-error: true
+        run: ./scripts/screenshot.sh dist/Pulse.app
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: dist/screenshots/*.png
+          if-no-files-found: ignore
