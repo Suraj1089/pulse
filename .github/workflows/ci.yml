@@ -2,6 +2,8 @@ name: CI
 
 on:
   push:
+    branches-ignore:
+      - screenshots
   pull_request:
   workflow_dispatch:
 
@@ -10,6 +12,8 @@ jobs:
     name: Build & memory budget
     # Same runner image as release.yml, so CI proves the release build too.
     runs-on: macos-14
+    permissions:
+      contents: write   # to publish screenshots to the `screenshots` branch
     steps:
       - uses: actions/checkout@v4
 
@@ -30,3 +34,26 @@ jobs:
           name: screenshots
           path: dist/screenshots/*.png
           if-no-files-found: ignore
+
+      # Real screenshots of the latest build, at a stable URL for docs:
+      # https://raw.githubusercontent.com/<owner>/<repo>/screenshots/<branch>/light.png
+      - name: Publish screenshots
+        if: github.event_name == 'push'
+        continue-on-error: true
+        run: |
+          set -e
+          ls dist/screenshots/*.png >/dev/null
+          BRANCH="${GITHUB_REF_NAME//\//-}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin screenshots:screenshots 2>/dev/null || true
+          git worktree add -f /tmp/shots screenshots 2>/dev/null || {
+            git worktree add --detach /tmp/shots
+            git -C /tmp/shots checkout --orphan screenshots
+            git -C /tmp/shots rm -rfq .
+          }
+          mkdir -p "/tmp/shots/$BRANCH"
+          cp dist/screenshots/*.png "/tmp/shots/$BRANCH/"
+          git -C /tmp/shots add -A
+          git -C /tmp/shots commit -qm "Screenshots for $BRANCH @ ${GITHUB_SHA::7}" || exit 0
+          git -C /tmp/shots push -q origin screenshots
