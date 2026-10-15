@@ -68,7 +68,13 @@ swift run Pulse .              # run, opening the current folder
 
 ## Release process
 
-Unchanged from before: bump `VERSION` on `main` and `release.yml` builds the universal app with `scripts/package.sh` and publishes `Pulse.dmg`, `Pulse.zip` and the Homebrew cask. Keep `site/VERSION` in sync once the site is updated.
+Every push to `main` that passes CI (build, `swift test`, memory budget) is released automatically by `release.yml`, which builds the universal app with `scripts/package.sh` and publishes `Pulse.dmg`, `Pulse.zip` and the Homebrew cask. The website, `install.sh` and the in-app Update button all use `releases/latest`, so they always serve the newest build.
+
+- Version: if the exact version in `VERSION` has no release yet, it is released as is (bump `VERSION` to `2.1.0` to ship 2.1.0). Otherwise the next patch is used (`2.0.0` → `2.0.1` → …). Pushing a `v*` tag releases that tag.
+- Releases run one at a time and build the exact commit CI tested.
+- `scripts/package.sh` marks release builds (`PulseReleaseBuild` in Info.plist). Only those check for updates on their own: at launch and at most once a day on activation, via a short-lived `curl` (`App/Updater.swift`). Pulse › Check for Updates… checks on demand in any build.
+- An update downloads that release's `Pulse.zip`, checks the bundle id and version, quits Pulse, swaps the bundle in place and reopens it (tabs and unsaved text come back through session recovery). If the app's folder isn't writable, it offers the releases page.
+- `site/VERSION` and the site's `softwareVersion` are not updated per release; downloads don't depend on them.
 
 ## Copyright
 

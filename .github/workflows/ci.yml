@@ -20,6 +20,11 @@ jobs:
       - name: Build and bundle
         run: ./scripts/bundle.sh
 
+      # In-process end-to-end tests: windows stay off screen, the app never
+      # activates, and every file they touch is in a temp folder.
+      - name: Tests
+        run: swift test
+
       - name: Memory budget (fails above 100 MB)
         run: ./scripts/memory-check.sh dist/Pulse.app
 

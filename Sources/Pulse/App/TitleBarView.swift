@@ -1,8 +1,9 @@
 import AppKit
 
-/// The window's title-bar strip: traffic lights on the left and a centered
-/// search field, like VS Code's command center. The field is drawn, not a
-/// real text field; clicking it opens the palette.
+/// The window's title-bar strip: traffic lights on the left, a centered
+/// search field like VS Code's command center (drawn, not a real text field;
+/// clicking it opens the palette), and an Update button on the right that
+/// exists only while a newer release is available.
 final class TitleBarView: NSView {
     /// Matches the standard title bar so the traffic lights stay centered.
     static let height: CGFloat = 28
@@ -28,6 +29,48 @@ final class TitleBarView: NSView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    private var updateButton: NSButton?
+    private var onUpdate: (() -> Void)?
+
+    /// Shows "Update to <version>" at the right end, or removes it (nil).
+    func showUpdate(version: String?, action: (() -> Void)? = nil) {
+        guard let version else {
+            updateButton?.removeFromSuperview()
+            updateButton = nil
+            return
+        }
+        onUpdate = action
+        let button = updateButton ?? makeUpdateButton()
+        button.title = "Update to \(version)"
+        button.isEnabled = true
+        button.toolTip = "Pulse \(version) is available (you have \(Updater.currentVersion))"
+    }
+
+    /// While the download runs.
+    func showUpdating() {
+        updateButton?.title = "Updating…"
+        updateButton?.isEnabled = false
+    }
+
+    private func makeUpdateButton() -> NSButton {
+        let button = NSButton(title: "", target: self, action: #selector(updateClicked))
+        button.bezelStyle = .push
+        button.controlSize = .small
+        button.font = .systemFont(ofSize: NSFont.smallSystemFontSize, weight: .medium)
+        button.bezelColor = .controlAccentColor
+        button.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(button)
+        NSLayoutConstraint.activate([
+            button.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            button.centerYAnchor.constraint(equalTo: centerYAnchor),
+            searchField.trailingAnchor.constraint(lessThanOrEqualTo: button.leadingAnchor, constant: -12),
+        ])
+        updateButton = button
+        return button
+    }
+
+    @objc private func updateClicked() { onUpdate?() }
 
     override var mouseDownCanMoveWindow: Bool { true }
 

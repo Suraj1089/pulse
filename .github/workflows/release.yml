@@ -1,18 +1,36 @@
 name: Release Pulse
 
+# Every push to main that passes CI (build, tests, memory budget) becomes a
+# release, so the website's "latest" download links, install.sh and the
+# in-app Update button always serve the newest build.
+#
+# Version: VERSION holds major.minor.patch. If that exact version has no
+# release yet, it is released as is (so a manual bump to 2.1.0 ships 2.1.0).
+# Otherwise the next patch after the highest release in that major.minor is
+# used (2.0.0 → 2.0.1 → 2.0.2 …). Pushing a v* tag still releases that tag.
+
 on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
   push:
-    branches:
-      - main
-    paths:
-      - 'VERSION'
     tags:
       - 'v*'
   workflow_dispatch:
 
+# One release at a time, so two quick pushes cannot pick the same version.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   build-and-release:
     name: Build & Publish Release
+    # Only after a successful CI run of a push (not a pull request).
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: macos-14
     permissions:
       contents: write
@@ -21,23 +39,29 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
+          # The exact commit CI tested, not whatever main points at now.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
 
       - name: Determine Version
         id: version_step
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          git fetch --tags --force --quiet
+          if [[ "${{ github.ref }}" == refs/tags/v* && "${{ github.event_name }}" == "push" ]]; then
             RAW_VER="${GITHUB_REF#refs/tags/v}"
-            TAG_NAME="${GITHUB_REF#refs/tags/}"
-          elif [ -f "VERSION" ]; then
-            RAW_VER=$(tr -d '[:space:]' < VERSION)
-            TAG_NAME="v$RAW_VER"
           else
-            RAW_VER="1.0.0"
-            TAG_NAME="v1.0.0"
+            BASE=$(tr -d '[:space:]' < VERSION 2>/dev/null || echo "1.0.0")
+            if ! git rev-parse -q --verify "refs/tags/v$BASE" >/dev/null; then
+              RAW_VER="$BASE"
+            else
+              MAJOR_MINOR="${BASE%.*}"
+              LAST=$(git tag --list "v$MAJOR_MINOR.*" | sed 's/^v//' | sort -t. -k3,3n | tail -1)
+              RAW_VER="$MAJOR_MINOR.$(( ${LAST##*.} + 1 ))"
+            fi
           fi
-          echo "version=$RAW_VER" >> $GITHUB_OUTPUT
-          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Releasing $RAW_VER"
+          echo "version=$RAW_VER" >> "$GITHUB_OUTPUT"
+          echo "tag=v$RAW_VER" >> "$GITHUB_OUTPUT"
 
       - name: Make Scripts Executable
         run: chmod +x scripts/package.sh install.sh
@@ -49,7 +73,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version_step.outputs.tag }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ github.event.workflow_run.head_sha || github.sha }}
           name: Pulse ${{ steps.version_step.outputs.tag }}
           files: |
             dist/*.dmg
@@ -57,4 +81,5 @@ jobs:
             dist/pulse.rb
           draft: false
           prerelease: false
+          make_latest: true
           generate_release_notes: true

@@ -234,10 +234,67 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     // MARK: App activation
 
+    // MARK: Updates
+
+    /// At launch and on activation; Updater limits real checks to once a day.
+    func checkForUpdatesIfDue() {
+        Updater.checkIfDue { [weak self] release in
+            guard let self, let release else { return }
+            self.offer(release)
+        }
+    }
+
+    private func offer(_ release: Updater.Release) {
+        titleBar.showUpdate(version: release.version) { [weak self] in self?.install(release) }
+    }
+
+    private func install(_ release: Updater.Release) {
+        titleBar.showUpdating()
+        Updater.install(release) { [weak self] error in
+            guard let self, let window = self.window else { return }
+            self.offer(release)
+            let alert = NSAlert()
+            alert.messageText = "Pulse couldn't update itself"
+            alert.informativeText = error.text
+            alert.addButton(withTitle: "Open Releases Page")
+            alert.addButton(withTitle: "Cancel")
+            alert.beginSheetModal(for: window) { response in
+                if response == .alertFirstButtonReturn { NSWorkspace.shared.open(release.page) }
+            }
+        }
+    }
+
+    @objc func checkForUpdates(_ sender: Any?) {
+        Updater.latest { [weak self] result in
+            guard let self, let window = self.window else { return }
+            let alert = NSAlert()
+            switch result {
+            case .success(let release) where Updater.isVersion(release.version, newerThan: Updater.currentVersion):
+                self.offer(release)
+                alert.messageText = "Pulse \(release.version) is available"
+                alert.informativeText = "You have \(Updater.currentVersion). Pulse will quit, update and reopen with your tabs."
+                alert.addButton(withTitle: "Update Now")
+                alert.addButton(withTitle: "Later")
+                alert.beginSheetModal(for: window) { response in
+                    if response == .alertFirstButtonReturn { self.install(release) }
+                }
+            case .success:
+                alert.messageText = "Pulse is up to date"
+                alert.informativeText = "You have version \(Updater.currentVersion), the latest release."
+                alert.beginSheetModal(for: window)
+            case .failure(let error):
+                alert.messageText = "Couldn't check for updates"
+                alert.informativeText = error.text
+                alert.beginSheetModal(for: window)
+            }
+        }
+    }
+
     func appDidBecomeActive() {
         sidebar.fileTree.refresh()
         fileIndex?.invalidate()
         editor.reloadChangedDocuments()
+        checkForUpdatesIfDue()
         showBranch()
         sidebar.sourceControl.refresh()
         resources.start()
@@ -408,6 +465,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("Terminal: Toggle Terminal", #selector(toggleTerminal(_:))),
             command("Terminal: Kill Terminal", #selector(killTerminal(_:))),
             command("Preferences: Open Keyboard Shortcuts", #selector(openKeyboardShortcuts(_:))),
+            command("Pulse: Check for Updates", #selector(checkForUpdates(_:))),
             command("Preferences: Open Keyboard Shortcuts (JSON)", #selector(openKeyboardShortcutsJSON(_:))),
         ]
         for url in RecentFolders.all.prefix(5) where url != root {

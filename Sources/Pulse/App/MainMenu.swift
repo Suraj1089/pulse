@@ -34,6 +34,7 @@ enum MainMenu {
     private static func appMenu() -> NSMenu {
         let menu = NSMenu(title: "Pulse")
         menu.addItem(item("About Pulse", #selector(NSApplication.orderFrontStandardAboutPanel(_:))))
+        menu.addItem(item("Check for Updates…", #selector(MainWindowController.checkForUpdates(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Keyboard Shortcuts", #selector(MainWindowController.openKeyboardShortcuts(_:)), "k", [.command, .option]))
         menu.addItem(item("Keyboard Shortcuts (JSON)", #selector(MainWindowController.openKeyboardShortcutsJSON(_:))))

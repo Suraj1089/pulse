@@ -36,7 +36,7 @@ Pulse is a code editor written in Swift and AppKit, with no web view, no Electro
 - **Autosave and session recovery**: files save themselves a second after you stop typing, and Pulse reopens your folder, tabs and any unsaved buffers after you quit.
 - **Honest resource meter**: the status bar shows Pulse's own memory and CPU, with the terminal's shell measured separately.
 
-Not included, on purpose: extensions, Git UI, debugger, AI features, telemetry.
+Not included, on purpose: extensions, debugger, AI features, telemetry.
 
 ## Install
 
@@ -47,6 +47,8 @@ curl -fsSL https://pulse0.app/install.sh | bash
 Or download [Pulse.dmg](https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg) and drag Pulse to Applications.
 
 Open a folder from the terminal with `open -a Pulse .`
+
+Pulse checks for a new release once a day and shows an **Update** button at the top right when one is available; it installs the update and reopens with your tabs. Pulse › Check for Updates… checks right away. Every change merged to `main` is released automatically.
 
 ## Shortcuts
 

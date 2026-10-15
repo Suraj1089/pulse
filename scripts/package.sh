@@ -41,6 +41,9 @@ if [ -f "$REPO_ROOT/Sources/Pulse/Resources/Info.plist" ]; then
     # Inject version into Info.plist
     plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true
     plutil -replace CFBundleVersion -string "$VERSION" "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true
+    # Marks an official release build: only these check GitHub for updates
+    # (local bundle.sh / swift run builds are usually ahead of any release).
+    plutil -replace PulseReleaseBuild -bool true "$APP_BUNDLE/Contents/Info.plist"
 fi
 
   if [ -f "$REPO_ROOT/Sources/Pulse/Resources/AppIcon.icns" ]; then
