@@ -4,22 +4,25 @@ import PackageDescription
 let package = Package(
     name: "Pulse",
     platforms: [.macOS(.v14)],
+    dependencies: [
+        // The only dependency: a VT100/xterm emulator for the integrated
+        // terminal. It is created lazily, so it costs nothing until the
+        // terminal is first opened. Pinned: 1.19+ needs swift-tools 6.x.
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.18.0"),
+    ],
     targets: [
         .executableTarget(
             name: "Pulse",
-            path: "Sources/Pulse",
-            // Info.plist is embedded via the linker flag below, not SPM's
-            // resource bundling — exclude it from automatic source/resource
-            // discovery so it isn't also copied into a resource bundle.
-            // The iconset folder is excluded (it's only a build intermediate).
-            exclude: ["Resources/Info.plist", "Resources/AppIcon.iconset"],
-            resources: [
-                .copy("Resources/AppIcon.icns"),
+            dependencies: [
+                .product(name: "SwiftTerm", package: "SwiftTerm"),
             ],
-            // Embeds Info.plist into the built binary so TCC-gated APIs
-            // (Apple Events to Chrome, LSUIElement) work from a plain SwiftPM
-            // executable, which has no Info.plist otherwise. This is the
-            // standard technique for menu-bar-only SwiftPM apps on macOS.
+            path: "Sources/Pulse",
+            // Info.plist is embedded via the linker flag below and the icon is
+            // copied by scripts/bundle.sh, so SwiftPM generates no resource
+            // bundle. The iconset folder is a build intermediate.
+            exclude: ["Resources"],
+            // Embeds Info.plist into the binary so `swift run` behaves like
+            // the bundled app (bundle id, document types, display name).
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",

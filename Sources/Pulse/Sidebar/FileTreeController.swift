@@ -1,0 +1,233 @@
+import AppKit
+
+final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOutlineViewDelegate, NSMenuDelegate {
+    var onOpenFile: ((URL) -> Void)?
+    var onFilesChanged: (() -> Void)?
+
+    private(set) var root: FileNode?
+    private let outline = NSOutlineView()
+    private let header = NSTextField(labelWithString: "")
+    private let cellID = NSUserInterfaceItemIdentifier("FileCell")
+
+    override func loadView() {
+        let container = NSView()
+
+        header.font = .systemFont(ofSize: 11, weight: .semibold)
+        header.textColor = .secondaryLabelColor
+        header.lineBreakMode = .byTruncatingTail
+        header.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(header)
+
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
+        column.resizingMask = .autoresizingMask
+        outline.addTableColumn(column)
+        outline.outlineTableColumn = column
+        outline.headerView = nil
+        outline.style = .sourceList
+        outline.rowHeight = 22
+        outline.indentationPerLevel = 12
+        outline.autoresizesOutlineColumn = false
+        outline.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
+        outline.dataSource = self
+        outline.delegate = self
+        outline.target = self
+        outline.action = #selector(rowClicked)
+        outline.setAccessibilityLabel("Files")
+
+        let menu = NSMenu()
+        menu.delegate = self
+        outline.menu = menu
+
+        let scroll = NSScrollView()
+        scroll.documentView = outline
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.drawsBackground = false
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(scroll)
+
+        NSLayoutConstraint.activate([
+            header.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
+            header.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
+            header.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -12),
+            scroll.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 6),
+            scroll.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            scroll.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+        view = container
+    }
+
+    func setRoot(_ url: URL?) {
+        root = url.map { FileNode(url: $0, isDirectory: true) }
+        header.stringValue = url?.lastPathComponent.uppercased() ?? ""
+        outline.reloadData()
+    }
+
+    func refresh() {
+        guard let root else { return }
+        root.refresh()
+        outline.reloadItem(nil, reloadChildren: true)
+    }
+
+    /// Expands the folders above `url` and selects it.
+    func reveal(_ url: URL) {
+        guard let root else { return }
+        let rootPath = root.url.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+        guard path.hasPrefix(rootPath + "/") else { outline.deselectAll(nil); return }
+        var current = root
+        for part in path.dropFirst(rootPath.count + 1).split(separator: "/") {
+            guard let next = current.children.first(where: { $0.name == part }) else { return }
+            if next.isDirectory { outline.expandItem(next) }
+            current = next
+        }
+        let row = outline.row(forItem: current)
+        guard row >= 0 else { return }
+        outline.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        outline.scrollRowToVisible(row)
+    }
+
+    // MARK: Data source
+
+    func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+        guard let node = (item as? FileNode) ?? root else { return 0 }
+        return node.isDirectory ? node.children.count : 0
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+        let node = (item as? FileNode) ?? root!
+        return node.children[index]
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
+        (item as? FileNode)?.isDirectory ?? false
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
+        guard let node = item as? FileNode else { return nil }
+        let cell = outlineView.makeView(withIdentifier: cellID, owner: self) as? NSTableCellView ?? makeCell()
+        cell.textField?.stringValue = node.name
+        cell.imageView?.image = NSImage(
+            systemSymbolName: node.isDirectory ? "folder" : "doc",
+            accessibilityDescription: nil
+        )
+        cell.imageView?.contentTintColor = node.isDirectory ? .controlAccentColor : .secondaryLabelColor
+        return cell
+    }
+
+    private func makeCell() -> NSTableCellView {
+        let cell = NSTableCellView()
+        cell.identifier = cellID
+        let image = NSImageView()
+        image.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
+        image.translatesAutoresizingMaskIntoConstraints = false
+        let text = NSTextField(labelWithString: "")
+        text.font = .systemFont(ofSize: 13)
+        text.lineBreakMode = .byTruncatingMiddle
+        text.translatesAutoresizingMaskIntoConstraints = false
+        cell.addSubview(image)
+        cell.addSubview(text)
+        cell.imageView = image
+        cell.textField = text
+        NSLayoutConstraint.activate([
+            image.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+            image.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            image.widthAnchor.constraint(equalToConstant: 16),
+            text.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: 6),
+            text.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
+            text.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+        ])
+        return cell
+    }
+
+    @objc private func rowClicked() {
+        let row = outline.clickedRow
+        guard row >= 0, let node = outline.item(atRow: row) as? FileNode else { return }
+        if node.isDirectory {
+            if outline.isItemExpanded(node) { outline.collapseItem(node) } else { outline.expandItem(node) }
+        } else {
+            onOpenFile?(node.url)
+        }
+    }
+
+    // MARK: Context menu
+
+    private var menuTarget: FileNode? {
+        let row = outline.clickedRow
+        return row >= 0 ? outline.item(atRow: row) as? FileNode : root
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        guard root != nil else { return }
+        menu.addItem(withTitle: "New File…", action: #selector(newFile), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "New Folder…", action: #selector(newFolder), keyEquivalent: "").target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Reveal in Finder", action: #selector(revealInFinder), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Copy Path", action: #selector(copyPath), keyEquivalent: "").target = self
+        if outline.clickedRow >= 0 {
+            menu.addItem(.separator())
+            menu.addItem(withTitle: "Move to Trash", action: #selector(moveToTrash), keyEquivalent: "").target = self
+        }
+    }
+
+    private func targetFolder() -> URL? {
+        guard let node = menuTarget else { return nil }
+        return node.isDirectory ? node.url : node.url.deletingLastPathComponent()
+    }
+
+    @objc private func newFile() {
+        guard let folder = targetFolder(), let name = askForName(title: "New File") else { return }
+        let url = folder.appendingPathComponent(name)
+        guard !FileManager.default.fileExists(atPath: url.path) else { NSSound.beep(); return }
+        FileManager.default.createFile(atPath: url.path, contents: Data())
+        refresh()
+        onFilesChanged?()
+        onOpenFile?(url)
+    }
+
+    @objc private func newFolder() {
+        guard let folder = targetFolder(), let name = askForName(title: "New Folder") else { return }
+        try? FileManager.default.createDirectory(at: folder.appendingPathComponent(name), withIntermediateDirectories: true)
+        refresh()
+        onFilesChanged?()
+    }
+
+    @objc private func revealInFinder() {
+        guard let node = menuTarget else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([node.url])
+    }
+
+    @objc private func copyPath() {
+        guard let node = menuTarget else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(node.url.path, forType: .string)
+    }
+
+    @objc private func moveToTrash() {
+        guard let node = menuTarget, node !== root else { return }
+        let alert = NSAlert()
+        alert.messageText = "Move “\(node.name)” to the Trash?"
+        alert.addButton(withTitle: "Move to Trash")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        NSWorkspace.shared.recycle([node.url]) { [weak self] _, _ in
+            self?.refresh()
+            self?.onFilesChanged?()
+        }
+    }
+
+    private func askForName(title: String) -> String? {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.addButton(withTitle: "Create")
+        alert.addButton(withTitle: "Cancel")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty || name.contains("/") ? nil : name
+    }
+}

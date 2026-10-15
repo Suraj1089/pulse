@@ -4,119 +4,90 @@
 
 # Pulse
 
-**Minimalist, real-time memory monitor & command palette for macOS.**
+**A light, native code editor for macOS.**
 
-[![Release](https://img.shields.io/github/v/release/Suraj1089/pulse?style=flat-square&color=black)](https://github.com/Suraj1089/pulse/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-black?style=flat-square)](https://github.com/Suraj1089/pulse)
 [![Swift](https://img.shields.io/badge/swift-5.9%2B-orange?style=flat-square)](https://swift.org)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
-[![Website](https://img.shields.io/badge/website-pulse0.app-black?style=flat-square)](https://pulse0.app)
-
-<br />
-<br />
-
-<img src="assets/pulse-overview.png" alt="Pulse command palette showing memory pressure, resident-memory apps, and suggested actions on macOS" width="520" />
-
-<br />
-<br />
-
-[**Download Pulse.dmg**](https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg) • [**Website**](https://pulse0.app) • [**Release Notes**](https://github.com/Suraj1089/pulse/releases)
 
 </div>
 
 ---
 
-Pulse lives quietly in your macOS menu bar. Click the icon or press **`⌘⌥P`** to open a command palette with real-time memory pressure, the largest apps by resident memory, Chrome tabs for review, and fast Quit or Force Quit actions.
+Pulse is a code editor written in Swift and AppKit, with no web view, no Electron and no extension host. Its goal is to stay small: **50–60 MB of memory in normal use, and never more than 100 MB**, with no CPU use while you are not typing.
 
-## ✨ Features
+## Features
 
-- **⚡️ Real-Time Pressure Indicator**: Live 3-bar menu bar icon color-coded for Normal (Green), Warning (Yellow), and Critical (Red) memory pressure states.
-- **🎯 ⌘⌥P Command Palette**: Spotlight/Raycast-inspired global hotkey palette. Search, navigate with arrow keys, and quit apps without taking your hands off the keyboard.
-- **💥 Instant Force Quit**: Hold `⌥ Option` to switch Quit buttons to immediate kernel-level `SIGKILL` Force Quit.
-- **🌐 Chrome Tab Inspector**: Type `chrome` to review active Chrome tabs. For exact tab/process memory, use Chrome Task Manager (`Shift` + `Esc`).
-- **📊 Detailed Memory Breakdown**: Type `memory` for an instant breakdown of App Memory, Wired, Compressed, Cached, and Free RAM.
-- **🔍 System Diagnostics**: Type `why is my mac slow` to diagnose memory pressure causes and receive instant actionable recommendations.
-- **🪶 Native & Private**: Written in pure native Swift & SwiftUI, with zero telemetry and zero data collection.
+- **Folders and files**: open a folder, browse it in the sidebar, open many files in tabs.
+- **Editing**: syntax highlighting for Swift, JS/TS, Python, Go, Rust, C/C++/Obj-C, Java/Kotlin, Ruby, shell, HTML/XML, CSS, JSON, YAML, TOML, Markdown and SQL. Line numbers, current-line highlight, auto-indent, toggle comment, indent/outdent, word wrap.
+- **Find and replace** in the file (the standard macOS find bar), and **project search** (uses `ripgrep` when installed, otherwise a built-in scan).
+- **Command palette**: `⌘P` go to file, `⇧⌘P` commands, `⌘L` go to line.
+- **Integrated terminal** (`` ⌃` ``), started only when you first open it.
+- **Autosave and session recovery**: files save themselves a second after you stop typing, and Pulse reopens your folder, tabs and any unsaved buffers after you quit.
+- **Honest resource meter**: the status bar shows Pulse's own memory and CPU, with the terminal's shell measured separately.
 
----
+Not included, on purpose: extensions, Git UI, debugger, AI features, telemetry.
 
-## 📥 Installation
-
-### Option 1: One-Line Terminal Installer (Recommended)
+## Install
 
 ```sh
 curl -fsSL https://pulse0.app/install.sh | bash
 ```
 
-### Option 2: Direct Download
+Or download [Pulse.dmg](https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg) and drag Pulse to Applications.
 
-Download the disk image directly:
-👉 [**Download Pulse.dmg (Latest Release)**](https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg)
+Open a folder from the terminal with `open -a Pulse .`
 
-Open the `.dmg` and drag **Pulse** to your `/Applications` folder.
-
----
-
-## ⌨️ Shortcuts & Controls
+## Shortcuts
 
 | Shortcut | Action |
 | :--- | :--- |
-| **`⌘⌥P`** | Open Pulse from anywhere (global) |
-| **`↑` / `↓`** | Navigate running apps and suggestions |
-| **`↵` (Return)** | Quit selected application or run command |
-| **`⌥` (Hold Option)** | Switch Quit buttons to **Force Quit** (`SIGKILL`) |
-| **`esc`** | Dismiss palette |
+| `⌘O` | Open a folder or files |
+| `⌘P` | Go to file |
+| `⇧⌘P` | Command palette |
+| `⌘L` | Go to line |
+| `⌘F` / `⌥⌘F` | Find / find and replace in file |
+| `⇧⌘F` | Search the project |
+| `` ⌃` `` | Show or hide the terminal |
+| `⌘/` | Toggle line comment |
+| `⌘]` / `⌘[` | Indent / outdent |
+| `⇧⌘]` / `⇧⌘[` | Next / previous tab |
+| `⌃⌘S` | Toggle sidebar |
+| `⌘+` / `⌘-` / `⌘0` | Font size |
 
----
+## Memory budget
 
-## 🔍 Commands
+| Scenario | Target | Hard limit |
+| :--- | :--- | :--- |
+| Empty window | ≤ 40 MB | 100 MB |
+| Ten files open | ≤ 60 MB | 100 MB |
+| Ten files + terminal (Pulse only) | ≤ 60 MB | 100 MB |
 
-Type in the palette search bar to run instant diagnostics and filters:
+"Memory" means physical footprint, the number Activity Monitor shows. Shells and other processes you start in the terminal are reported separately. CI measures all three scenarios on every push and fails the build above 100 MB; see `scripts/memory-check.sh`.
 
-- **`memory`** — View detailed Mach memory allocation (App, Wired, Compressed, Cached, Free) and pressure history.
-- **`chrome`** — List open Google Chrome tabs for review. Chrome Task Manager (`Shift` + `Esc`) provides exact tab/process memory.
-- **`why is my mac slow`** — Comprehensive memory diagnostic report and health tips.
-- **`quit <app>`** or **`forcequit <app>`** — Search and terminate processes by name.
+How it stays small:
 
----
+- One text view for all tabs. Switching tabs swaps the layout manager onto another document's text, so each extra file costs roughly its own text.
+- Syntax colors are layout-manager temporary attributes: no copies of the text, no relayout. Files over 300 KB are highlighted around the visible area only.
+- The file tree reads a folder only when you expand it. The go-to-file index is built on first use.
+- The terminal view and shell are created the first time you open the terminal.
+- Nothing polls in the background. The resource meter samples every 2 s only while Pulse is the active app.
 
-## 🔒 Permissions & Privacy
+## Build from source
 
-Pulse runs locally on your Mac with **zero telemetry** and **zero data collection**. It requests standard macOS permissions only when necessary:
-
-- **No special permission is required** for the global `⌘⌥P` hotkey. *(Clicking the menu bar icon works too.)*
-- **Automation (AppleScript)**: Requested only when running the `chrome` command to inspect open tabs.
-
----
-
-## 🛠️ Architecture & Performance
-
-- **Mach Kernel Telemetry**: Reads page allocation directly via `host_statistics64` (the exact source used by `vm_stat`) and hooks kernel pressure events with `DispatchSource.makeMemoryPressureSource`.
-- **Resident-Memory App View**: Inspects running processes with `proc_pid_rusage` and groups helper processes under their parent app without presenting summed process footprints as total system RAM.
-- **Minimal Footprint**: Native binary compiled with Swift 5.9+. Ad-hoc signed and optimized for Apple Silicon (M1/M2/M3/M4) and Intel Macs.
-
----
-
-## 🏗️ Build from Source
-
-Requirements:
-- macOS 14.0+ (Sonoma or Sequoia)
-- Xcode 15.0+ or Swift 5.9+
+Requirements: macOS 14+, Xcode 15+ (Swift 5.9+).
 
 ```sh
-# Clone repository
 git clone https://github.com/Suraj1089/pulse.git
 cd pulse
 
-# Run in development
-swift run
-
-# Build release DMG, ZIP, and Homebrew formula
-./scripts/package.sh
+swift run Pulse .                    # run from source, opening this folder
+./scripts/bundle.sh                  # build dist/Pulse.app for this Mac
+open dist/Pulse.app
+./scripts/memory-check.sh            # measure the memory budget locally
+./scripts/package.sh                 # universal release build: DMG, ZIP, Homebrew cask
 ```
 
----
+## License
 
-## 📄 License
-
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
+MIT. See [`LICENSE`](LICENSE).

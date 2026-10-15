@@ -1,59 +1,66 @@
-import SwiftUI
+import AppKit
 
-/// Design tokens lifted from the handoff's 1g "Handoff notes" artboard:
-/// SF Pro Text for prose, SF Mono for numbers/section headers/key hints;
-/// 38px rows (46px with a reason line), 10px side padding, 7px row radius,
-/// 8px window padding, 13px window corner radius.
-enum Metrics {
-    static let windowWidth: CGFloat = 400
-    static let windowMinHeight: CGFloat = 480
-    static let windowMaxHeight: CGFloat = 580
-    static let windowRadius: CGFloat = 22
-    static let headerHeight: CGFloat = 54
-    static let footerHeight: CGFloat = 40
-    static let windowPadding: CGFloat = 16
-    static let rowHeight: CGFloat = 48
-    static let rowHeightWithReason: CGFloat = 50
-    static let rowRadius: CGFloat = 10
-    static let rowSidePadding: CGFloat = 8
-}
+/// Colors and fonts. Every color is dynamic so light/dark switches need no
+/// re-highlighting: temporary attributes resolve the color at draw time.
+enum Theme {
+    static let defaultFontSize: CGFloat = 13
+    static let minFontSize: CGFloat = 9
+    static let maxFontSize: CGFloat = 28
 
-enum Fonts {
-    static let body = Font.system(size: 13.5)
-    static let bodyStrong = Font.system(size: 13.5, weight: .semibold)
-    static let title = Font.system(size: 15, weight: .bold)
-    static let query = Font.system(size: 13)
-    static let sectionHeader = Font.system(size: 11.5, weight: .semibold)
-    static let mono = Font.system(size: 12.5, design: .monospaced)
-    static let monoSmall = Font.system(size: 11, design: .monospaced)
-    static let monoTiny = Font.system(size: 10, design: .monospaced)
-}
+    static var fontSize: CGFloat {
+        get {
+            let stored = UserDefaults.standard.double(forKey: "editorFontSize")
+            return stored > 0 ? CGFloat(stored) : defaultFontSize
+        }
+        set {
+            let clamped = min(max(newValue, minFontSize), maxFontSize)
+            UserDefaults.standard.set(Double(clamped), forKey: "editorFontSize")
+        }
+    }
 
-/// Semantic ink/surface tokens matching modern macOS vibrancy and the premium minimalist style.
-struct Theme {
-    let scheme: ColorScheme
+    static var editorFont: NSFont {
+        NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+    }
 
-    var background: Color { scheme == .dark ? Color(red: 0x18 / 255, green: 0x18 / 255, blue: 0x1b / 255) : Color(red: 0xf6 / 255, green: 0xf6 / 255, blue: 0xf8 / 255) }
-    var border: Color { scheme == .dark ? .white.opacity(0.12) : .black.opacity(0.08) }
-    var borderSoft: Color { scheme == .dark ? .white.opacity(0.07) : .black.opacity(0.06) }
-    var rowSelected: Color { scheme == .dark ? .white.opacity(0.06) : .black.opacity(0.04) }
-    var trackBackground: Color { scheme == .dark ? .white.opacity(0.10) : .black.opacity(0.08) }
-    var cardBackground: Color { scheme == .dark ? .white.opacity(0.06) : .white.opacity(0.65) }
-    var pillBackground: Color { scheme == .dark ? .white.opacity(0.09) : .black.opacity(0.05) }
-    var pillBorder: Color { scheme == .dark ? .white.opacity(0.14) : .black.opacity(0.07) }
+    static var gutterFont: NSFont {
+        NSFont.monospacedDigitSystemFont(ofSize: max(fontSize - 2, 9), weight: .regular)
+    }
 
-    var textPrimary: Color { scheme == .dark ? Color(red: 0xf6 / 255, green: 0xf6 / 255, blue: 0xf8 / 255) : Color(red: 0x16 / 255, green: 0x16 / 255, blue: 0x18 / 255) }
-    var textSecondary: Color { scheme == .dark ? .white.opacity(0.70) : .black.opacity(0.60) }
-    var textMuted: Color { scheme == .dark ? .white.opacity(0.52) : .black.opacity(0.48) }
-    var textDim: Color { scheme == .dark ? .white.opacity(0.38) : .black.opacity(0.38) }
-    var sectionHeader: Color { scheme == .dark ? .white.opacity(0.50) : .black.opacity(0.50) }
-    var hint: Color { scheme == .dark ? .white.opacity(0.32) : .black.opacity(0.34) }
-    var placeholder: Color { scheme == .dark ? .white.opacity(0.32) : .black.opacity(0.35) }
-    var searchIcon: Color { scheme == .dark ? .white.opacity(0.45) : .black.opacity(0.40) }
+    static func dynamic(light: UInt32, dark: UInt32) -> NSColor {
+        NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? hex(dark) : hex(light)
+        }
+    }
 
-    var accent: Color { Color(red: 0.12, green: 0.48, blue: 0.98) }
-    var blueAccent: Color { Color(red: 0.12, green: 0.48, blue: 0.98) }
+    static func hex(_ value: UInt32) -> NSColor {
+        NSColor(
+            srgbRed: CGFloat((value >> 16) & 0xFF) / 255,
+            green: CGFloat((value >> 8) & 0xFF) / 255,
+            blue: CGFloat(value & 0xFF) / 255,
+            alpha: 1
+        )
+    }
 
-    var quitBorder: Color { scheme == .dark ? .white.opacity(0.15) : .black.opacity(0.08) }
-    var quitText: Color { scheme == .dark ? .white.opacity(0.9) : .black.opacity(0.8) }
+    static let editorBackground = dynamic(light: 0xFFFFFF, dark: 0x1E1E20)
+    static let chromeBackground = dynamic(light: 0xF5F5F7, dark: 0x252528)
+    static let currentLine = dynamic(light: 0xF1F4FA, dark: 0x26292E)
+    static let text = dynamic(light: 0x1D1D1F, dark: 0xE6E6E8)
+
+    static let keyword = dynamic(light: 0x9C2F96, dark: 0xEE72B3)
+    static let string = dynamic(light: 0xB3261E, dark: 0xF0907F)
+    static let comment = dynamic(light: 0x5D6977, dark: 0x8E98A2)
+    static let type = dynamic(light: 0x1B5C8A, dark: 0x74CDEE)
+    static let number = dynamic(light: 0x3B2CC0, dark: 0xD9C674)
+    static let attribute = dynamic(light: 0x7A4A1E, dark: 0xEFA25E)
+
+    static func color(for kind: TokenKind) -> NSColor {
+        switch kind {
+        case .keyword: return keyword
+        case .string: return string
+        case .comment: return comment
+        case .type: return type
+        case .number: return number
+        case .attribute: return attribute
+        }
+    }
 }

@@ -94,13 +94,14 @@ cask "pulse" do
 
   url "https://github.com/Suraj1089/pulse/releases/download/v#{version}/Pulse-#{version}.dmg"
   name "Pulse"
-  desc "Minimalist, real-time memory monitor & command palette for macOS"
+  desc "Light, native code editor for macOS"
   homepage "https://github.com/Suraj1089/pulse"
 
   app "Pulse.app"
 
   zap trash: [
     "~/Library/Preferences/app.pulse.plist",
+    "~/Library/Application Support/Pulse",
   ]
 end
 EOF

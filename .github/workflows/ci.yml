@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-measure:
+    name: Build & memory budget
+    # Same runner image as release.yml, so CI proves the release build too.
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and bundle
+        run: ./scripts/bundle.sh
+
+      - name: Memory budget (fails above 100 MB)
+        run: ./scripts/memory-check.sh dist/Pulse.app

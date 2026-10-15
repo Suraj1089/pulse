@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleExecutable</key>
+	<string>Pulse</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIconName</key>
@@ -12,13 +14,50 @@
 	<string>Pulse</string>
 	<key>CFBundleDisplayName</key>
 	<string>Pulse</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.0</string>
+	<string>2.0.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>LSUIElement</key>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.developer-tools</string>
+	<key>NSHighResolutionCapable</key>
 	<true/>
-	<key>NSAppleEventsUsageDescription</key>
-	<string>Pulse reads open tab titles from Google Chrome to show a per-tab memory breakdown and suggest tabs you may want to review.</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Source Code</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.text</string>
+				<string>public.source-code</string>
+				<string>public.data</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Folder</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.folder</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
