@@ -499,6 +499,22 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             "text color sample: \(colorSample())",
         ]
         print("PULSE_LAYOUT " + lines.joined(separator: "\nPULSE_LAYOUT "))
+        func describe(_ view: NSView, depth: Int) {
+            let pad = String(repeating: "  ", count: depth)
+            print("PULSE_VIEWS \(pad)\(type(of: view)) frame=\(view.frame) hidden=\(view.isHidden) layer=\(view.layer != nil) opaque=\(view.isOpaque)")
+            if depth < 6 { view.subviews.forEach { describe($0, depth: depth + 1) } }
+        }
+        describe(scrollView, depth: 0)
+        if let directory = ProcessInfo.processInfo.environment["PULSE_DEBUG_DIR"] {
+            let targets: [(String, NSView)] = [("textview", textView), ("scrollview", scrollView)]
+            for (name, target) in targets {
+                let rect = name == "textview" ? target.visibleRect : target.bounds
+                guard let rep = target.bitmapImageRepForCachingDisplay(in: rect) else { continue }
+                target.cacheDisplay(in: rect, to: rep)
+                let url = URL(fileURLWithPath: directory).appendingPathComponent("debug-\(name).png")
+                try? rep.representation(using: .png, properties: [:])?.write(to: url)
+            }
+        }
         fflush(stdout)
     }
 

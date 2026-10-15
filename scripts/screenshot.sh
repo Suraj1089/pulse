@@ -26,7 +26,8 @@ FILES=(
 shoot() {
     local name="$1" style="$2"
     rm -f "$SESSION"
-    PULSE_DEBUG_LAYOUT=1 PULSE_OPEN_TERMINAL=1 PULSE_APPEARANCE="$style" "$BIN" "${FILES[@]}" &
+    mkdir -p "$OUT/$name"
+    PULSE_DEBUG_DIR="$PWD/$OUT/$name" PULSE_DEBUG_LAYOUT=1 PULSE_OPEN_TERMINAL=1 PULSE_APPEARANCE="$style" "$BIN" "${FILES[@]}" &
     local pid=$!
     sleep 8
     screencapture -x "$OUT/$name.png" || echo "screencapture failed for $name"
