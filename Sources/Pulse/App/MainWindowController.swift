@@ -42,6 +42,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         window.setContentSize(NSSize(width: 1180, height: 760))
         window.minSize = NSSize(width: 640, height: 420)
         if !window.setFrameUsingName("PulseMainWindow") { window.center() }
+        // First launch: a sidebar wide enough for nested file names. Later
+        // launches use the width the user left it at (autosaved).
+        if UserDefaults.standard.object(forKey: "NSSplitView Subview Frames PulseSidebarSplit") == nil {
+            splitController.splitView.setPosition(250, ofDividerAt: 0)
+        }
         window.setFrameAutosaveName("PulseMainWindow")
         window.delegate = self
 

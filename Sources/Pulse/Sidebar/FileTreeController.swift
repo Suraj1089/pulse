@@ -36,7 +36,7 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
         outline.headerView = nil
         outline.style = .sourceList
         outline.rowHeight = 22
-        outline.indentationPerLevel = 12
+        outline.indentationPerLevel = 10
         outline.autoresizesOutlineColumn = false
         outline.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         outline.dataSource = self
