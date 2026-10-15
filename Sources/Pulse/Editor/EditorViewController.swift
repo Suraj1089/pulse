@@ -25,7 +25,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private let tabBar = TabBarView()
     private let split = NSSplitView()
     private let editorArea = NSView()
-    private let scrollView = NSScrollView()
+    private let scrollView = EditorScrollView()
     private let layoutManager = NSLayoutManager()
     private let textContainer = NSTextContainer(size: NSSize(width: EditorViewController.unbounded, height: EditorViewController.unbounded))
     private let emptyStorage = NSTextStorage()
@@ -155,20 +155,18 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     // MARK: Word wrap
 
     func applyWrap() {
-        if EditorViewController.wrapLines {
-            textContainer.widthTracksTextView = true
-            textContainer.containerSize = NSSize(width: scrollView.contentSize.width, height: EditorViewController.unbounded)
-            textView.isHorizontallyResizable = false
-            textView.autoresizingMask = [.width]
-            textView.setFrameSize(NSSize(width: scrollView.contentSize.width, height: textView.frame.height))
-            scrollView.hasHorizontalScroller = false
-        } else {
-            textContainer.widthTracksTextView = false
+        let wrap = EditorViewController.wrapLines
+        // First: the scroller change below retiles, and a tile while wrapping
+        // sizes the text view and its container (see EditorScrollView.tile).
+        scrollView.wrapsLines = wrap
+        textView.autoresizingMask = []
+        textView.isHorizontallyResizable = !wrap
+        textContainer.widthTracksTextView = wrap
+        if !wrap {
             textContainer.containerSize = NSSize(width: EditorViewController.unbounded, height: EditorViewController.unbounded)
-            textView.isHorizontallyResizable = true
-            textView.autoresizingMask = []
-            scrollView.hasHorizontalScroller = true
         }
+        scrollView.hasHorizontalScroller = !wrap
+        scrollView.tile()
     }
 
     func toggleWrap() {
@@ -235,8 +233,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let selection = NSRange(location: min(document.selectedRange.location, length),
                                 length: min(document.selectedRange.length, length - min(document.selectedRange.location, length)))
         textView.setSelectedRange(selection)
-        scrollView.contentView.scroll(to: document.scrollPoint)
-        scrollView.reflectScrolledClipView(scrollView.contentView)
+        scrollView.visibleTextOrigin = document.scrollPoint
         textView.needsDisplay = true
         highlightNow()
         refreshChrome()
@@ -248,7 +245,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private func rememberViewState() {
         guard let document = activeDocument else { return }
         document.selectedRange = textView.selectedRange()
-        document.scrollPoint = scrollView.contentView.bounds.origin
+        document.scrollPoint = scrollView.visibleTextOrigin
     }
 
     /// Returns false when the user cancelled.

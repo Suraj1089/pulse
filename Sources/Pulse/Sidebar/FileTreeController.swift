@@ -162,7 +162,11 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
     }
 
     @objc private func rowClicked() {
-        let row = outline.clickedRow
+        activate(row: outline.clickedRow)
+    }
+
+    /// What a click on `row` does: toggle a folder, open a file.
+    func activate(row: Int) {
         guard row >= 0, let node = outline.item(atRow: row) as? FileNode else { return }
         if node.isDirectory {
             if outline.isItemExpanded(node) { outline.collapseItem(node) } else { outline.expandItem(node) }

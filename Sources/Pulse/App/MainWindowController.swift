@@ -5,6 +5,7 @@ import AppKit
 final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
     private let splitController = NSSplitViewController()
     private let sidebar = SidebarViewController()
+    var sidebarForTesting: SidebarViewController { sidebar }
     let editor = EditorViewController()
     private let palette = CommandPalette()
     private let titleBar = TitleBarView()

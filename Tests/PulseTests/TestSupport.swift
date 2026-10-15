@@ -11,6 +11,7 @@ class PulseTestCase: XCTestCase {
     private(set) var temp: URL!
     private var savedDefaults: [String: Any?] = [:]
     private var originalSessionURL: URL!
+    private var originalKeyBindingsURL: URL!
     private var controllers: [MainWindowController] = []
 
     private static let preferenceKeys = ["autosave", "wrapLines", "editorFontSize", "recentFolders"]
@@ -19,12 +20,19 @@ class PulseTestCase: XCTestCase {
         try super.setUpWithError()
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.accessory)
-        temp = FileManager.default.temporaryDirectory
+        let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("PulseTests-\(UUID().uuidString)", isDirectory: true)
-            .resolvingSymlinksInPath()
-        try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        // /var is a symlink to /private/var. Use the canonical path, which is
+        // what directory listings return (URL.resolvingSymlinksInPath strips
+        // "/private" instead).
+        let canonical = try XCTUnwrap(realpath(folder.path, nil))
+        temp = URL(fileURLWithPath: String(cString: canonical), isDirectory: true)
+        free(canonical)
         originalSessionURL = SessionState.fileURL
         SessionState.fileURL = temp.appendingPathComponent("session.json")
+        originalKeyBindingsURL = KeyBindings.fileURL
+        KeyBindings.fileURL = temp.appendingPathComponent("keybindings.json")
         for key in PulseTestCase.preferenceKeys {
             savedDefaults[key] = UserDefaults.standard.object(forKey: key)
             UserDefaults.standard.removeObject(forKey: key)
@@ -40,6 +48,7 @@ class PulseTestCase: XCTestCase {
         // Let pending autosave/session work run against the temp folder, not later.
         spin(0.1)
         SessionState.fileURL = originalSessionURL
+        KeyBindings.fileURL = originalKeyBindingsURL
         for (key, value) in savedDefaults {
             if let value { UserDefaults.standard.set(value, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) }
         }
@@ -161,16 +170,17 @@ class PulseTestCase: XCTestCase {
             NSEvent.mouseEvent(with: type, location: location, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                                windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clickCount, pressure: 1)!
         }
-        // Tables track the mouse in a loop that reads the next event; queue the
-        // mouse-up first so that loop ends.
+        // The app is never active, so the window would take a click as the
+        // "first mouse" that only activates it. Deliver it to the view under
+        // the pointer, as the window does once active. Tables track the mouse
+        // in a loop that reads the next event; queue the mouse-up first so
+        // that loop ends.
+        guard let target = window.contentView?.superview?.hitTest(location) else {
+            return XCTFail("nothing to click at \(location)")
+        }
         NSApp.postEvent(event(.leftMouseUp), atStart: false)
-        window.sendEvent(event(.leftMouseDown))
+        target.mouseDown(with: event(.leftMouseDown))
         spin(0.05)
     }
 
-    /// Clicks the given row of an outline or table.
-    func click(row: Int, in table: NSTableView) {
-        let rect = table.rect(ofRow: row)
-        click(table, at: NSPoint(x: rect.midX, y: rect.midY))
-    }
 }

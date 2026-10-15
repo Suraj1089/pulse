@@ -11,7 +11,9 @@ final class SmokeTests: PulseTestCase {
         let files = try XCTUnwrap(outline("Files", in: controller))
         XCTAssertEqual(rowTexts(files), ["docs", "main.swift"])
 
-        click(row: 1, in: files)
+        // NSTableView's mouse tracking ignores synthetic clicks in a window
+        // that was never shown, so rows are activated the way a click does.
+        controller.sidebarForTesting.fileTree.activate(row: 1)
         XCTAssertEqual(controller.editor.activeDocument?.url, root.appendingPathComponent("main.swift"))
     }
 }

@@ -39,6 +39,7 @@ final class Document {
     private(set) var special: Special?
 
     var selectedRange = NSRange(location: 0, length: 0)
+    /// Document point at the top-left of the visible text (see EditorScrollView).
     var scrollPoint: NSPoint = .zero
     var onDirtyChange: (() -> Void)?
 

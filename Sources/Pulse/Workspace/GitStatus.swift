@@ -33,9 +33,10 @@ final class GitStatus {
         var directory = url.standardizedFileURL
         while true {
             if FileManager.default.fileExists(atPath: directory.appendingPathComponent(".git").path) { return directory }
-            let parent = directory.deletingLastPathComponent()
-            if parent.path == directory.path { return nil }
-            directory = parent
+            // For a directory URL, "/" has the parent "/..", so stop at the root
+            // rather than comparing paths.
+            if directory.pathComponents.count <= 1 { return nil }
+            directory = directory.deletingLastPathComponent()
         }
     }
 
