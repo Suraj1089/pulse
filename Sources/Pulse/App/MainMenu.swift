@@ -13,6 +13,9 @@ enum MainMenu {
         let window = windowMenu()
         main.addItem(submenu(window))
         NSApp.windowsMenu = window
+        let help = helpMenu()
+        main.addItem(submenu(help))
+        NSApp.helpMenu = help
         KeyBindings.register(main)
         return main
     }
@@ -116,8 +119,44 @@ enum MainMenu {
         menu.addItem(item("Zoom In", #selector(MainWindowController.zoomIn(_:)), "="))
         menu.addItem(item("Zoom Out", #selector(MainWindowController.zoomOut(_:)), "-"))
         menu.addItem(item("Actual Size", #selector(MainWindowController.resetZoom(_:)), "0"))
+        menu.addItem(submenu(fontSizeMenu()))
+        menu.addItem(submenu(appearanceMenu()))
         menu.addItem(.separator())
         menu.addItem(item("Enter Full Screen", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]))
+        return menu
+    }
+
+    /// ⌘+ / ⌘− change whichever area has focus; these name the area.
+    private static func fontSizeMenu() -> NSMenu {
+        let menu = NSMenu(title: "Font Size")
+        let groups: [(String, Selector, Selector, Selector)] = [
+            ("Editor", #selector(MainWindowController.editorFontBigger(_:)),
+             #selector(MainWindowController.editorFontSmaller(_:)), #selector(MainWindowController.editorFontReset(_:))),
+            ("Sidebar", #selector(MainWindowController.sidebarFontBigger(_:)),
+             #selector(MainWindowController.sidebarFontSmaller(_:)), #selector(MainWindowController.sidebarFontReset(_:))),
+            ("Terminal", #selector(MainWindowController.terminalFontBigger(_:)),
+             #selector(MainWindowController.terminalFontSmaller(_:)), #selector(MainWindowController.terminalFontReset(_:))),
+        ]
+        for (index, group) in groups.enumerated() {
+            if index > 0 { menu.addItem(.separator()) }
+            menu.addItem(item("Bigger \(group.0) Font", group.1))
+            menu.addItem(item("Smaller \(group.0) Font", group.2))
+            menu.addItem(item("Reset \(group.0) Font", group.3))
+        }
+        return menu
+    }
+
+    private static func appearanceMenu() -> NSMenu {
+        let menu = NSMenu(title: "Appearance")
+        menu.addItem(item("Auto", #selector(MainWindowController.useAutoAppearance(_:))))
+        menu.addItem(item("Light", #selector(MainWindowController.useLightAppearance(_:))))
+        menu.addItem(item("Dark", #selector(MainWindowController.useDarkAppearance(_:))))
+        return menu
+    }
+
+    private static func helpMenu() -> NSMenu {
+        let menu = NSMenu(title: "Help")
+        menu.addItem(item("Welcome to Pulse", #selector(MainWindowController.showWelcome(_:))))
         return menu
     }
 

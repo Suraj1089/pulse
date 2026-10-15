@@ -17,6 +17,22 @@ enum CommandLineTool {
 
     static var script: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/pulse") }
 
+    /// A `pulse` link to this copy of Pulse exists in one of the usual folders.
+    static var isInstalled: Bool {
+        fallbackFolders.contains { folder in
+            let link = (folder as NSString).appendingPathComponent("pulse")
+            guard let destination = try? fileManager.destinationOfSymbolicLink(atPath: link) else { return false }
+            let resolved = URL(fileURLWithPath: destination, relativeTo: URL(fileURLWithPath: folder, isDirectory: true)).standardizedFileURL
+            return resolved.path == script.standardizedFileURL.path
+        }
+    }
+
+    /// What to run in a terminal when installing from Pulse doesn't work.
+    static var manualCommand: String {
+        let path = "'" + script.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        return "sudo mkdir -p /usr/local/bin && sudo ln -sf \(path) /usr/local/bin/pulse"
+    }
+
     /// Common user-writable bin folders, used when the shell's PATH can't be read.
     private static var fallbackFolders: [String] {
         ["/usr/local/bin", "/opt/homebrew/bin", NSHomeDirectory() + "/.local/bin", NSHomeDirectory() + "/bin"]

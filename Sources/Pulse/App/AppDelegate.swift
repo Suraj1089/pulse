@@ -9,7 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch ProcessInfo.processInfo.environment["PULSE_APPEARANCE"] {
         case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
         case "light": NSApp.appearance = NSAppearance(named: .aqua)
-        default: break
+        default: AppAppearance.current.apply()
         }
         NSApp.mainMenu = MainMenu.build()
         let controller = MainWindowController()
@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.open(pendingURLs)
             pendingURLs = []
         }
+        controller.showWelcomeIfNeeded()
 
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)

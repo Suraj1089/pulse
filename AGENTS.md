@@ -36,6 +36,7 @@ Sources/Pulse/
 │   ├── SyntaxHighlighter     Regex pass → layout-manager temporary attributes
 │   ├── Language.swift        Per-language rules + extension detection
 │   ├── TabBarView / StatusBarView / EmptyStateView
+│   ├── WelcomeController     Welcome tab (first launch, Help › Welcome); built when shown
 ├── Sidebar/                  File tree, project search panel, the switcher
 ├── Palette/CommandPalette    Go to file / commands / go to line, fuzzy matching
 ├── Terminal/TerminalPanel    SwiftTerm view, created lazily

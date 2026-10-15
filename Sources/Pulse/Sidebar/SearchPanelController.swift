@@ -103,6 +103,14 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
         if !field.stringValue.isEmpty { runSearch() }
     }
 
+    /// View › Font Size › Sidebar: new row heights, rows redrawn in place.
+    func applyFontSize() {
+        guard isViewLoaded else { return }
+        let rows = IndexSet(integersIn: 0..<outline.numberOfRows)
+        outline.noteHeightOfRows(withIndexesChanged: rows)
+        outline.reloadData(forRowIndexes: rows, columnIndexes: IndexSet(integer: 0))
+    }
+
     func clear() {
         search.cancel()
         results = []
@@ -164,7 +172,7 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
     }
 
     func outlineView(_ outlineView: NSOutlineView, heightOfRowByItem item: Any) -> CGFloat {
-        item is SearchFileResult ? 22 : 20
+        item is SearchFileResult ? Theme.sidebarRowHeight() : Theme.sidebarRowHeight(offset: -2)
     }
 
     func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
@@ -172,18 +180,18 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
         let cell = outlineView.makeView(withIdentifier: id, owner: self) as? NSTableCellView ?? makeCell(id)
         if let file = item as? SearchFileResult {
             let title = NSMutableAttributedString(string: file.url.lastPathComponent, attributes: [
-                .font: NSFont.systemFont(ofSize: 12, weight: .semibold), .foregroundColor: NSColor.labelColor,
+                .font: Theme.sidebarFont(offset: -1, weight: .semibold), .foregroundColor: NSColor.labelColor,
             ])
             let folder = (file.relativePath as NSString).deletingLastPathComponent
             if !folder.isEmpty {
                 title.append(NSAttributedString(string: "  " + folder, attributes: [
-                    .font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor,
+                    .font: Theme.sidebarFont(offset: -2), .foregroundColor: NSColor.secondaryLabelColor,
                 ]))
             }
             cell.textField?.attributedStringValue = title
             cell.toolTip = file.relativePath
         } else if let match = item as? MatchItem {
-            let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+            let font = Theme.sidebarMonospacedFont(offset: -2)
             let text = NSMutableAttributedString(string: "\(match.match.line)  ", attributes: [
                 .font: font, .foregroundColor: NSColor.tertiaryLabelColor,
             ])

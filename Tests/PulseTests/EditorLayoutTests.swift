@@ -108,7 +108,7 @@ final class EditorLayoutTests: PulseTestCase {
         let root = try makeFolder(files: ["main.swift": lines(50)])
         let controller = makeController(opening: [root.appendingPathComponent("main.swift")])
         for delta: CGFloat in [6, 6, -12] {
-            controller.editor.changeFontSize(by: delta)
+            controller.changeFontSize(of: .editor, by: delta)
             layout(controller)
             assertTextClearsGutter(controller, "zoom \(delta)")
         }

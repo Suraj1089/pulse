@@ -14,7 +14,8 @@ class PulseTestCase: XCTestCase {
     private var originalKeyBindingsURL: URL!
     private var controllers: [MainWindowController] = []
 
-    private static let preferenceKeys = ["autosave", "wrapLines", "editorFontSize", "recentFolders"]
+    private static let preferenceKeys = ["autosave", "wrapLines", "editorFontSize", "sidebarFontSize", "terminalFontSize",
+                                         "recentFolders", "appearance", "welcomeShown", "showWelcomeOnLaunch"]
 
     override func setUpWithError() throws {
         try super.setUpWithError()

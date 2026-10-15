@@ -59,6 +59,13 @@ final class SidebarViewController: NSViewController {
         display(fileTree)
     }
 
+    /// View › Font Size › Sidebar, for all three panels.
+    func applyFontSize() {
+        fileTree.applyFontSize()
+        searchPanel.applyFontSize()
+        sourceControl.applyFontSize()
+    }
+
     private func display(_ child: NSViewController) {
         container.subviews.forEach { $0.removeFromSuperview() }
         child.view.frame = container.bounds

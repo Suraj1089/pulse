@@ -32,7 +32,7 @@ final class TerminalPanel: NSView, LocalProcessTerminalViewDelegate {
         guard terminalView == nil else { return }
         let view = LocalProcessTerminalView(frame: .zero)
         view.translatesAutoresizingMaskIntoConstraints = false
-        view.font = NSFont.monospacedSystemFont(ofSize: max(Theme.fontSize - 1, 10), weight: .regular)
+        view.font = Theme.terminalFont
         view.nativeBackgroundColor = Theme.editorBackground
         view.nativeForegroundColor = Theme.text
         view.processDelegate = self
@@ -52,6 +52,11 @@ final class TerminalPanel: NSView, LocalProcessTerminalViewDelegate {
                           currentDirectory: (directory ?? home).path)
         isRunning = true
         header.stringValue = "Terminal — \(shellName)"
+    }
+
+    /// View › Font Size › Terminal; a running shell keeps going, its grid reflows.
+    func applyFontSize() {
+        terminalView?.font = Theme.terminalFont
     }
 
     func focus() {

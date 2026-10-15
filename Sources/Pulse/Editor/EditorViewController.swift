@@ -35,6 +35,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private let terminal = TerminalPanel()
     /// The view of the active special tab; built when shown, dropped when its tab closes.
     private var specialController: NSViewController?
+    private var specialKind: Document.Special?
     private let highlighter = SyntaxHighlighter()
     private var highlightWork: DispatchWorkItem?
     private var autosaveWork: DispatchWorkItem?
@@ -271,9 +272,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             }
         }
         documents.remove(at: index)
-        if document.special != nil {
+        if let kind = document.special, kind == specialKind {
             specialController?.view.removeFromSuperview()
             specialController = nil
+            specialKind = nil
         }
         if documents.isEmpty {
             activeIndex = nil
@@ -396,8 +398,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         view.window?.makeFirstResponder(textView)
     }
 
-    func changeFontSize(by delta: CGFloat?) {
-        Theme.fontSize = delta.map { Theme.fontSize + $0 } ?? Theme.defaultFontSize
+    /// Re-applies the editor size from Theme to every open document.
+    func applyEditorFontSize() {
         documents.forEach { $0.applyFont() }
         textView.typingAttributes = Document.baseAttributes
         ruler.updateThickness()
@@ -437,6 +439,15 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         onSessionChange?()
     }
 
+    func applyTerminalFontSize() {
+        terminal.applyFontSize()
+    }
+
+    /// True when `view` is the terminal or inside it (for focus-aware ⌘+ / ⌘−).
+    func terminalContains(_ view: NSView) -> Bool {
+        view.isDescendant(of: terminal)
+    }
+
     func killTerminal() {
         terminal.kill()
         hideTerminal()
@@ -464,10 +475,18 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             return
         }
         let controller: NSViewController
-        switch kind {
-        case .keyboardShortcuts: controller = specialController as? ShortcutsEditor ?? ShortcutsEditor()
+        if kind == specialKind, let current = specialController {
+            controller = current
+        } else {
+            // One special view at a time: the other one is rebuilt if its tab comes back.
+            specialController?.view.removeFromSuperview()
+            switch kind {
+            case .keyboardShortcuts: controller = ShortcutsEditor()
+            case .welcome: controller = WelcomeController()
+            }
         }
         specialController = controller
+        specialKind = kind
         if controller.view.superview !== editorArea {
             controller.view.frame = editorArea.bounds
             controller.view.autoresizingMask = [.width, .height]
