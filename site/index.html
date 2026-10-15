@@ -141,6 +141,7 @@
     .nav-links { display: flex; align-items: center; gap: 26px; }
     .nav-links a { text-decoration: none; color: var(--muted); font-size: 14px; font-weight: 500; }
     .nav-links a:hover { color: var(--text); }
+    .nav-links a.btn-ink, .nav-links a.btn-ink:hover { color: var(--on-ink); }
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 8px;
       min-height: 40px; padding: 0 18px; border-radius: 10px;
@@ -316,9 +317,9 @@
       <figure class="shot">
         <picture>
           <source srcset="/screenshot-dark.png" media="(prefers-color-scheme: dark)">
-          <img src="/screenshot-light.png" alt="The Pulse editor window: a file tree on the left, tabs across the top, Swift code with syntax highlighting, and a terminal panel at the bottom." width="2048" height="1280">
+          <img src="/screenshot-light.png" alt="The Pulse editor window: a file tree on the left, tabs across the top, Swift code with syntax highlighting, and a terminal panel at the bottom." width="1180" height="760">
         </picture>
-        <figcaption>Pulse with four files and the terminal open.</figcaption>
+        <figcaption>A real screenshot from CI: four files, the project tree and a terminal open, with Pulse at 31 MB.</figcaption>
       </figure>
     </div>
 
