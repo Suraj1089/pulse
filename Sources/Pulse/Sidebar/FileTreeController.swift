@@ -72,6 +72,11 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
 
     /// Expands the folders above `url` and selects it.
     func reveal(_ url: URL) {
+        // Deferred one turn so a just-reloaded outline has created its rows.
+        DispatchQueue.main.async { [weak self] in self?.revealNow(url) }
+    }
+
+    private func revealNow(_ url: URL) {
         guard let root else { return }
         let rootPath = root.url.standardizedFileURL.path
         let path = url.standardizedFileURL.path
@@ -83,7 +88,7 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
             current = next
         }
         let row = outline.row(forItem: current)
-        guard row >= 0 else { return }
+        guard row >= 0 else { outline.deselectAll(nil); return }
         outline.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
         outline.scrollRowToVisible(row)
     }

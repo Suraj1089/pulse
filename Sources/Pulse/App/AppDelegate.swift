@@ -5,6 +5,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingURLs: [URL] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Used by scripts/screenshot.sh to capture both appearances.
+        switch ProcessInfo.processInfo.environment["PULSE_APPEARANCE"] {
+        case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+        case "light": NSApp.appearance = NSAppearance(named: .aqua)
+        default: break
+        }
         NSApp.mainMenu = MainMenu.build()
         let controller = MainWindowController()
         windowController = controller

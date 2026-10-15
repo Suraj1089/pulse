@@ -13,17 +13,20 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SESSION="$HOME/Library/Application Support/Pulse/session.json"
 mkdir -p "$OUT"
 
+# The repo folder first (it becomes the sidebar root), then the tabs; the
+# last file is the active one.
 FILES=(
-    "$REPO_ROOT/Sources/Pulse/Editor/Language.swift"
-    "$REPO_ROOT/Sources/Pulse/Workspace/Document.swift"
+    "$REPO_ROOT"
     "$REPO_ROOT/README.md"
+    "$REPO_ROOT/Sources/Pulse/Editor/Language.swift"
     "$REPO_ROOT/Sources/Pulse/Editor/EditorViewController.swift"
+    "$REPO_ROOT/Sources/Pulse/Workspace/Document.swift"
 )
 
 shoot() {
     local name="$1" style="$2"
     rm -f "$SESSION"
-    PULSE_OPEN_TERMINAL=1 "$BIN" -AppleInterfaceStyle "$style" "${FILES[@]}" &
+    PULSE_OPEN_TERMINAL=1 PULSE_APPEARANCE="$style" "$BIN" "${FILES[@]}" &
     local pid=$!
     sleep 8
     screencapture -x "$OUT/$name.png" || echo "screencapture failed for $name"
@@ -33,6 +36,6 @@ shoot() {
 }
 
 system_profiler SPDisplaysDataType | grep -i resolution || true
-shoot light Light
-shoot dark Dark
+shoot light light
+shoot dark dark
 ls -la "$OUT"

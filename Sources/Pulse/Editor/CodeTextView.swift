@@ -32,7 +32,9 @@ final class CodeTextView: NSTextView {
 
     override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
         super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
-        setNeedsDisplay(visibleRect, avoidAdditionalLayout: true)
+        // Must allow layout: with non-contiguous layout, a redraw that skips
+        // layout paints the background but no glyphs.
+        setNeedsDisplay(visibleRect)
     }
 
     // MARK: Typing
