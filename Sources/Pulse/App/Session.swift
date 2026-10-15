@@ -7,6 +7,7 @@ struct SessionState: Codable {
         var path: String?
         var unsavedText: String?
         var selection: Int
+        var special: Document.Special? = nil
     }
 
     var root: String?

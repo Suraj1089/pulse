@@ -10,6 +10,7 @@ final class StatusBarView: NSView {
     private let language = StatusBarView.makeLabel()
     private let indentation = StatusBarView.makeLabel()
     private let encoding = StatusBarView.makeLabel()
+    private let message = StatusBarView.makeLabel()
     private let resources = StatusBarView.makeLabel()
 
     override init(frame frameRect: NSRect) {
@@ -17,7 +18,10 @@ final class StatusBarView: NSView {
         branch.isHidden = true
         let left = NSStackView(views: [branch, position, language, indentation, encoding])
         left.spacing = 16
-        let stack = NSStackView(views: [left, NSView(), resources])
+        message.isHidden = true
+        message.textColor = .systemOrange
+        message.lineBreakMode = .byTruncatingTail
+        let stack = NSStackView(views: [left, NSView(), message, resources])
         stack.orientation = .horizontal
         stack.distribution = .fill
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -57,6 +61,13 @@ final class StatusBarView: NSView {
     func showBranch(_ name: String?) {
         branch.stringValue = name.map { "⎇ " + $0 } ?? ""
         branch.isHidden = name == nil
+    }
+
+    /// A problem worth surfacing without a dialog, such as a bad keybindings.json.
+    func showMessage(_ text: String?) {
+        message.stringValue = text ?? ""
+        message.toolTip = text
+        message.isHidden = text == nil
     }
 
     func showResources(_ snapshot: ResourceSnapshot) {

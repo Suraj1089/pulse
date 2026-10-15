@@ -91,7 +91,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             if let url = document?.url { self.sidebar.fileTree.reveal(url) }
         }
         editor.onSessionChange = { [weak self] in self?.scheduleSessionSave() }
-        editor.onDidSave = { [weak self] in self?.sidebar.sourceControl.refresh() }
+        editor.onDidSave = { [weak self] document in
+            guard let self else { return }
+            self.sidebar.sourceControl.refresh()
+            if document.url?.standardizedFileURL == KeyBindings.fileURL.standardizedFileURL {
+                self.editor.statusBar.showMessage(KeyBindings.reloadFromFile().map { "keybindings.json: \($0)" })
+            }
+        }
+        // The visual editor rewrote keybindings.json: refresh an open, unedited JSON tab.
+        NotificationCenter.default.addObserver(forName: .keyBindingsDidChange, object: nil, queue: .main) { [weak self] _ in
+            self?.editor.reloadChangedDocuments()
+        }
         sidebar.sourceControl.onOpenFile = { [weak self] url in self?.editor.open(url) }
         editor.onOpenRequest = { [weak self] in self?.openDocument(nil) }
         editor.onOpenRecent = { [weak self] url in self?.open([url]) }
@@ -160,7 +170,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         }
         for entry in state.entries {
             let document: Document?
-            if let path = entry.path {
+            if let special = entry.special {
+                document = Document(special: special)
+            } else if let path = entry.path {
                 let url = URL(fileURLWithPath: path)
                 if let text = entry.unsavedText {
                     document = Document(url: url, text: text)
@@ -200,7 +212,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             SessionState.Entry(
                 path: document.url?.path,
                 unsavedText: document.isDirty ? document.storage.string : nil,
-                selection: document.selectedRange.location
+                selection: document.selectedRange.location,
+                special: document.special
             )
         }
         SessionState(root: root?.path, entries: entries, active: editor.activeIndex,
@@ -287,6 +300,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         editor.statusBar.showBranch(branch)
     }
 
+    @objc func openKeyboardShortcuts(_ sender: Any?) { editor.openSpecial(.keyboardShortcuts) }
+
+    @objc func openKeyboardShortcutsJSON(_ sender: Any?) {
+        KeyBindings.ensureFile()
+        editor.open(KeyBindings.fileURL)
+    }
+
     @objc func toggleTerminal(_ sender: Any?) { editor.toggleTerminal() }
     @objc func killTerminal(_ sender: Any?) { editor.killTerminal() }
     @objc func toggleComment(_ sender: Any?) { editor.textView.toggleLineComment() }
@@ -314,7 +334,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        let hasDocument = editor.activeDocument != nil
+        // Text commands need a text tab, not a special one like Keyboard Shortcuts.
+        let hasDocument = editor.activeDocument.map { $0.special == nil } ?? false
         switch menuItem.action {
         case #selector(toggleAutosave(_:)):
             menuItem.state = EditorViewController.autosaveEnabled ? .on : .off
@@ -374,7 +395,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("View: Reset Zoom", #selector(resetZoom(_:))),
             command("Terminal: Toggle Terminal", #selector(toggleTerminal(_:))),
             command("Terminal: Kill Terminal", #selector(killTerminal(_:))),
-            command("Preferences: Keyboard Shortcuts", #selector(AppDelegate.showKeyboardShortcuts(_:)), to: NSApp.delegate as AnyObject?),
+            command("Preferences: Open Keyboard Shortcuts", #selector(openKeyboardShortcuts(_:))),
+            command("Preferences: Open Keyboard Shortcuts (JSON)", #selector(openKeyboardShortcutsJSON(_:))),
         ]
         for url in RecentFolders.all.prefix(5) where url != root {
             commands.append(PaletteCommand(title: "Open Recent: \(url.lastPathComponent)", shortcut: "") { [weak self] in

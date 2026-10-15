@@ -12,7 +12,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     var onActiveDocumentChange: ((Document?) -> Void)?
     var onSessionChange: (() -> Void)?
-    var onDidSave: (() -> Void)?
+    var onDidSave: ((Document) -> Void)?
     var onOpenRequest: (() -> Void)?
     var onOpenRecent: ((URL) -> Void)?
 
@@ -33,6 +33,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private var ruler: LineNumberRuler!
     private let emptyState = EmptyStateView()
     private let terminal = TerminalPanel()
+    /// The view of the active special tab; built when shown, dropped when its tab closes.
+    private var specialController: NSViewController?
     private let highlighter = SyntaxHighlighter()
     private var highlightWork: DispatchWorkItem?
     private var autosaveWork: DispatchWorkItem?
@@ -191,6 +193,15 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         if let range { reveal(range) }
     }
 
+    /// Opens (or switches to) a special tab such as Keyboard Shortcuts.
+    func openSpecial(_ kind: Document.Special) {
+        if let index = documents.firstIndex(where: { $0.special == kind }) {
+            activate(index)
+        } else {
+            add(Document(special: kind))
+        }
+    }
+
     func newDocument() {
         add(Document(url: nil, text: ""))
         view.window?.makeFirstResponder(textView)
@@ -229,7 +240,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         textView.needsDisplay = true
         highlightNow()
         refreshChrome()
-        view.window?.makeFirstResponder(textView)
+        view.window?.makeFirstResponder(document.special == nil ? textView : (specialController as? ShortcutsEditor)?.initialFirstResponder)
         onActiveDocumentChange?(document)
         onSessionChange?()
     }
@@ -263,6 +274,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             }
         }
         documents.remove(at: index)
+        if document.special != nil {
+            specialController?.view.removeFromSuperview()
+            specialController = nil
+        }
         if documents.isEmpty {
             activeIndex = nil
             layoutManager.replaceTextStorage(emptyStorage)
@@ -297,6 +312,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     @discardableResult
     func save(_ document: Document, as forceDialog: Bool = false) -> Bool {
+        if document.special != nil { return true }
         var target = document.url
         if target == nil || forceDialog {
             let panel = NSSavePanel()
@@ -320,7 +336,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             onActiveDocumentChange?(document)
         }
         onSessionChange?()
-        onDidSave?()
+        onDidSave?(document)
         return true
     }
 
@@ -336,7 +352,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     /// are kept by session recovery instead.
     func saveNamedDocuments() {
         for document in documents where document.isDirty && document.url != nil {
-            try? document.save()
+            if (try? document.save()) != nil { onDidSave?(document) }
         }
     }
 
@@ -437,10 +453,29 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     private func refreshChrome() {
         let hasDocument = activeDocument != nil
+        let special = activeDocument?.special
         emptyState.isHidden = hasDocument
-        scrollView.isHidden = !hasDocument
+        scrollView.isHidden = !hasDocument || special != nil
+        showSpecial(special)
         refreshTabs()
         updateStatus()
+    }
+
+    private func showSpecial(_ kind: Document.Special?) {
+        guard let kind else {
+            specialController?.view.removeFromSuperview()
+            return
+        }
+        let controller: NSViewController
+        switch kind {
+        case .keyboardShortcuts: controller = specialController as? ShortcutsEditor ?? ShortcutsEditor()
+        }
+        specialController = controller
+        if controller.view.superview !== editorArea {
+            controller.view.frame = editorArea.bounds
+            controller.view.autoresizingMask = [.width, .height]
+            editorArea.addSubview(controller.view)
+        }
     }
 
     private func refreshTabs() {
@@ -451,7 +486,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func updateStatus() {
-        guard let document = activeDocument else {
+        guard let document = activeDocument, document.special == nil else {
             statusBar.showDocument(languageName: nil, visible: false)
             return
         }
@@ -527,7 +562,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     func textDidChange(_ notification: Notification) {
-        guard let document = activeDocument else { return }
+        guard let document = activeDocument, document.special == nil else { return }
         document.invalidateLines()
         document.isDirty = true
         ruler.updateThickness()

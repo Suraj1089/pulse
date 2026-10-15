@@ -2,10 +2,12 @@ import AppKit
 
 private final class ChangeSection: NSObject {
     let title: String
+    let isStaged: Bool
     var items: [ChangeItem] = []
 
-    init(title: String) {
+    init(title: String, isStaged: Bool) {
         self.title = title
+        self.isStaged = isStaged
         super.init()
     }
 }
@@ -18,8 +20,9 @@ private final class ChangeItem: NSObject {
     }
 }
 
-/// A view-only Source Control list, like VS Code's: staged and unstaged
-/// changes with their status letters. git runs only while this is on screen.
+/// Source Control, like VS Code's: staged and unstaged changes with their
+/// status letters, and hover buttons to stage (+) or unstage (−) a file or a
+/// whole section. git runs only while this is on screen or when asked.
 final class SourceControlPanel: NSViewController, NSOutlineViewDataSource, NSOutlineViewDelegate {
     var onOpenFile: ((URL) -> Void)?
 
@@ -129,12 +132,12 @@ final class SourceControlPanel: NSViewController, NSOutlineViewDataSource, NSOut
         }
         var built: [ChangeSection] = []
         if !snapshot.staged.isEmpty {
-            let section = ChangeSection(title: "Staged Changes")
+            let section = ChangeSection(title: "Staged Changes", isStaged: true)
             section.items = snapshot.staged.map(ChangeItem.init)
             built.append(section)
         }
         if !snapshot.changes.isEmpty {
-            let section = ChangeSection(title: "Changes")
+            let section = ChangeSection(title: "Changes", isStaged: false)
             section.items = snapshot.changes.map(ChangeItem.init)
             built.append(section)
         }
@@ -143,6 +146,25 @@ final class SourceControlPanel: NSViewController, NSOutlineViewDataSource, NSOut
         summary.stringValue = "\(snapshot.branch.uppercased())  ·  " + (count == 0 ? "NO CHANGES" : "\(count) CHANGED")
         outline.reloadData()
         outline.expandItem(nil, expandChildren: true)
+    }
+
+    // MARK: Staging
+
+    /// Stages (from Changes) or unstages (from Staged Changes), then refreshes.
+    private func toggleStage(_ changes: [GitChange], staged: Bool) {
+        guard let repository, !changes.isEmpty else { return }
+        let finish: (String?) -> Void = { [weak self] error in
+            guard let self else { return }
+            self.refreshNow()
+            if let error { self.summary.stringValue = error.components(separatedBy: "\n").first ?? error }
+        }
+        if staged {
+            // Unstaging a rename restores both the new and the old path.
+            let paths = changes.flatMap { [$0.path] + ($0.originalPath.map { [$0] } ?? []) }
+            GitStatus.unstage(paths, repository: repository, completion: finish)
+        } else {
+            GitStatus.stage(changes.map(\.path), repository: repository, completion: finish)
+        }
     }
 
     @objc private func rowClicked() {
@@ -184,6 +206,10 @@ final class SourceControlPanel: NSViewController, NSOutlineViewDataSource, NSOut
             cell.badge.stringValue = "\(section.items.count)"
             cell.badge.textColor = .secondaryLabelColor
             cell.toolTip = nil
+            cell.configureAction(staged: section.isStaged, all: true) { [weak self, weak section] in
+                guard let section else { return }
+                self?.toggleStage(section.items.map(\.change), staged: section.isStaged)
+            }
         } else if let item = item as? ChangeItem {
             let change = item.change
             let deleted = change.kind == .deleted
@@ -202,6 +228,10 @@ final class SourceControlPanel: NSViewController, NSOutlineViewDataSource, NSOut
             cell.badge.stringValue = String(change.kind.rawValue)
             cell.badge.textColor = SourceControlPanel.color(for: change.kind)
             cell.toolTip = change.path
+            let staged = (outlineView.parent(forItem: item) as? ChangeSection)?.isStaged ?? false
+            cell.configureAction(staged: staged, all: false) { [weak self] in
+                self?.toggleStage([change], staged: staged)
+            }
         }
         return cell
     }
@@ -215,9 +245,12 @@ final class SourceControlPanel: NSViewController, NSOutlineViewDataSource, NSOut
     }
 }
 
-/// Name on the left, status letter (or section count) on the right.
+/// Name on the left, status letter (or section count) on the right, and a
+/// stage/unstage button that appears while the pointer is over the row.
 private final class ChangeCell: NSTableCellView {
     let badge = NSTextField(labelWithString: "")
+    private let action = NSButton()
+    private var onAction: (() -> Void)?
 
     init(_ id: NSUserInterfaceItemIdentifier) {
         super.init(frame: .zero)
@@ -228,15 +261,24 @@ private final class ChangeCell: NSTableCellView {
         badge.font = .monospacedSystemFont(ofSize: 11, weight: .semibold)
         badge.alignment = .right
         badge.setContentCompressionResistancePriority(.required, for: .horizontal)
-        [text, badge].forEach {
+        action.isBordered = false
+        action.imagePosition = .imageOnly
+        action.contentTintColor = .secondaryLabelColor
+        action.isHidden = true
+        action.target = self
+        action.action = #selector(actionClicked)
+        [text, action, badge].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             addSubview($0)
         }
         textField = text
         NSLayoutConstraint.activate([
             text.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
-            text.trailingAnchor.constraint(lessThanOrEqualTo: badge.leadingAnchor, constant: -6),
+            text.trailingAnchor.constraint(lessThanOrEqualTo: action.leadingAnchor, constant: -4),
             text.centerYAnchor.constraint(equalTo: centerYAnchor),
+            action.trailingAnchor.constraint(equalTo: badge.leadingAnchor, constant: -6),
+            action.centerYAnchor.constraint(equalTo: centerYAnchor),
+            action.widthAnchor.constraint(equalToConstant: 16),
             badge.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
             badge.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
@@ -244,4 +286,40 @@ private final class ChangeCell: NSTableCellView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// "+" stages, "−" unstages; `all` is the section-header version.
+    func configureAction(staged: Bool, all: Bool, perform: @escaping () -> Void) {
+        let label = staged ? (all ? "Unstage All Changes" : "Unstage Changes") : (all ? "Stage All Changes" : "Stage Changes")
+        action.image = NSImage(systemSymbolName: staged ? "minus" : "plus", accessibilityDescription: label)?
+            .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
+        action.toolTip = label
+        action.setAccessibilityLabel(label)
+        onAction = perform
+        action.isHidden = !isPointerInside
+        // The button only shows on hover; VoiceOver gets the same action on the row.
+        setAccessibilityCustomActions([NSAccessibilityCustomAction(name: label) { perform(); return true }])
+    }
+
+    @objc private func actionClicked() { onAction?() }
+
+    // MARK: Hover
+
+    private var isPointerInside = false {
+        didSet { action.isHidden = !isPointerInside }
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+
+    override func mouseEntered(with event: NSEvent) { isPointerInside = true }
+    override func mouseExited(with event: NSEvent) { isPointerInside = false }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        isPointerInside = false
+    }
 }

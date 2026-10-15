@@ -1,17 +1,9 @@
 import AppKit
 
-/// Keyboard Shortcuts editor, like VS Code's: search, then double-click a
-/// command and press the new keys. Created when opened, released when closed.
-final class ShortcutsPanel: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
-    private static var shared: ShortcutsPanel?
-
-    static func show() {
-        let panel = shared ?? ShortcutsPanel()
-        shared = panel
-        panel.showWindow(nil)
-        panel.window?.makeKeyAndOrderFront(nil)
-    }
-
+/// The Keyboard Shortcuts tab, like VS Code's: search, then double-click a
+/// command and press the new keys. The editor creates it when the tab opens
+/// and drops it when the tab closes. Changes are saved to keybindings.json.
+final class ShortcutsEditor: NSViewController, NSTableViewDataSource, NSTableViewDelegate {
     private let search = NSSearchField()
     private let table = NSTableView()
     private let hint = NSTextField(labelWithString: "")
@@ -24,25 +16,17 @@ final class ShortcutsPanel: NSWindowController, NSWindowDelegate, NSTableViewDat
 
     private static let defaultHint = "Double-click a command to change its shortcut."
 
-    init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 520),
-                              styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: true)
-        window.title = "Keyboard Shortcuts"
-        window.minSize = NSSize(width: 480, height: 300)
-        window.isReleasedWhenClosed = false
-        window.tabbingMode = .disallowed
-        super.init(window: window)
-        window.delegate = self
-        buildUI()
-        reload()
-        window.center()
+    deinit {
+        stopRecording()
+        NotificationCenter.default.removeObserver(self)
     }
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+    /// Where the keyboard goes when the tab becomes active.
+    var initialFirstResponder: NSView { table }
 
-    private func buildUI() {
-        guard let content = window?.contentView else { return }
+    override func loadView() {
+        let content = NSView()
+        view = content
 
         search.placeholderString = "Search commands or keys"
         search.target = self
@@ -73,7 +57,7 @@ final class ShortcutsPanel: NSWindowController, NSWindowDelegate, NSTableViewDat
         hint.textColor = .secondaryLabelColor
         hint.lineBreakMode = .byTruncatingTail
         hint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        hint.stringValue = ShortcutsPanel.defaultHint
+        hint.stringValue = ShortcutsEditor.defaultHint
 
         changeButton.target = self
         changeButton.action = #selector(changeSelected)
@@ -83,18 +67,28 @@ final class ShortcutsPanel: NSWindowController, NSWindowDelegate, NSTableViewDat
         resetButton.action = #selector(resetSelected)
         let resetAll = NSButton(title: "Reset All", target: self, action: #selector(resetAllShortcuts))
 
+        // Like VS Code's "Open Keyboard Shortcuts (JSON)" button.
+        let json = NSButton(image: NSImage(systemSymbolName: "curlybraces", accessibilityDescription: "Open keybindings.json") ?? NSImage(),
+                            target: nil, action: #selector(MainWindowController.openKeyboardShortcutsJSON(_:)))
+        json.bezelStyle = .texturedRounded
+        json.toolTip = "Open Keyboard Shortcuts (JSON)"
+        json.setContentHuggingPriority(.required, for: .horizontal)
+
+        let top = NSStackView(views: [search, json])
+        top.spacing = 8
+
         let buttons = NSStackView(views: [hint, NSView(), changeButton, removeButton, resetButton, resetAll])
         buttons.spacing = 8
 
-        [search, scroll, buttons].forEach {
+        [top, scroll, buttons].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             content.addSubview($0)
         }
         NSLayoutConstraint.activate([
-            search.topAnchor.constraint(equalTo: content.topAnchor, constant: 12),
-            search.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
-            search.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
-            scroll.topAnchor.constraint(equalTo: search.bottomAnchor, constant: 8),
+            top.topAnchor.constraint(equalTo: content.topAnchor, constant: 12),
+            top.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
+            top.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
+            scroll.topAnchor.constraint(equalTo: top.bottomAnchor, constant: 8),
             scroll.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: content.trailingAnchor),
             buttons.topAnchor.constraint(equalTo: scroll.bottomAnchor, constant: 8),
@@ -103,6 +97,14 @@ final class ShortcutsPanel: NSWindowController, NSWindowDelegate, NSTableViewDat
             buttons.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -12),
         ])
         updateButtons()
+        reload()
+        // keybindings.json edited in another tab.
+        NotificationCenter.default.addObserver(self, selector: #selector(bindingsChanged),
+                                               name: .keyBindingsDidChange, object: nil)
+    }
+
+    @objc private func bindingsChanged() {
+        if recording == nil { reload() }
     }
 
     // MARK: Data
@@ -145,7 +147,7 @@ final class ShortcutsPanel: NSWindowController, NSWindowDelegate, NSTableViewDat
         // Only this row changes; a full reload would drop the selection.
         table.reloadData(forRowIndexes: IndexSet(integer: table.selectedRow), columnIndexes: IndexSet(integer: 1))
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, event.window === self.window else { return event }
+            guard let self, event.window === self.view.window else { return event }
             self.record(event)
             return nil
         }
@@ -170,7 +172,7 @@ final class ShortcutsPanel: NSWindowController, NSWindowDelegate, NSTableViewDat
 
     private func finish(message: String?) {
         stopRecording()
-        hint.stringValue = message ?? ShortcutsPanel.defaultHint
+        hint.stringValue = message ?? ShortcutsEditor.defaultHint
         reload()
     }
 
@@ -200,12 +202,9 @@ final class ShortcutsPanel: NSWindowController, NSWindowDelegate, NSTableViewDat
         finish(message: "All shortcuts are back to their defaults.")
     }
 
-    // MARK: NSWindowDelegate
-
-    func windowWillClose(_ notification: Notification) {
-        stopRecording()
-        // Free the window and table; reopening builds them again.
-        DispatchQueue.main.async { ShortcutsPanel.shared = nil }
+    override func viewWillDisappear() {
+        super.viewWillDisappear()
+        if recording != nil { finish(message: nil) }
     }
 
     // MARK: Table
@@ -227,6 +226,7 @@ final class ShortcutsPanel: NSWindowController, NSWindowDelegate, NSTableViewDat
         switch column.identifier.rawValue {
         case "command":
             text.stringValue = command.title
+            cell.toolTip = command.id
         case "key":
             if recording?.id == command.id {
                 text.stringValue = "Press keys…"

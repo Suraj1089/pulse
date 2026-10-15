@@ -112,6 +112,11 @@ struct Language {
         ("-?" + number, .number),
     ])
 
+    /// JSON with comments, for config files such as keybindings.json.
+    static let jsonc = Language(name: "JSON with Comments", lineComment: "//", rules: [
+        (cBlockComment, .comment), (slashComment, .comment),
+    ] + json.rules)
+
     static let yaml = Language(name: "YAML", lineComment: "#", rules: [
         (hashComment, .comment),
         (doubleQuoted, .string), (singleQuoted, .string),
@@ -193,7 +198,7 @@ struct Language {
     private static let byFileName: [String: Language] = [
         "Makefile": shell, "Dockerfile": shell, "Gemfile": ruby, "Rakefile": ruby,
         ".zshrc": shell, ".bashrc": shell, ".profile": shell, ".gitignore": shell, ".env": shell,
-        "Package.resolved": json,
+        "Package.resolved": json, "keybindings.json": jsonc,
     ]
 
     static func detect(url: URL?) -> Language? {

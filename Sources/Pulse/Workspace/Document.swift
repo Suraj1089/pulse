@@ -20,11 +20,23 @@ enum DocumentError: LocalizedError {
 final class Document {
     static let maxBytes = 64 * 1024 * 1024
 
+    /// Tabs that show a view instead of text, like VS Code's settings editors.
+    enum Special: String, Codable {
+        case keyboardShortcuts
+
+        var title: String {
+            switch self {
+            case .keyboardShortcuts: return "Keyboard Shortcuts"
+            }
+        }
+    }
+
     private(set) var url: URL?
     let storage = NSTextStorage()
     let undoManager = UndoManager()
     private(set) var language: Language?
     private(set) var lastModified: Date?
+    private(set) var special: Special?
 
     var selectedRange = NSRange(location: 0, length: 0)
     var scrollPoint: NSPoint = .zero
@@ -34,7 +46,7 @@ final class Document {
         didSet { if oldValue != isDirty { onDirtyChange?() } }
     }
 
-    var displayName: String { url?.lastPathComponent ?? "Untitled" }
+    var displayName: String { special?.title ?? url?.lastPathComponent ?? "Untitled" }
     var length: Int { storage.length }
 
     init(url: URL?, text: String) {
@@ -42,6 +54,11 @@ final class Document {
         self.language = Language.detect(url: url)
         storage.setAttributedString(NSAttributedString(string: text, attributes: Document.baseAttributes))
         refreshModificationDate()
+    }
+
+    convenience init(special: Special) {
+        self.init(url: nil, text: "")
+        self.special = special
     }
 
     static var baseAttributes: [NSAttributedString.Key: Any] {

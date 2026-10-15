@@ -7,6 +7,7 @@ struct GitChange {
 
     let path: String        // relative to the repository root
     let kind: Kind
+    var originalPath: String? = nil   // a staged rename's old path
 }
 
 struct GitSnapshot {
@@ -15,9 +16,9 @@ struct GitSnapshot {
     var changes: [GitChange] = []
 }
 
-/// Read-only git. `status` runs `git status` as a short-lived child process,
-/// only when asked, so git's memory is never Pulse's. `branch` reads
-/// .git/HEAD directly and starts no process at all.
+/// git, as short-lived child processes started only when asked, so git's
+/// memory is never Pulse's: `run` reads status, `stage`/`unstage` move files
+/// in and out of the index. `branch` reads .git/HEAD and starts no process.
 final class GitStatus {
     private var process: Process?
     private var generation = 0
@@ -88,6 +89,46 @@ final class GitStatus {
         }
     }
 
+    /// `git add` for the given paths (new, modified, deleted or conflicted).
+    static func stage(_ paths: [String], repository: URL, completion: @escaping (String?) -> Void) {
+        execute(["add", "-A", "--"] + paths, repository: repository, completion: completion)
+    }
+
+    /// Moves staged changes back to the working tree, keeping the edits.
+    static func unstage(_ paths: [String], repository: URL, completion: @escaping (String?) -> Void) {
+        execute(["restore", "--staged", "--"] + paths, repository: repository) { error in
+            guard error != nil else { completion(nil); return }
+            // A repository with no commits has no HEAD to restore from.
+            execute(["rm", "--cached", "-r", "-q", "--"] + paths, repository: repository, completion: completion)
+        }
+    }
+
+    /// Runs git off the main thread; completes on main with nil or an error message.
+    private static func execute(_ arguments: [String], repository: URL, completion: @escaping (String?) -> Void) {
+        guard let git else { completion("git is not installed"); return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: git)
+            process.arguments = ["-C", repository.path] + arguments
+            let errors = Pipe()
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = errors
+            var message: String?
+            do {
+                try process.run()
+                let output = errors.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                if process.terminationStatus != 0 {
+                    message = String(decoding: output, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if message?.isEmpty ?? true { message = "git \(arguments.first ?? "") failed" }
+                }
+            } catch {
+                message = error.localizedDescription
+            }
+            DispatchQueue.main.async { completion(message) }
+        }
+    }
+
     /// Parses `git status --porcelain=v1 -z`: "XY path\0", with renames
     /// followed by an extra "\0origPath".
     static func parse(_ data: Data, branch: String) -> GitSnapshot {
@@ -100,13 +141,17 @@ final class GitStatus {
             guard entry.count > 3 else { continue }
             let x = entry[0], y = entry[1]
             let path = String(entry[3...])
-            if x == "R" || x == "C" { index += 1 }  // skip the original path
+            var originalPath: String?
+            if x == "R" || x == "C" {
+                originalPath = index < fields.count ? fields[index] : nil
+                index += 1
+            }
             if x == "?" {
                 snapshot.changes.append(GitChange(path: path, kind: .untracked))
             } else if x == "U" || y == "U" || (x == "A" && y == "A") || (x == "D" && y == "D") {
                 snapshot.changes.append(GitChange(path: path, kind: .conflicted))
             } else {
-                if let kind = kind(x) { snapshot.staged.append(GitChange(path: path, kind: kind)) }
+                if let kind = kind(x) { snapshot.staged.append(GitChange(path: path, kind: kind, originalPath: originalPath)) }
                 if let kind = kind(y) { snapshot.changes.append(GitChange(path: path, kind: kind)) }
             }
         }
