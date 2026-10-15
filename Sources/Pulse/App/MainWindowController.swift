@@ -1,0 +1,332 @@
+import AppKit
+
+/// The single Pulse window: sidebar + editor. Menu commands arrive here
+/// through the responder chain.
+final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
+    private let splitController = NSSplitViewController()
+    private let sidebar = SidebarViewController()
+    let editor = EditorViewController()
+    private let palette = CommandPalette()
+    private let resources = ResourceMonitor()
+    private var sidebarItem: NSSplitViewItem!
+
+    private(set) var root: URL?
+    private var fileIndex: FileIndex?
+    private var sessionWork: DispatchWorkItem?
+
+    init() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.tabbingMode = .disallowed
+        window.isReleasedWhenClosed = false
+        window.title = "Pulse"
+        super.init(window: window)
+
+        sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebar)
+        sidebarItem.minimumThickness = 180
+        sidebarItem.maximumThickness = 420
+        sidebarItem.canCollapse = true
+        let editorItem = NSSplitViewItem(viewController: editor)
+        editorItem.minimumThickness = 360
+        splitController.addSplitViewItem(sidebarItem)
+        splitController.addSplitViewItem(editorItem)
+        splitController.splitView.autosaveName = "PulseSidebarSplit"
+
+        window.contentViewController = splitController
+        window.setContentSize(NSSize(width: 1180, height: 760))
+        window.minSize = NSSize(width: 640, height: 420)
+        if !window.setFrameUsingName("PulseMainWindow") { window.center() }
+        window.setFrameAutosaveName("PulseMainWindow")
+        window.delegate = self
+
+        wire()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    private func wire() {
+        sidebar.fileTree.onOpenFile = { [weak self] url in self?.editor.open(url) }
+        sidebar.fileTree.onFilesChanged = { [weak self] in self?.fileIndex?.invalidate() }
+        sidebar.searchPanel.onOpenMatch = { [weak self] url, match in
+            guard let self else { return }
+            self.editor.open(url)
+            self.editor.reveal(line: match.line, column: match.column, length: match.length)
+        }
+        editor.onActiveDocumentChange = { [weak self] document in
+            guard let self else { return }
+            self.window?.title = document?.displayName ?? "Pulse"
+            self.window?.representedURL = document?.url
+            if let url = document?.url { self.sidebar.fileTree.reveal(url) }
+        }
+        editor.onSessionChange = { [weak self] in self?.scheduleSessionSave() }
+        editor.onOpenRequest = { [weak self] in self?.openDocument(nil) }
+        editor.onOpenRecent = { [weak self] url in self?.open([url]) }
+        editor.setRecents(RecentFolders.all)
+
+        resources.onUpdate = { [weak self] snapshot in self?.editor.statusBar.showResources(snapshot) }
+
+        palette.commands = { [weak self] in self?.paletteCommands() ?? [] }
+        palette.files = { [weak self] completion in
+            guard let index = self?.fileIndex else { completion([]); return }
+            index.withPaths(completion)
+        }
+        palette.openFile = { [weak self] path in
+            guard let self, let root = self.root else { return }
+            self.editor.open(root.appendingPathComponent(path))
+        }
+        palette.goToLine = { [weak self] line in self?.editor.goToLine(line) }
+    }
+
+    // MARK: Opening
+
+    func open(_ urls: [URL]) {
+        for url in urls {
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
+            if isDirectory.boolValue {
+                setRoot(url)
+            } else {
+                if root == nil { setRoot(url.deletingLastPathComponent()) }
+                editor.open(url)
+            }
+        }
+    }
+
+    func setRoot(_ url: URL?) {
+        guard url?.standardizedFileURL != root?.standardizedFileURL else { return }
+        root = url
+        fileIndex = url.map { FileIndex(root: $0) }
+        sidebar.fileTree.setRoot(url)
+        sidebar.searchPanel.root = url
+        sidebar.searchPanel.index = fileIndex
+        sidebar.searchPanel.clear()
+        editor.terminalDirectory = url
+        if let url {
+            RecentFolders.add(url)
+            NSDocumentController.shared.noteNewRecentDocumentURL(url)
+            editor.setRecents(RecentFolders.all)
+        }
+        scheduleSessionSave()
+    }
+
+    // MARK: Session
+
+    func restoreSession() {
+        guard let state = SessionState.load() else { return }
+        if let path = state.root, FileManager.default.fileExists(atPath: path) {
+            setRoot(URL(fileURLWithPath: path, isDirectory: true))
+        }
+        for entry in state.entries {
+            let document: Document?
+            if let path = entry.path {
+                let url = URL(fileURLWithPath: path)
+                if let text = entry.unsavedText {
+                    document = Document(url: url, text: text)
+                    document?.isDirty = true
+                } else {
+                    document = try? Document.open(url)
+                }
+            } else if let text = entry.unsavedText {
+                document = Document(url: nil, text: text)
+                document?.isDirty = true
+            } else {
+                document = nil
+            }
+            guard let document else { continue }
+            document.selectedRange = NSRange(location: min(entry.selection, document.length), length: 0)
+            editor.add(document, activate: false)
+        }
+        if let active = state.active, editor.documents.indices.contains(active) {
+            editor.activate(active)
+        } else if !editor.documents.isEmpty {
+            editor.activate(0)
+        }
+        if state.terminalOpen { editor.showTerminal() }
+    }
+
+    func scheduleSessionSave() {
+        sessionWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.saveSession() }
+        sessionWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
+    }
+
+    func saveSession() {
+        sessionWork?.cancel()
+        if let active = editor.activeDocument { active.selectedRange = editor.textView.selectedRange() }
+        let entries = editor.documents.map { document in
+            SessionState.Entry(
+                path: document.url?.path,
+                unsavedText: document.isDirty ? document.storage.string : nil,
+                selection: document.selectedRange.location
+            )
+        }
+        SessionState(root: root?.path, entries: entries, active: editor.activeIndex,
+                     terminalOpen: editor.isTerminalVisible).save()
+    }
+
+    /// Called when Pulse quits or the window closes.
+    func prepareForQuit() {
+        if EditorViewController.autosaveEnabled { editor.saveNamedDocuments() }
+        saveSession()
+    }
+
+    // MARK: App activation
+
+    func appDidBecomeActive() {
+        sidebar.fileTree.refresh()
+        fileIndex?.invalidate()
+        editor.reloadChangedDocuments()
+        resources.start()
+    }
+
+    func appDidResignActive() {
+        resources.stop()
+        if EditorViewController.autosaveEnabled { editor.saveNamedDocuments() }
+        saveSession()
+    }
+
+    // MARK: NSWindowDelegate
+
+    func windowWillClose(_ notification: Notification) {
+        prepareForQuit()
+    }
+
+    // MARK: Commands (responder chain)
+
+    @objc func newFile(_ sender: Any?) { editor.newDocument() }
+
+    @objc func openDocument(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose a folder to work in, or files to open."
+        guard panel.runModal() == .OK else { return }
+        open(panel.urls)
+    }
+
+    @objc func saveDocument(_ sender: Any?) { editor.saveActive() }
+    @objc func saveDocumentAs(_ sender: Any?) { editor.saveActive(as: true) }
+    @objc func saveAllDocuments(_ sender: Any?) { editor.saveAll() }
+    @objc func closeTab(_ sender: Any?) { editor.closeActive() }
+    @objc func nextTab(_ sender: Any?) { editor.selectTab(offset: 1) }
+    @objc func previousTab(_ sender: Any?) { editor.selectTab(offset: -1) }
+
+    @objc func showCommandPalette(_ sender: Any?) { showPalette(">") }
+    @objc func showGoToFile(_ sender: Any?) { showPalette("") }
+    @objc func showGoToLine(_ sender: Any?) { showPalette(":") }
+
+    private func showPalette(_ prefix: String) {
+        guard let window else { return }
+        palette.show(over: window, initialText: prefix)
+    }
+
+    @objc func findInProject(_ sender: Any?) {
+        if sidebarItem.isCollapsed { sidebarItem.animator().isCollapsed = false }
+        sidebar.showSearch(seed: editor.selectedText)
+    }
+
+    @objc func showFiles(_ sender: Any?) {
+        if sidebarItem.isCollapsed { sidebarItem.animator().isCollapsed = false }
+        sidebar.showFiles()
+    }
+
+    @objc func toggleTerminal(_ sender: Any?) { editor.toggleTerminal() }
+    @objc func killTerminal(_ sender: Any?) { editor.killTerminal() }
+    @objc func toggleComment(_ sender: Any?) { editor.textView.toggleLineComment() }
+    @objc func indentLines(_ sender: Any?) { editor.textView.shiftLines(right: true) }
+    @objc func outdentLines(_ sender: Any?) { editor.textView.shiftLines(right: false) }
+    @objc func zoomIn(_ sender: Any?) { editor.changeFontSize(by: 1) }
+    @objc func zoomOut(_ sender: Any?) { editor.changeFontSize(by: -1) }
+    @objc func resetZoom(_ sender: Any?) { editor.changeFontSize(by: nil) }
+    @objc func toggleWordWrap(_ sender: Any?) { editor.toggleWrap() }
+
+    @objc func toggleAutosave(_ sender: Any?) {
+        EditorViewController.autosaveEnabled.toggle()
+        if EditorViewController.autosaveEnabled { editor.saveNamedDocuments() }
+    }
+
+    @objc func revealInFinder(_ sender: Any?) {
+        guard let url = editor.activeDocument?.url ?? root else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    @objc func copyFilePath(_ sender: Any?) {
+        guard let url = editor.activeDocument?.url else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.path, forType: .string)
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        let hasDocument = editor.activeDocument != nil
+        switch menuItem.action {
+        case #selector(toggleAutosave(_:)):
+            menuItem.state = EditorViewController.autosaveEnabled ? .on : .off
+            return true
+        case #selector(toggleWordWrap(_:)):
+            menuItem.state = EditorViewController.wrapLines ? .on : .off
+            return true
+        case #selector(toggleTerminal(_:)):
+            menuItem.title = editor.isTerminalVisible ? "Hide Terminal" : "Show Terminal"
+            return true
+        case #selector(saveDocument(_:)), #selector(saveDocumentAs(_:)), #selector(toggleComment(_:)),
+             #selector(indentLines(_:)), #selector(outdentLines(_:)), #selector(showGoToLine(_:)),
+             #selector(copyFilePath(_:)):
+            return hasDocument
+        case #selector(nextTab(_:)), #selector(previousTab(_:)):
+            return editor.documents.count > 1
+        case #selector(findInProject(_:)), #selector(showGoToFile(_:)):
+            return root != nil
+        default:
+            return true
+        }
+    }
+
+    // MARK: Palette commands
+
+    private func paletteCommands() -> [PaletteCommand] {
+        var commands: [PaletteCommand] = [
+            PaletteCommand(title: "File: New File", shortcut: "⌘N") { [weak self] in self?.newFile(nil) },
+            PaletteCommand(title: "File: Open…", shortcut: "⌘O") { [weak self] in self?.openDocument(nil) },
+            PaletteCommand(title: "File: Save", shortcut: "⌘S") { [weak self] in self?.saveDocument(nil) },
+            PaletteCommand(title: "File: Save As…", shortcut: "⇧⌘S") { [weak self] in self?.saveDocumentAs(nil) },
+            PaletteCommand(title: "File: Save All", shortcut: "⌥⌘S") { [weak self] in self?.saveAllDocuments(nil) },
+            PaletteCommand(title: "File: Close Tab", shortcut: "⌘W") { [weak self] in self?.closeTab(nil) },
+            PaletteCommand(title: "File: Toggle Autosave", shortcut: "") { [weak self] in self?.toggleAutosave(nil) },
+            PaletteCommand(title: "File: Reveal in Finder", shortcut: "") { [weak self] in self?.revealInFinder(nil) },
+            PaletteCommand(title: "File: Copy Path", shortcut: "") { [weak self] in self?.copyFilePath(nil) },
+            PaletteCommand(title: "Go: Go to File", shortcut: "⌘P") { [weak self] in self?.showGoToFile(nil) },
+            PaletteCommand(title: "Go: Go to Line", shortcut: "⌘L") { [weak self] in self?.showGoToLine(nil) },
+            PaletteCommand(title: "Go: Next Tab", shortcut: "⇧⌘]") { [weak self] in self?.nextTab(nil) },
+            PaletteCommand(title: "Go: Previous Tab", shortcut: "⇧⌘[") { [weak self] in self?.previousTab(nil) },
+            PaletteCommand(title: "Search: Find in Project", shortcut: "⇧⌘F") { [weak self] in self?.findInProject(nil) },
+            PaletteCommand(title: "Edit: Toggle Line Comment", shortcut: "⌘/") { [weak self] in self?.toggleComment(nil) },
+            PaletteCommand(title: "Edit: Indent Lines", shortcut: "⌘]") { [weak self] in self?.indentLines(nil) },
+            PaletteCommand(title: "Edit: Outdent Lines", shortcut: "⌘[") { [weak self] in self?.outdentLines(nil) },
+            PaletteCommand(title: "View: Toggle Sidebar", shortcut: "⌃⌘S") { [weak self] in
+                self?.splitController.toggleSidebar(nil)
+            },
+            PaletteCommand(title: "View: Show Files", shortcut: "⇧⌘E") { [weak self] in self?.showFiles(nil) },
+            PaletteCommand(title: "View: Toggle Word Wrap", shortcut: "⌥⌘W") { [weak self] in self?.toggleWordWrap(nil) },
+            PaletteCommand(title: "View: Zoom In", shortcut: "⌘+") { [weak self] in self?.zoomIn(nil) },
+            PaletteCommand(title: "View: Zoom Out", shortcut: "⌘−") { [weak self] in self?.zoomOut(nil) },
+            PaletteCommand(title: "View: Reset Zoom", shortcut: "⌘0") { [weak self] in self?.resetZoom(nil) },
+            PaletteCommand(title: "Terminal: Toggle Terminal", shortcut: "⌃`") { [weak self] in self?.toggleTerminal(nil) },
+            PaletteCommand(title: "Terminal: Kill Terminal", shortcut: "") { [weak self] in self?.killTerminal(nil) },
+        ]
+        for url in RecentFolders.all.prefix(5) where url != root {
+            commands.append(PaletteCommand(title: "Open Recent: \(url.lastPathComponent)", shortcut: "") { [weak self] in
+                self?.open([url])
+            })
+        }
+        return commands
+    }
+}
