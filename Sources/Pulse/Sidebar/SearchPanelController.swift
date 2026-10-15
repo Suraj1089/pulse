@@ -20,13 +20,19 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
     private let caseButton = NSButton(title: "Aa", target: nil, action: nil)
     private let summary = NSTextField(labelWithString: "")
     private let outline = NSOutlineView()
+    private let scroll = NSScrollView()
     private let search = ProjectSearch()
     private var results: [SearchFileResult] = []
     private var items: [ObjectIdentifier: [MatchItem]] = [:]
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        outline.sizeLastColumnToFit()
+        // Keep the single column exactly as wide as the sidebar so names
+        // truncate at the sidebar edge, not at a default column width.
+        let width = scroll.contentSize.width
+        if let column = outline.tableColumns.first, width > 0, abs(column.width - width) > 0.5 {
+            column.width = width
+        }
     }
 
     override func loadView() {
@@ -63,7 +69,6 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
         outline.action = #selector(rowClicked)
         outline.setAccessibilityLabel("Search results")
 
-        let scroll = NSScrollView()
         scroll.documentView = outline
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true

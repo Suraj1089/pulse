@@ -6,12 +6,18 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
 
     private(set) var root: FileNode?
     private let outline = NSOutlineView()
+    private let scroll = NSScrollView()
     private let header = NSTextField(labelWithString: "")
     private let cellID = NSUserInterfaceItemIdentifier("FileCell")
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        outline.sizeLastColumnToFit()
+        // Keep the single column exactly as wide as the sidebar so names
+        // truncate at the sidebar edge, not at a default column width.
+        let width = scroll.contentSize.width
+        if let column = outline.tableColumns.first, width > 0, abs(column.width - width) > 0.5 {
+            column.width = width
+        }
     }
 
     override func loadView() {
@@ -43,7 +49,6 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
         menu.delegate = self
         outline.menu = menu
 
-        let scroll = NSScrollView()
         scroll.documentView = outline
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
@@ -71,8 +76,10 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
 
     func refresh() {
         guard let root else { return }
+        let selected = (outline.item(atRow: outline.selectedRow) as? FileNode)?.url
         root.refresh()
         outline.reloadItem(nil, reloadChildren: true)
+        if let selected { revealNow(selected) }
     }
 
     /// Expands the folders above `url` and selects it.

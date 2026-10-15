@@ -53,7 +53,7 @@ jobs:
             git -C /tmp/shots rm -rfq .
           }
           mkdir -p "/tmp/shots/$BRANCH"
-          cp -R dist/screenshots/. "/tmp/shots/$BRANCH/"
+          rm -rf "/tmp/shots/$BRANCH"/*; cp dist/screenshots/*.png "/tmp/shots/$BRANCH/"
           git -C /tmp/shots add -A
           git -C /tmp/shots commit -qm "Screenshots for $BRANCH @ ${GITHUB_SHA::7}" || exit 0
           git -C /tmp/shots push -q origin screenshots
