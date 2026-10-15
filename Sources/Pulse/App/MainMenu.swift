@@ -106,7 +106,7 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(item("Show Files", #selector(MainWindowController.showFiles(_:)), "e", [.command, .shift]))
         menu.addItem(item("Show Source Control", #selector(MainWindowController.showSourceControl(_:)), "g", [.control, .shift]))
-        menu.addItem(item("Toggle Sidebar", #selector(NSSplitViewController.toggleSidebar(_:)), "s", [.command, .control]))
+        menu.addItem(item("Toggle Sidebar", #selector(MainWindowController.toggleSidebarVisibility(_:)), "s", [.command, .control]))
         menu.addItem(item("Show Terminal", #selector(MainWindowController.toggleTerminal(_:)), "`", [.control]))
         menu.addItem(item("Kill Terminal", #selector(MainWindowController.killTerminal(_:))))
         menu.addItem(.separator())

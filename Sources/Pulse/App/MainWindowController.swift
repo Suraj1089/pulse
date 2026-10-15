@@ -29,15 +29,20 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         window.title = "Pulse"
         super.init(window: window)
 
-        sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebar)
+        // A plain split item, not a "sidebar" one: on macOS 26 those float as an
+        // inset glass card. Like VS Code, the sidebar is a flush column level with
+        // the tabs, separated from the editor by a thin divider.
+        sidebarItem = NSSplitViewItem(viewController: sidebar)
         sidebarItem.minimumThickness = 180
         sidebarItem.maximumThickness = 420
         sidebarItem.canCollapse = true
+        sidebarItem.holdingPriority = NSLayoutConstraint.Priority(260)  // keeps its width as the window resizes
         let editorItem = NSSplitViewItem(viewController: editor)
         editorItem.minimumThickness = 360
         splitController.addSplitViewItem(sidebarItem)
         splitController.addSplitViewItem(editorItem)
         splitController.splitView.autosaveName = "PulseSidebarSplit"
+        splitController.splitView.dividerStyle = .thin
 
         // Title strip on top, sidebar + editor below it.
         let content = NSViewController()
@@ -289,6 +294,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         sidebar.showFiles()
     }
 
+    /// Replaces NSSplitViewController.toggleSidebar(_:), which only acts on
+    /// "sidebar"-behavior items.
+    @objc func toggleSidebarVisibility(_ sender: Any?) {
+        sidebarItem.animator().isCollapsed.toggle()
+    }
+
     @objc func showSourceControl(_ sender: Any?) {
         if sidebarItem.isCollapsed { sidebarItem.animator().isCollapsed = false }
         sidebar.showSourceControl()
@@ -386,7 +397,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("Edit: Toggle Line Comment", #selector(toggleComment(_:))),
             command("Edit: Indent Lines", #selector(indentLines(_:))),
             command("Edit: Outdent Lines", #selector(outdentLines(_:))),
-            command("View: Toggle Sidebar", #selector(NSSplitViewController.toggleSidebar(_:)), to: splitController),
+            command("View: Toggle Sidebar", #selector(toggleSidebarVisibility(_:))),
             command("View: Show Files", #selector(showFiles(_:))),
             command("View: Show Source Control", #selector(showSourceControl(_:))),
             command("View: Toggle Word Wrap", #selector(toggleWordWrap(_:))),

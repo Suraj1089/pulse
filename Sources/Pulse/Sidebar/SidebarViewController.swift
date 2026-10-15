@@ -1,17 +1,26 @@
 import AppKit
 
-/// Files, Search and Source Control, switched by a small segmented control in the header
-/// row level with the tabs.
+/// Files, Search and Source Control, switched by a small segmented control.
+/// Like VS Code's side bar: a flush column in the chrome color, with a header
+/// row ("EXPLORER") exactly as tall as the tab row beside it.
 final class SidebarViewController: NSViewController {
     let fileTree = FileTreeController()
     let searchPanel = SearchPanelController()
     let sourceControl = SourceControlPanel()
 
     private let modeControl = NSSegmentedControl()
+    private let headerTitle = NSTextField(labelWithString: "EXPLORER")
     private let container = NSView()
 
     override func loadView() {
-        let root = NSView()
+        let root = ChromeBackgroundView()
+
+        headerTitle.font = .systemFont(ofSize: 11, weight: .semibold)
+        headerTitle.textColor = .secondaryLabelColor
+        headerTitle.lineBreakMode = .byTruncatingTail
+        headerTitle.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        headerTitle.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(headerTitle)
 
         modeControl.segmentCount = 3
         modeControl.trackingMode = .selectOne
@@ -32,6 +41,9 @@ final class SidebarViewController: NSViewController {
         root.addSubview(container)
 
         NSLayoutConstraint.activate([
+            headerTitle.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
+            headerTitle.trailingAnchor.constraint(lessThanOrEqualTo: modeControl.leadingAnchor, constant: -8),
+            headerTitle.centerYAnchor.constraint(equalTo: modeControl.centerYAnchor),
             modeControl.centerYAnchor.constraint(equalTo: root.topAnchor, constant: TabBarView.height / 2),
             modeControl.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -10),
             container.topAnchor.constraint(equalTo: root.topAnchor, constant: TabBarView.height),
@@ -64,17 +76,32 @@ final class SidebarViewController: NSViewController {
 
     func showFiles() {
         modeControl.selectedSegment = 0
+        headerTitle.stringValue = "EXPLORER"
         display(fileTree)
     }
 
     func showSearch(seed: String?) {
         modeControl.selectedSegment = 1
+        headerTitle.stringValue = "SEARCH"
         display(searchPanel)
         searchPanel.focus(with: seed)
     }
 
     func showSourceControl() {
         modeControl.selectedSegment = 2
+        headerTitle.stringValue = "SOURCE CONTROL"
         display(sourceControl)
+    }
+}
+
+/// The sidebar's surface: the same chrome color as the tab bar, set as a layer
+/// color so it needs no backing store.
+private final class ChromeBackgroundView: NSView {
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = Theme.chromeBackground.cgColor
+        }
     }
 }

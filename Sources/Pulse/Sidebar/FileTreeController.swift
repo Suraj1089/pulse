@@ -34,7 +34,10 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
         outline.addTableColumn(column)
         outline.outlineTableColumn = column
         outline.headerView = nil
-        outline.style = .sourceList
+        // Plain rows on the sidebar's flat chrome color (a source list expects
+        // a glass background and draws a black selection without one).
+        outline.style = .plain
+        outline.backgroundColor = .clear
         outline.rowHeight = 22
         outline.indentationPerLevel = 10
         outline.autoresizesOutlineColumn = false
