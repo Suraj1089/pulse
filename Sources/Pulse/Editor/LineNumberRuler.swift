@@ -10,6 +10,10 @@ final class LineNumberRuler: NSRulerView {
         super.init(scrollView: textView.enclosingScrollView, orientation: .verticalRuler)
         clientView = textView
         ruleThickness = 40
+        // Since macOS 14 views do not clip by default and the ruler floats
+        // over the text. Without clipping, filling the dirty rect painted
+        // over the code.
+        clipsToBounds = true
     }
 
     @available(*, unavailable)
@@ -34,7 +38,7 @@ final class LineNumberRuler: NSRulerView {
               let document else { return }
 
         Theme.editorBackground.setFill()
-        rect.fill()
+        NSRect(x: 0, y: rect.minY, width: ruleThickness, height: rect.height).fill()
 
         let text = textView.string as NSString
         let glyphs = layoutManager.glyphRange(forBoundingRect: textView.visibleRect, in: container)
