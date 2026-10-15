@@ -5,6 +5,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingURLs: [URL] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Used by scripts/screenshot.sh to capture both appearances.
+        switch ProcessInfo.processInfo.environment["PULSE_APPEARANCE"] {
+        case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+        case "light": NSApp.appearance = NSAppearance(named: .aqua)
+        default: break
+        }
         NSApp.mainMenu = MainMenu.build()
         let controller = MainWindowController()
         windowController = controller
@@ -25,6 +31,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Used by scripts/memory-check.sh to measure the terminal scenario.
         if ProcessInfo.processInfo.environment["PULSE_OPEN_TERMINAL"] == "1" {
             controller.editor.showTerminal()
+        }
+        if ProcessInfo.processInfo.environment["PULSE_DEBUG_LAYOUT"] == "1" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { controller.editor.dumpLayout() }
         }
     }
 

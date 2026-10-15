@@ -6,9 +6,19 @@
 
 **A light, native code editor for macOS.**
 
+<br />
+
+<picture>
+  <source srcset="assets/screenshot-dark.png" media="(prefers-color-scheme: dark)" />
+  <img src="assets/screenshot-light.png" alt="Pulse editor window with the file tree, tabs, highlighted Swift code and a terminal" width="820" />
+</picture>
+
 [![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-black?style=flat-square)](https://github.com/Suraj1089/pulse)
 [![Swift](https://img.shields.io/badge/swift-5.9%2B-orange?style=flat-square)](https://swift.org)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Suraj1089/pulse/ci.yml?style=flat-square&label=memory%20budget)](https://github.com/Suraj1089/pulse/actions/workflows/ci.yml)
+
+[**Download Pulse.dmg**](https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg) • [**Website**](https://pulse0.app)
 
 </div>
 
@@ -57,13 +67,13 @@ Open a folder from the terminal with `open -a Pulse .`
 
 ## Memory budget
 
-| Scenario | Target | Hard limit |
-| :--- | :--- | :--- |
-| Empty window | ≤ 40 MB | 100 MB |
-| Ten files open | ≤ 60 MB | 100 MB |
-| Ten files + terminal (Pulse only) | ≤ 60 MB | 100 MB |
+| Scenario | Measured in CI | Target | Hard limit |
+| :--- | :--- | :--- | :--- |
+| Empty window | **15.0 MB** | ≤ 40 MB | 100 MB |
+| Ten files open | **31.8 MB** | ≤ 60 MB | 100 MB |
+| Ten files + terminal | **31.0 MB** (+1.8 MB shell) | ≤ 60 MB | 100 MB |
 
-"Memory" means physical footprint, the number Activity Monitor shows. Shells and other processes you start in the terminal are reported separately. CI measures all three scenarios on every push and fails the build above 100 MB; see `scripts/memory-check.sh`.
+"Memory" means physical footprint, the number Activity Monitor shows, read with `vmmap` 8 seconds after launch on GitHub's macOS 14 runner. Shells and other processes you start in the terminal are reported separately. CI measures all three scenarios on every push and fails the build above 100 MB (`scripts/memory-check.sh`). It also captures real screenshots of the build (`scripts/screenshot.sh`), which is where the image above comes from.
 
 How it stays small:
 

@@ -6,7 +6,7 @@
 
 **Pulse** is a native macOS code editor (Swift + AppKit) built around one constraint: **stay at 50–60 MB of physical footprint in normal use and never exceed 100 MB**, with zero CPU while idle. It ships as a standalone `.app` (ad-hoc signed, not notarized).
 
-- **Website**: <https://pulse0.app> (the `site/` folder still describes the previous memory-monitor app and needs rewriting)
+- **Website**: <https://pulse0.app> (static, in `site/`; screenshots there and in `assets/` are cropped from the CI capture in `scripts/screenshot.sh`)
 - **Install**: `curl -fsSL https://pulse0.app/install.sh | bash`
 
 ## Non-negotiables
@@ -45,6 +45,7 @@ Sources/Pulse/
 scripts/
 ├── bundle.sh                 Fast single-arch dist/Pulse.app
 ├── memory-check.sh           Memory budget scenarios (used by CI)
+├── screenshot.sh             Real light/dark screenshots (CI publishes them to the `screenshots` branch)
 └── package.sh                Universal release: DMG, ZIP, Homebrew cask
 ```
 

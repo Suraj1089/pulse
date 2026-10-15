@@ -1,71 +1,109 @@
-# Pulse — Full Technical Documentation & LLM Guide
+# Pulse — Full Technical Guide
 
-## 1. Executive Summary
-Pulse is an open-source, minimalist memory monitor and command palette designed natively for macOS. It lives in the macOS menu bar and gives a fast answer when a Mac feels slow: current memory pressure and the largest running apps, with quick Quit and Force Quit actions. It complements—rather than replaces—Activity Monitor, which remains the right tool for detailed CPU, disk, network, and process diagnostics.
+## 1. Summary
 
-- **Developer**: Suraj Pisal
-- **License**: MIT
-- **Repository**: https://github.com/Suraj1089/pulse
-- **Homepage**: https://pulse0.app
-- **Installer**: https://pulse0.app/install.sh
+Pulse is a native macOS code editor written in Swift and AppKit. Its design constraint is memory: about 30 MB with several files open in CI measurements, a 50–60 MB target in normal use, and a hard limit of 100 MB enforced on every build. It uses no CPU while idle.
 
----
+- Developer: Suraj Pisal
+- License: MIT
+- Platform: macOS 14 Sonoma or later, Apple silicon and Intel
+- Repository: https://github.com/Suraj1089/pulse
+- Website: https://pulse0.app
 
-## 2. System Architecture & Internals
-
-### Kernel-Level Telemetry
-Pulse does not rely on shell command scraping (such as executing `ps`, `top`, or `vm_stat` subprocesses). Instead, it links directly against Darwin kernel Mach APIs:
-- **`host_statistics64(mach_host_self(), HOST_VM_INFO64, ...)`**: Retrieves exact counts of active, inactive, wired, speculative, compressed, and purgeable memory pages.
-- **`DispatchSource.makeMemoryPressureSource(...)`**: Directly subscribes to kernel memory pressure warning thresholds (Normal, Warning, Critical), providing identical state fidelity to macOS Activity Monitor.
-
-### Process Memory Aggregation
-Unlike basic process listings that only inspect the main executable, Pulse accounts for modern multi-process applications (such as Google Chrome, Slack, Discord, and Electron apps):
-- Utilizes `libproc` API (`proc_pid_rusage(pid, PROC_RUSAGE_INFO_V6, &info)`).
-- Reads resident memory to report an app's currently resident memory without representing summed per-process footprints as total physical RAM.
-- Groups auxiliary helper processes (e.g., Google Chrome helpers) under their parent application for a practical quick-action view.
-
-### Memory Optimization & Dormancy
-- **Idle Memory Footprint**: ~13.5 MB RAM when closed in the menu bar.
-- **Active Window Footprint**: ~31 MB RAM (including Metal/CoreAnimation double-buffered framebuffer render passes).
-- **AutoFill Daemon Elimination**: Implements an `NSViewRepresentable` text field overriding the internal Objective-C selector `_isPasswordAutofillEnabled() -> false`, completely preventing macOS from launching the 10–12 MB background `AutoFill` system daemon.
+Pulse 2.0 replaces the earlier Pulse menu-bar memory monitor (1.x), which remains available from GitHub Releases.
 
 ---
 
-## 3. Installation Methods
+## 2. Features
 
-### Method 1: One-Line Terminal Installer (Recommended)
+- **Folders and files**: open a folder (⌘O), browse it in a sidebar file tree, open files in tabs. Folders are read only when expanded. New file, new folder, reveal in Finder, copy path and move to Trash from the tree's context menu.
+- **Syntax highlighting**: Swift, JavaScript/TypeScript, Python, Go, Rust, C/C++/Objective-C, Java/Kotlin/Scala/Dart/C#, Ruby, shell, HTML/XML, CSS/SCSS, JSON, YAML, TOML, Markdown and SQL. Regex-based, not a full parser.
+- **Editing**: line numbers, current-line highlight, auto-indent (including after `{`, `[`, `(` and Python `:`), spaces for tabs, toggle line comment (⌘/), indent and outdent (⌘] and ⌘[), word wrap (⌥⌘W), font size (⌘+, ⌘−, ⌘0).
+- **Find and replace**: the standard macOS find bar (⌘F, ⌥⌘F, ⌘G, ⌘E).
+- **Project search** (⇧⌘F): runs ripgrep (`rg`) as a short-lived child process when installed, otherwise a built-in scan. Results grouped by file; click to jump to the match.
+- **Command palette**: ⌘P go to file (fuzzy), ⇧⌘P commands, ⌘L go to line.
+- **Integrated terminal** (⌃`): your login shell via SwiftTerm, created on first use. Hiding the panel keeps the shell running; "Kill Terminal" ends it.
+- **Autosave** (on by default): modified files with a path are written one second after typing stops, when Pulse loses focus, and at quit.
+- **Session recovery**: the open folder, tabs, cursor positions and the text of unsaved buffers are stored in `~/Library/Application Support/Pulse/session.json` and restored at launch.
+- **External changes**: files changed on disk are reloaded when Pulse regains focus, if they have no unsaved edits.
+- **Resource meter**: the status bar shows Pulse's own physical footprint and CPU, and the footprint of shells it started, separately.
+
+Not included by design: extensions, Git interface, debugger, language servers, AI features, telemetry, accounts.
+
+---
+
+## 3. Architecture
+
+- **AppKit only.** No SwiftUI, no WKWebView, no storyboards. The only dependency is SwiftTerm for terminal emulation.
+- **One text view for every tab.** Each document owns an `NSTextStorage` and an `UndoManager`. The editor has a single `NSLayoutManager` and `NSTextView`; switching tabs calls `replaceTextStorage`, so an open file costs roughly its own text.
+- **TextKit 1** with non-contiguous layout, an `NSRulerView` gutter that draws only visible line numbers from a cached line index.
+- **Highlighting** uses one combined `NSRegularExpression` per language and applies colors as layout-manager temporary attributes, which never modify or copy the text. Files up to 300 KB are highlighted in full, larger files around the visible range.
+- **Laziness.** The terminal, the go-to-file index and folder contents are created on first use.
+- **No idle work.** No polling or animations. The resource meter samples every 2 seconds only while Pulse is the active app.
+
+---
+
+## 4. Memory measurements
+
+CI (`scripts/memory-check.sh`, GitHub macOS 14 runner) launches the bundled app and reads physical footprint with `vmmap --summary` after 8 seconds:
+
+| Scenario | Pulse | Child processes |
+|---|---|---|
+| Empty window | 15.0 MB | 0 MB |
+| Ten source files open | 31.8 MB | 0 MB |
+| Ten files + terminal | 31.0 MB | 1.8 MB (shell) |
+
+The build fails if Pulse exceeds 100 MB in any scenario. Numbers vary with display, font size, open files and macOS version.
+
+---
+
+## 5. Installation
+
+One-line installer (downloads the latest release ZIP, installs to /Applications, clears quarantine, opens the app):
+
 ```bash
 curl -fsSL https://pulse0.app/install.sh | bash
 ```
-This script downloads the latest release archive from GitHub Releases, extracts `Pulse.app`, removes Gatekeeper quarantine attributes (`xattr -cr`), places the application into `/Applications`, and launches it.
 
-### Method 2: Direct Download
-Download `Pulse.dmg` or `Pulse-1.0.0.dmg` from the GitHub releases page:
-https://github.com/Suraj1089/pulse/releases/latest
+Disk image: https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg
 
----
+From source:
 
-## 4. Keyboard Shortcuts & Commands
+```bash
+git clone https://github.com/Suraj1089/pulse
+cd pulse
+swift run Pulse .          # run, opening the current folder
+./scripts/bundle.sh        # build dist/Pulse.app
+```
 
-| Input | Action |
-| :--- | :--- |
-| `⌘ ⌥ P` | Open the Pulse palette from anywhere |
-| `↑` / `↓` | Navigate running applications and command results |
-| `↵` (Return) | Quit selected application or run selected command |
-| `⌥` (Hold Option) | Dynamically converts Quit buttons to **Force Quit** (`SIGKILL`) |
-| `esc` | Dismiss palette |
-
-### Query Triggers (Search Bar)
-- `memory`: Detailed RAM composition (App, Wired, Compressed, Cached, Free) and pressure history sparkline.
-- `chrome`: Lists active Google Chrome tabs for review. Chrome Task Manager (`Shift + Escape`) is the authoritative source for exact tab/process memory.
-- `why is my mac slow`: Runs diagnostic telemetry and recommends heavy idle apps to terminate.
-- `quit <name>`: Gracefully terminates processes (`SIGTERM` via `NSRunningApplication.terminate()`).
-- `forcequit <name>`: Immediately kills unresponsive processes (`SIGKILL` via `NSRunningApplication.forceTerminate()`).
+Open a folder from Terminal: `open -a Pulse .`
 
 ---
 
-## 5. Permissions & Security
+## 6. Keyboard shortcuts
 
-- **Sandboxing**: Pulse operates un-sandboxed because macOS App Sandboxing strictly blocks process inspection (`libproc`) and terminating external processes.
-- **Accessibility / Input Monitoring**: Not required for the global `⌘ ⌥ P` shortcut.
-- **AppleScript / Automation**: Prompted only when using the `chrome` command to query open tab titles.
+| Shortcut | Action |
+|---|---|
+| ⌘O | Open a folder or files |
+| ⌘N | New file |
+| ⌘S / ⇧⌘S / ⌥⌘S | Save / Save As / Save All |
+| ⌘W | Close tab |
+| ⌘P | Go to file |
+| ⇧⌘P | Command palette |
+| ⌘L | Go to line |
+| ⌘F / ⌥⌘F | Find / Find and replace |
+| ⇧⌘F | Search the project |
+| ⇧⌘E | Show files |
+| ⌃` | Show or hide the terminal |
+| ⌘/ | Toggle line comment |
+| ⌘] / ⌘[ | Indent / outdent |
+| ⇧⌘] / ⇧⌘[ | Next / previous tab |
+| ⌃⌘S | Toggle sidebar |
+| ⌥⌘W | Word wrap |
+| ⌘+ / ⌘− / ⌘0 | Font size |
+
+---
+
+## 7. Privacy
+
+Pulse makes no network requests, has no telemetry or analytics, and needs no account. Files never leave the Mac.
