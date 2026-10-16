@@ -13,9 +13,56 @@ enum CommandLineTool {
     }
 
     private static let attemptedKey = "cliInstallAttempted"
+    /// The folder the link was last installed into (it may not be a usual one).
+    private static let folderKey = "cliInstallFolder"
     private static let fileManager = FileManager.default
+    private static let manualFolder = "/usr/local/bin"
 
     static var script: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/pulse") }
+
+    /// A `pulse` link to this copy of Pulse exists where it was installed or
+    /// in one of the usual folders.
+    static var isInstalled: Bool {
+        let installedFolder = UserDefaults.standard.string(forKey: folderKey)
+        return ([installedFolder].compactMap { $0 } + fallbackFolders).contains { folder in
+            linkTarget(in: folder) == script.standardizedFileURL.path
+        }
+    }
+
+    /// What to run in a terminal when installing from Pulse doesn't work, or
+    /// nil when /usr/local/bin/pulse is a different program it would replace.
+    static var manualCommand: String? {
+        guard canLink(in: manualFolder) else { return nil }
+        let path = "'" + script.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        return "sudo mkdir -p \(manualFolder) && sudo ln -sfn \(path) \(manualFolder)/pulse"
+    }
+
+    /// Where the `pulse` symlink in `folder` points (resolved), or nil if
+    /// there is no symlink there.
+    private static func linkTarget(in folder: String) -> String? {
+        let link = (folder as NSString).appendingPathComponent("pulse")
+        guard let destination = try? fileManager.destinationOfSymbolicLink(atPath: link) else { return nil }
+        return URL(fileURLWithPath: destination, relativeTo: URL(fileURLWithPath: folder, isDirectory: true)).standardizedFileURL.path
+    }
+
+    /// True when `folder/pulse` is free, or a link to some copy of Pulse:
+    /// never replace a different program called `pulse`.
+    static func canLink(in folder: String) -> Bool {
+        if let target = linkTarget(in: folder) { return target.hasSuffix("/Contents/Resources/pulse") }
+        return !fileManager.fileExists(atPath: (folder as NSString).appendingPathComponent("pulse"))
+    }
+
+    /// Remembers where the link is and tells views showing its state.
+    private static func record(_ outcome: Outcome) -> Outcome {
+        switch outcome {
+        case .installed(let folder), .alreadyInstalled(let folder):
+            UserDefaults.standard.set(folder, forKey: folderKey)
+            NotificationCenter.default.post(name: .commandLineToolDidChange, object: nil)
+        case .needsPassword, .unavailable:
+            break
+        }
+        return outcome
+    }
 
     /// Common user-writable bin folders, used when the shell's PATH can't be read.
     private static var fallbackFolders: [String] {
@@ -40,17 +87,16 @@ enum CommandLineTool {
         }
         shellPath { path in
             let folders = path ?? fallbackFolders.filter { fileManager.fileExists(atPath: $0) }
-            completion(link(in: folders))
+            completion(record(link(in: folders)))
         }
     }
 
     private static func link(in folders: [String]) -> Outcome {
         for folder in folders where !folder.isEmpty && !isSystemFolder(folder) {
             let link = (folder as NSString).appendingPathComponent("pulse")
-            if let destination = try? fileManager.destinationOfSymbolicLink(atPath: link) {
-                let resolved = URL(fileURLWithPath: destination, relativeTo: URL(fileURLWithPath: folder, isDirectory: true)).standardizedFileURL
-                if resolved.path == script.standardizedFileURL.path { return .alreadyInstalled(folder) }
-                guard resolved.path.hasSuffix("/Contents/Resources/pulse") else {
+            if let target = linkTarget(in: folder) {
+                if target == script.standardizedFileURL.path { return .alreadyInstalled(folder) }
+                guard canLink(in: folder) else {
                     return .unavailable("Another program called “pulse” is already at \(link).")
                 }
                 // An older or moved copy of Pulse: point the link at this one.
@@ -74,8 +120,12 @@ enum CommandLineTool {
     /// Installs into /usr/local/bin (on PATH by default) with the standard
     /// macOS administrator prompt, which the user answers.
     static func installWithPassword(completion: @escaping (Outcome) -> Void) {
+        guard canLink(in: manualFolder) else {
+            completion(.unavailable("Another program called “pulse” is already at \(manualFolder)/pulse."))
+            return
+        }
         func quoted(_ text: String) -> String { "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'" }
-        let command = "mkdir -p /usr/local/bin && ln -sfn \(quoted(script.path)) /usr/local/bin/pulse"
+        let command = "mkdir -p \(manualFolder) && ln -sfn \(quoted(script.path)) \(manualFolder)/pulse"
         let source = "do shell script \"\(command.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\" with administrator privileges"
         DispatchQueue.global(qos: .userInitiated).async {
             var error: NSDictionary?
@@ -84,7 +134,7 @@ enum CommandLineTool {
                 if let error {
                     completion(.unavailable(error[NSAppleScript.errorMessage] as? String ?? "The command was not installed."))
                 } else {
-                    completion(.installed("/usr/local/bin"))
+                    completion(record(.installed(manualFolder)))
                 }
             }
         }

@@ -33,8 +33,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private var ruler: LineNumberRuler!
     private let emptyState = EmptyStateView()
     private let terminal = TerminalPanel()
-    /// The view of the active special tab; built when shown, dropped when its tab closes.
-    private var specialController: NSViewController?
+    /// Views of the open special tabs, one per kind: built when first shown,
+    /// kept while the tab is open (so switching keeps their state), dropped
+    /// when the tab closes. Only the active one is in the view hierarchy.
+    private var specialControllers: [Document.Special: NSViewController] = [:]
     private let highlighter = SyntaxHighlighter()
     private var highlightWork: DispatchWorkItem?
     private var autosaveWork: DispatchWorkItem?
@@ -43,7 +45,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     static var autosaveEnabled: Bool {
         get { UserDefaults.standard.object(forKey: "autosave") as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: "autosave") }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "autosave")
+            NotificationCenter.default.post(name: .settingsDidChange, object: nil)
+        }
     }
 
     static var wrapLines: Bool {
@@ -237,7 +242,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         textView.needsDisplay = true
         highlightNow()
         refreshChrome()
-        view.window?.makeFirstResponder(document.special == nil ? textView : (specialController as? ShortcutsEditor)?.initialFirstResponder)
+        view.window?.makeFirstResponder(document.special == nil ? textView : (specialControllers[.keyboardShortcuts] as? ShortcutsEditor)?.initialFirstResponder)
         onActiveDocumentChange?(document)
         onSessionChange?()
     }
@@ -271,9 +276,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             }
         }
         documents.remove(at: index)
-        if document.special != nil {
-            specialController?.view.removeFromSuperview()
-            specialController = nil
+        if let kind = document.special, let controller = specialControllers.removeValue(forKey: kind) {
+            controller.view.removeFromSuperview()
         }
         if documents.isEmpty {
             activeIndex = nil
@@ -396,8 +400,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         view.window?.makeFirstResponder(textView)
     }
 
-    func changeFontSize(by delta: CGFloat?) {
-        Theme.fontSize = delta.map { Theme.fontSize + $0 } ?? Theme.defaultFontSize
+    /// Re-applies the editor size from Theme to every open document.
+    func applyEditorFontSize() {
         documents.forEach { $0.applyFont() }
         textView.typingAttributes = Document.baseAttributes
         ruler.updateThickness()
@@ -437,6 +441,15 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         onSessionChange?()
     }
 
+    func applyTerminalFontSize() {
+        terminal.applyFontSize()
+    }
+
+    /// True when `view` is the terminal or inside it (for focus-aware ⌘+ / ⌘−).
+    func terminalContains(_ view: NSView) -> Bool {
+        view.isDescendant(of: terminal)
+    }
+
     func killTerminal() {
         terminal.kill()
         hideTerminal()
@@ -459,15 +472,21 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func showSpecial(_ kind: Document.Special?) {
-        guard let kind else {
-            specialController?.view.removeFromSuperview()
-            return
+        // Only the active special view is on screen; the others keep their state.
+        for (other, controller) in specialControllers where other != kind {
+            controller.view.removeFromSuperview()
         }
+        guard let kind else { return }
         let controller: NSViewController
-        switch kind {
-        case .keyboardShortcuts: controller = specialController as? ShortcutsEditor ?? ShortcutsEditor()
+        if let existing = specialControllers[kind] {
+            controller = existing
+        } else {
+            switch kind {
+            case .keyboardShortcuts: controller = ShortcutsEditor()
+            case .welcome: controller = WelcomeController()
+            }
+            specialControllers[kind] = controller
         }
-        specialController = controller
         if controller.view.superview !== editorArea {
             controller.view.frame = editorArea.bounds
             controller.view.autoresizingMask = [.width, .height]

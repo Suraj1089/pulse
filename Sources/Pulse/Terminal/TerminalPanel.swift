@@ -32,9 +32,7 @@ final class TerminalPanel: NSView, LocalProcessTerminalViewDelegate {
         guard terminalView == nil else { return }
         let view = LocalProcessTerminalView(frame: .zero)
         view.translatesAutoresizingMaskIntoConstraints = false
-        view.font = NSFont.monospacedSystemFont(ofSize: max(Theme.fontSize - 1, 10), weight: .regular)
-        view.nativeBackgroundColor = Theme.editorBackground
-        view.nativeForegroundColor = Theme.text
+        view.font = Theme.terminalFont
         view.processDelegate = self
         addSubview(view)
         NSLayoutConstraint.activate([
@@ -44,6 +42,7 @@ final class TerminalPanel: NSView, LocalProcessTerminalViewDelegate {
             view.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
         ])
         terminalView = view
+        applyColors()
 
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let shellName = (shell as NSString).lastPathComponent
@@ -52,6 +51,26 @@ final class TerminalPanel: NSView, LocalProcessTerminalViewDelegate {
                           currentDirectory: (directory ?? home).path)
         isRunning = true
         header.stringValue = "Terminal — \(shellName)"
+    }
+
+    /// SwiftTerm turns its colors into fixed values when they are set, so
+    /// they are set again whenever light/dark changes (View › Appearance or macOS).
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyColors()
+    }
+
+    private func applyColors() {
+        guard let terminalView else { return }
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            terminalView.nativeBackgroundColor = Theme.editorBackground
+            terminalView.nativeForegroundColor = Theme.text
+        }
+    }
+
+    /// View › Font Size › Terminal; a running shell keeps going, its grid reflows.
+    func applyFontSize() {
+        terminalView?.font = Theme.terminalFont
     }
 
     func focus() {

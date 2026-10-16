@@ -270,10 +270,22 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case .unavailable(let reason):
             alert.messageText = "Couldn't install the pulse command"
             alert.informativeText = reason
+            // The by-hand fallback, when this copy of Pulse has the script to link to
+            // and linking it wouldn't replace a different program called pulse.
+            if FileManager.default.isExecutableFile(atPath: CommandLineTool.script.path), let command = CommandLineTool.manualCommand {
+                alert.informativeText += "\n\nTo install it yourself, run this in Terminal:\n\(command)"
+                alert.addButton(withTitle: "Copy Command")
+                alert.addButton(withTitle: "Close")
+            }
         case .needsPassword:
             return
         }
-        alert.beginSheetModal(for: window)
+        alert.beginSheetModal(for: window) { response in
+            guard case .unavailable(_) = outcome, response == .alertFirstButtonReturn,
+                  alert.buttons.count > 1, let command = CommandLineTool.manualCommand else { return }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(command, forType: .string)
+        }
     }
 
     // MARK: Updates
@@ -423,9 +435,64 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     @objc func toggleComment(_ sender: Any?) { editor.textView.toggleLineComment() }
     @objc func indentLines(_ sender: Any?) { editor.textView.shiftLines(right: true) }
     @objc func outdentLines(_ sender: Any?) { editor.textView.shiftLines(right: false) }
-    @objc func zoomIn(_ sender: Any?) { editor.changeFontSize(by: 1) }
-    @objc func zoomOut(_ sender: Any?) { editor.changeFontSize(by: -1) }
-    @objc func resetZoom(_ sender: Any?) { editor.changeFontSize(by: nil) }
+    // ⌘+ / ⌘− / ⌘0 resize the area being worked in; View › Font Size names one.
+    @objc func zoomIn(_ sender: Any?) { changeFontSize(of: focusedFontArea, by: 1) }
+    @objc func zoomOut(_ sender: Any?) { changeFontSize(of: focusedFontArea, by: -1) }
+    @objc func resetZoom(_ sender: Any?) { changeFontSize(of: focusedFontArea, by: nil) }
+    @objc func editorFontBigger(_ sender: Any?) { changeFontSize(of: .editor, by: 1) }
+    @objc func editorFontSmaller(_ sender: Any?) { changeFontSize(of: .editor, by: -1) }
+    @objc func editorFontReset(_ sender: Any?) { changeFontSize(of: .editor, by: nil) }
+    @objc func sidebarFontBigger(_ sender: Any?) { changeFontSize(of: .sidebar, by: 1) }
+    @objc func sidebarFontSmaller(_ sender: Any?) { changeFontSize(of: .sidebar, by: -1) }
+    @objc func sidebarFontReset(_ sender: Any?) { changeFontSize(of: .sidebar, by: nil) }
+    @objc func terminalFontBigger(_ sender: Any?) { changeFontSize(of: .terminal, by: 1) }
+    @objc func terminalFontSmaller(_ sender: Any?) { changeFontSize(of: .terminal, by: -1) }
+    @objc func terminalFontReset(_ sender: Any?) { changeFontSize(of: .terminal, by: nil) }
+
+    /// The terminal or the sidebar when the keyboard is in them, else the editor.
+    private var focusedFontArea: FontArea {
+        guard let focused = window?.firstResponder as? NSView else { return .editor }
+        if editor.terminalContains(focused) { return .terminal }
+        if focused.isDescendant(of: sidebar.view) { return .sidebar }
+        return .editor
+    }
+
+    /// nil resets the area to its default size.
+    func changeFontSize(of area: FontArea, by delta: CGFloat?) {
+        Theme.setFontSize(delta.map { Theme.fontSize(for: area) + $0 }, for: area)
+        switch area {
+        case .editor:
+            editor.applyEditorFontSize()
+            // A terminal that follows the editor's size (never set on its own) follows it now too.
+            editor.applyTerminalFontSize()
+        case .sidebar: sidebar.applyFontSize()
+        case .terminal: editor.applyTerminalFontSize()
+        }
+        let size = Theme.fontSize(for: area)
+        let points = size == size.rounded() ? String(Int(size)) : String(format: "%.1f", size)
+        editor.statusBar.showMessage("\(area.title) font: \(points) pt", isWarning: false, duration: 2)
+    }
+
+    // MARK: Welcome and appearance
+
+    @objc func showWelcome(_ sender: Any?) { editor.openSpecial(.welcome) }
+
+    /// At launch: the first time Pulse opens with nothing to show, and every
+    /// launch when "Show on launch" is ticked, unless Pulse was launched to
+    /// open specific files (`pulse file.swift`, Finder): those stay in front.
+    func showWelcomeIfNeeded(launchedWithFiles: Bool = false) {
+        let defaults = UserDefaults.standard
+        let firstLaunch = !defaults.bool(forKey: "welcomeShown")
+        defaults.set(true, forKey: "welcomeShown")
+        let isEmpty = root == nil && editor.documents.isEmpty
+        if (firstLaunch && isEmpty) || (WelcomeController.showsOnLaunch && !launchedWithFiles) {
+            editor.openSpecial(.welcome)
+        }
+    }
+
+    @objc func useAutoAppearance(_ sender: Any?) { AppAppearance.current = .auto }
+    @objc func useLightAppearance(_ sender: Any?) { AppAppearance.current = .light }
+    @objc func useDarkAppearance(_ sender: Any?) { AppAppearance.current = .dark }
     @objc func toggleWordWrap(_ sender: Any?) { editor.toggleWrap() }
 
     @objc func toggleAutosave(_ sender: Any?) {
@@ -456,6 +523,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             return true
         case #selector(toggleTerminal(_:)):
             menuItem.title = editor.isTerminalVisible ? "Hide Terminal" : "Show Terminal"
+            return true
+        case #selector(useAutoAppearance(_:)):
+            menuItem.state = AppAppearance.current == .auto ? .on : .off
+            return true
+        case #selector(useLightAppearance(_:)):
+            menuItem.state = AppAppearance.current == .light ? .on : .off
+            return true
+        case #selector(useDarkAppearance(_:)):
+            menuItem.state = AppAppearance.current == .dark ? .on : .off
             return true
         case #selector(saveDocument(_:)), #selector(saveDocumentAs(_:)), #selector(toggleComment(_:)),
              #selector(indentLines(_:)), #selector(outdentLines(_:)), #selector(showGoToLine(_:)),
@@ -504,6 +580,19 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("View: Zoom In", #selector(zoomIn(_:))),
             command("View: Zoom Out", #selector(zoomOut(_:))),
             command("View: Reset Zoom", #selector(resetZoom(_:))),
+            command("Editor: Bigger Font", #selector(editorFontBigger(_:))),
+            command("Editor: Smaller Font", #selector(editorFontSmaller(_:))),
+            command("Editor: Reset Font Size", #selector(editorFontReset(_:))),
+            command("Sidebar: Bigger Font", #selector(sidebarFontBigger(_:))),
+            command("Sidebar: Smaller Font", #selector(sidebarFontSmaller(_:))),
+            command("Sidebar: Reset Font Size", #selector(sidebarFontReset(_:))),
+            command("Terminal: Bigger Font", #selector(terminalFontBigger(_:))),
+            command("Terminal: Smaller Font", #selector(terminalFontSmaller(_:))),
+            command("Terminal: Reset Font Size", #selector(terminalFontReset(_:))),
+            command("Preferences: Appearance: Auto", #selector(useAutoAppearance(_:))),
+            command("Preferences: Appearance: Light", #selector(useLightAppearance(_:))),
+            command("Preferences: Appearance: Dark", #selector(useDarkAppearance(_:))),
+            command("Help: Welcome", #selector(showWelcome(_:))),
             command("Terminal: Toggle Terminal", #selector(toggleTerminal(_:))),
             command("Terminal: Kill Terminal", #selector(killTerminal(_:))),
             command("Preferences: Open Keyboard Shortcuts", #selector(openKeyboardShortcuts(_:))),

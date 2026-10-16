@@ -183,6 +183,14 @@ final class SourceControlPanel: NSViewController, NSOutlineViewDataSource, NSOut
 
     // MARK: Outline
 
+    /// View › Font Size › Sidebar: new row heights, rows redrawn in place.
+    func applyFontSize() {
+        guard isViewLoaded else { return }
+        let rows = IndexSet(integersIn: 0..<outline.numberOfRows)
+        outline.noteHeightOfRows(withIndexesChanged: rows)
+        outline.reloadData(forRowIndexes: rows, columnIndexes: IndexSet(integer: 0))
+    }
+
     func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
         if item == nil { return sections.count }
         return (item as? ChangeSection)?.items.count ?? 0
@@ -197,14 +205,15 @@ final class SourceControlPanel: NSViewController, NSOutlineViewDataSource, NSOut
         item is ChangeSection
     }
 
-    func outlineView(_ outlineView: NSOutlineView, heightOfRowByItem item: Any) -> CGFloat { 22 }
+    func outlineView(_ outlineView: NSOutlineView, heightOfRowByItem item: Any) -> CGFloat { Theme.sidebarRowHeight() }
 
     func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
         let id = NSUserInterfaceItemIdentifier("ChangeRow")
         let cell = outlineView.makeView(withIdentifier: id, owner: self) as? ChangeCell ?? ChangeCell(id)
+        cell.badge.font = .monospacedSystemFont(ofSize: Theme.fontSize(for: .sidebar) - 2, weight: .semibold)
         if let section = item as? ChangeSection {
             cell.textField?.attributedStringValue = NSAttributedString(string: section.title, attributes: [
-                .font: NSFont.systemFont(ofSize: 11, weight: .semibold), .foregroundColor: NSColor.secondaryLabelColor,
+                .font: Theme.sidebarFont(offset: -2, weight: .semibold), .foregroundColor: NSColor.secondaryLabelColor,
             ])
             cell.badge.stringValue = "\(section.items.count)"
             cell.badge.textColor = .secondaryLabelColor
@@ -217,14 +226,14 @@ final class SourceControlPanel: NSViewController, NSOutlineViewDataSource, NSOut
             let change = item.change
             let deleted = change.kind == .deleted
             var nameAttributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 12), .foregroundColor: SourceControlPanel.color(for: change.kind),
+                .font: Theme.sidebarFont(offset: -1), .foregroundColor: SourceControlPanel.color(for: change.kind),
             ]
             if deleted { nameAttributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
             let title = NSMutableAttributedString(string: (change.path as NSString).lastPathComponent, attributes: nameAttributes)
             let folder = (change.path as NSString).deletingLastPathComponent
             if !folder.isEmpty {
                 title.append(NSAttributedString(string: "  " + folder, attributes: [
-                    .font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor,
+                    .font: Theme.sidebarFont(offset: -2), .foregroundColor: NSColor.secondaryLabelColor,
                 ]))
             }
             cell.textField?.attributedStringValue = title

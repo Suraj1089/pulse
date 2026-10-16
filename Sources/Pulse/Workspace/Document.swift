@@ -23,10 +23,12 @@ final class Document {
     /// Tabs that show a view instead of text, like VS Code's settings editors.
     enum Special: String, Codable {
         case keyboardShortcuts
+        case welcome
 
         var title: String {
             switch self {
             case .keyboardShortcuts: return "Keyboard Shortcuts"
+            case .welcome: return "Welcome"
             }
         }
     }

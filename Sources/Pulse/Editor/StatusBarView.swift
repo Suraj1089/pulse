@@ -64,14 +64,14 @@ final class StatusBarView: NSView {
     }
 
     /// A message without a dialog: a problem such as a bad keybindings.json
-    /// (orange, stays until cleared), or a note that clears itself.
-    func showMessage(_ text: String?, isWarning: Bool = true) {
+    /// (orange, stays until cleared), or a note that clears itself after `duration`.
+    func showMessage(_ text: String?, isWarning: Bool = true, duration: TimeInterval = 10) {
         message.stringValue = text ?? ""
         message.toolTip = text
         message.isHidden = text == nil
         message.textColor = isWarning ? .systemOrange : .secondaryLabelColor
         if let text, !isWarning {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
                 if self?.message.stringValue == text { self?.showMessage(nil) }
             }
         }

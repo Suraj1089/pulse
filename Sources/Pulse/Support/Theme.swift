@@ -3,23 +3,49 @@ import AppKit
 /// Colors and fonts. Every color is dynamic so light/dark switches need no
 /// re-highlighting: temporary attributes resolve the color at draw time.
 enum Theme {
-    static let defaultFontSize: CGFloat = 13
-    static let minFontSize: CGFloat = 9
-    static let maxFontSize: CGFloat = 28
-
+    /// The editor's size; the sidebar and terminal have their own (FontArea).
     static var fontSize: CGFloat {
-        get {
-            let stored = UserDefaults.standard.double(forKey: "editorFontSize")
-            return stored > 0 ? CGFloat(stored) : defaultFontSize
-        }
-        set {
-            let clamped = min(max(newValue, minFontSize), maxFontSize)
-            UserDefaults.standard.set(Double(clamped), forKey: "editorFontSize")
+        get { fontSize(for: .editor) }
+        set { setFontSize(newValue, for: .editor) }
+    }
+
+    static func fontSize(for area: FontArea) -> CGFloat {
+        let stored = UserDefaults.standard.double(forKey: area.defaultsKey)
+        guard stored > 0 else { return area.defaultSize }
+        return min(max(CGFloat(stored), area.range.lowerBound), area.range.upperBound)
+    }
+
+    /// nil resets the area to its default.
+    static func setFontSize(_ size: CGFloat?, for area: FontArea) {
+        if let size {
+            let clamped = min(max(size, area.range.lowerBound), area.range.upperBound)
+            UserDefaults.standard.set(Double(clamped), forKey: area.defaultsKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: area.defaultsKey)
         }
     }
 
     static var editorFont: NSFont {
         NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+    }
+
+    static var terminalFont: NSFont {
+        NSFont.monospacedSystemFont(ofSize: fontSize(for: .terminal), weight: .regular)
+    }
+
+    /// Sidebar rows (file tree, search results, changes); `offset` keeps the
+    /// smaller secondary text in proportion.
+    static func sidebarFont(offset: CGFloat = 0, weight: NSFont.Weight = .regular) -> NSFont {
+        .systemFont(ofSize: fontSize(for: .sidebar) + offset, weight: weight)
+    }
+
+    static func sidebarMonospacedFont(offset: CGFloat = 0) -> NSFont {
+        .monospacedSystemFont(ofSize: fontSize(for: .sidebar) + offset, weight: .regular)
+    }
+
+    /// 22 pt for the default 13 pt text.
+    static func sidebarRowHeight(offset: CGFloat = 0) -> CGFloat {
+        (fontSize(for: .sidebar) + offset + 9).rounded()
     }
 
     static var gutterFont: NSFont {
@@ -65,6 +91,50 @@ enum Theme {
         case .type: return type
         case .number: return number
         case .attribute: return attribute
+        }
+    }
+}
+
+/// Parts of the window with their own font size (View › Font Size).
+enum FontArea: String, CaseIterable {
+    case editor, sidebar, terminal
+
+    var title: String { rawValue.capitalized }
+
+    fileprivate var defaultsKey: String { rawValue + "FontSize" }
+
+    var range: ClosedRange<CGFloat> { self == .sidebar ? 10...20 : 9...28 }
+
+    var defaultSize: CGFloat {
+        switch self {
+        case .editor, .sidebar: return 13
+        // Until set on its own, the terminal stays a point under the editor.
+        case .terminal: return max(Theme.fontSize(for: .editor) - 1, 10)
+        }
+    }
+}
+
+/// Light, dark, or following macOS (Auto). Applied to the whole app; every
+/// color is dynamic, so open views update without a relaunch.
+enum AppAppearance: String, CaseIterable {
+    case auto, light, dark
+
+    var title: String { rawValue.capitalized }
+
+    static var current: AppAppearance {
+        get { UserDefaults.standard.string(forKey: "appearance").flatMap(AppAppearance.init) ?? .auto }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: "appearance")
+            newValue.apply()
+            NotificationCenter.default.post(name: .settingsDidChange, object: nil)
+        }
+    }
+
+    func apply() {
+        switch self {
+        case .auto: NSApp.appearance = nil
+        case .light: NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
         }
     }
 }

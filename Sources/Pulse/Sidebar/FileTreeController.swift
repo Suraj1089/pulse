@@ -38,7 +38,7 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
         // a glass background and draws a black selection without one).
         outline.style = .plain
         outline.backgroundColor = .clear
-        outline.rowHeight = 22
+        outline.rowHeight = Theme.sidebarRowHeight()
         outline.indentationPerLevel = 10
         outline.autoresizesOutlineColumn = false
         outline.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
@@ -69,6 +69,14 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
             scroll.bottomAnchor.constraint(equalTo: container.bottomAnchor),
         ])
         view = container
+    }
+
+    /// View › Font Size › Sidebar: taller rows, and the visible ones redrawn
+    /// in place so expanded folders stay expanded.
+    func applyFontSize() {
+        guard isViewLoaded else { return }
+        outline.rowHeight = Theme.sidebarRowHeight()
+        outline.reloadData(forRowIndexes: IndexSet(integersIn: 0..<outline.numberOfRows), columnIndexes: IndexSet(integer: 0))
     }
 
     func setRoot(_ url: URL?) {
@@ -128,6 +136,8 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
         guard let node = item as? FileNode else { return nil }
         let cell = outlineView.makeView(withIdentifier: cellID, owner: self) as? NSTableCellView ?? makeCell()
         cell.textField?.stringValue = node.name
+        cell.textField?.font = Theme.sidebarFont()
+        cell.imageView?.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: Theme.fontSize(for: .sidebar) - 1, weight: .regular)
         cell.imageView?.image = NSImage(
             systemSymbolName: node.isDirectory ? "folder" : "doc",
             accessibilityDescription: nil
@@ -140,10 +150,8 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
         let cell = NSTableCellView()
         cell.identifier = cellID
         let image = NSImageView()
-        image.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
         image.translatesAutoresizingMaskIntoConstraints = false
         let text = NSTextField(labelWithString: "")
-        text.font = .systemFont(ofSize: 13)
         text.lineBreakMode = .byTruncatingMiddle
         text.translatesAutoresizingMaskIntoConstraints = false
         cell.addSubview(image)

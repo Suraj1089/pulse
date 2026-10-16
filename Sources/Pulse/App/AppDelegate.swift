@@ -9,7 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch ProcessInfo.processInfo.environment["PULSE_APPEARANCE"] {
         case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
         case "light": NSApp.appearance = NSAppearance(named: .aqua)
-        default: break
+        default: AppAppearance.current.apply()
         }
         NSApp.mainMenu = MainMenu.build()
         let controller = MainWindowController()
@@ -20,10 +20,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let arguments = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }
         let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         pendingURLs += arguments.map { URL(fileURLWithPath: $0, relativeTo: cwd).standardizedFileURL }
-        if !pendingURLs.isEmpty {
+        let launchedWithFiles = !pendingURLs.isEmpty
+        if launchedWithFiles {
             controller.open(pendingURLs)
             pendingURLs = []
         }
+        controller.showWelcomeIfNeeded(launchedWithFiles: launchedWithFiles)
 
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
