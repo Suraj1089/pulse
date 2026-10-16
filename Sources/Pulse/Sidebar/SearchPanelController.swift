@@ -11,6 +11,9 @@ private final class MatchItem: NSObject {
     }
 }
 
+/// Project search, like VS Code's: the query, match case, and behind "…" the
+/// files to include and exclude (built the first time they are shown, and
+/// applied only while shown).
 final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NSOutlineViewDelegate {
     var onOpenMatch: ((URL, SearchMatch) -> Void)?
     var root: URL?
@@ -18,7 +21,12 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
 
     private let field = NSSearchField()
     private let caseButton = NSButton(title: "Aa", target: nil, action: nil)
+    private let detailsButton = NSButton()
+    private var details: NSStackView?
+    private var includeField: NSTextField?
+    private var excludeField: NSTextField?
     private let summary = NSTextField(labelWithString: "")
+    private var summaryTop: NSLayoutConstraint!
     private let outline = NSOutlineView()
     private let scroll = NSScrollView()
     private let search = ProjectSearch()
@@ -53,6 +61,14 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
         caseButton.action = #selector(runSearch)
         caseButton.translatesAutoresizingMaskIntoConstraints = false
 
+        detailsButton.image = NSImage(systemSymbolName: "ellipsis", accessibilityDescription: "Toggle search details")
+        detailsButton.isBordered = false
+        detailsButton.contentTintColor = .secondaryLabelColor
+        detailsButton.toolTip = "Toggle search details"
+        detailsButton.target = self
+        detailsButton.action = #selector(toggleDetails)
+        detailsButton.translatesAutoresizingMaskIntoConstraints = false
+
         summary.font = .systemFont(ofSize: 11)
         summary.textColor = .secondaryLabelColor
         summary.translatesAutoresizingMaskIntoConstraints = false
@@ -78,7 +94,9 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
         scroll.drawsBackground = false
         scroll.translatesAutoresizingMaskIntoConstraints = false
 
-        [field, caseButton, summary, scroll].forEach(container.addSubview)
+        [field, caseButton, detailsButton, summary, scroll].forEach(container.addSubview)
+        let summaryTop = summary.topAnchor.constraint(equalTo: detailsButton.bottomAnchor, constant: 2)
+        self.summaryTop = summaryTop
         NSLayoutConstraint.activate([
             field.topAnchor.constraint(equalTo: container.topAnchor, constant: 4),
             field.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
@@ -86,7 +104,11 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
             caseButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
             caseButton.centerYAnchor.constraint(equalTo: field.centerYAnchor),
             caseButton.widthAnchor.constraint(equalToConstant: 30),
-            summary.topAnchor.constraint(equalTo: field.bottomAnchor, constant: 8),
+            detailsButton.topAnchor.constraint(equalTo: field.bottomAnchor, constant: 2),
+            detailsButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
+            detailsButton.widthAnchor.constraint(equalToConstant: 30),
+            detailsButton.heightAnchor.constraint(equalToConstant: 16),
+            summaryTop,
             summary.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
             summary.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -12),
             scroll.topAnchor.constraint(equalTo: summary.bottomAnchor, constant: 6),
@@ -122,11 +144,82 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
         outline.reloadData()
     }
 
+    // MARK: Files to include / exclude
+
+    /// The include and exclude patterns, while they are shown.
+    private var filter: PathFilter {
+        guard let details, !details.isHidden else { return PathFilter() }
+        return PathFilter(include: includeField?.stringValue ?? "", exclude: excludeField?.stringValue ?? "")
+    }
+
+    @objc private func toggleDetails() {
+        let show = self.details?.isHidden ?? true
+        let details = self.details ?? makeDetails()
+        details.isHidden = !show
+        summaryTop.isActive = false
+        summaryTop = summary.topAnchor.constraint(equalTo: show ? details.bottomAnchor : detailsButton.bottomAnchor,
+                                                  constant: show ? 8 : 2)
+        summaryTop.isActive = true
+        detailsButton.contentTintColor = show ? .controlAccentColor : .secondaryLabelColor
+        if show { view.window?.makeFirstResponder(includeField) }
+        // Showing or hiding patterns changes what is searched.
+        let patterns = PathFilter(include: includeField?.stringValue ?? "", exclude: excludeField?.stringValue ?? "")
+        if !field.stringValue.isEmpty, !patterns.isEmpty { runSearch() }
+    }
+
+    private func makeDetails() -> NSStackView {
+        let include = patternField(placeholder: "e.g. *.ts, src/**/include", label: "Files to include")
+        let exclude = patternField(placeholder: "e.g. *.ts, src/**/exclude", label: "Files to exclude")
+        includeField = include
+        excludeField = exclude
+        let stack = NSStackView(views: [caption("files to include"), include, caption("files to exclude"), exclude])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 3
+        stack.setCustomSpacing(8, after: include)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: detailsButton.bottomAnchor, constant: 2),
+            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
+            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
+            include.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            exclude.widthAnchor.constraint(equalTo: stack.widthAnchor),
+        ])
+        details = stack
+        return stack
+    }
+
+    private func caption(_ text: String) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.font = .systemFont(ofSize: 11)
+        label.textColor = .secondaryLabelColor
+        return label
+    }
+
+    /// Return runs the search, as in the query field.
+    private func patternField(placeholder: String, label: String) -> NSTextField {
+        let field = NSTextField(string: "")
+        field.placeholderString = placeholder
+        field.setAccessibilityLabel(label)
+        field.bezelStyle = .roundedBezel
+        field.cell?.usesSingleLineMode = true
+        field.cell?.wraps = false
+        field.cell?.isScrollable = true
+        // Not on losing focus: clicking a result would search again under it.
+        field.cell?.sendsActionOnEndEditing = false
+        field.target = self
+        field.action = #selector(runSearch)
+        return field
+    }
+
+    // MARK: Searching
+
     @objc private func runSearch() {
         let query = field.stringValue
         guard !query.isEmpty, let root, let index else { clear(); return }
         summary.stringValue = "Searching…"
-        search.run(query: query, root: root, caseSensitive: caseButton.state == .on, index: index) { [weak self] results, truncated in
+        search.run(query: query, root: root, caseSensitive: caseButton.state == .on, filter: filter, index: index) { [weak self] results, truncated in
             guard let self else { return }
             self.results = results
             self.items = [:]

@@ -33,7 +33,7 @@ Pulse is a code editor written in Swift and AppKit, with no web view, no Electro
 - **Editing**: syntax highlighting for Swift, JS/TS, Python, Go, Rust, C/C++/Obj-C, Java/Kotlin, Ruby, shell, HTML/XML, CSS, JSON, YAML, TOML, Markdown and SQL. Line numbers, current-line highlight, auto-indent, toggle comment, indent/outdent, word wrap.
 - **Breadcrumbs**: the open file's path, from the opened folder, shows under the tabs.
 - **Split editor**: View › Split Editor Right (`⌥⌘\`) or Down, or right-click a tab. Each pane has its own tabs; a file open in two panes is one text, edited in both. Nothing is created until you split, and a pane closes with its last tab.
-- **Find and replace** in the file (the standard macOS find bar), and **project search** (uses `ripgrep` when installed, otherwise a built-in scan; a block of code finds the same code however it is wrapped or indented).
+- **Find and replace** in the file (the standard macOS find bar), and **project search** (uses `ripgrep` when installed, otherwise a built-in scan; a block of code finds the same code however it is wrapped or indented). Under `…`, **files to include** and **files to exclude** take comma-separated globs as in VS Code: `*.ts`, `src` (that folder at any depth), `./src` (only the top-level one), `src/**/*.test.ts`, `*.{ts,tsx}`.
 - **Command palette**: `⌘P` go to file, `⇧⌘P` commands, `⌘L` go to line.
 - **Integrated terminal** (`` ⌃` ``) with tabs and side-by-side splits, started only when you first open it.
 - **Source Control** (`⌃⇧G`): staged and unstaged changes, with buttons to stage or unstage a file or a whole section. Click a changed file to see its diff (added and removed lines with old and new line numbers, like GitHub); double-click opens the file.

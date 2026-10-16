@@ -47,7 +47,7 @@ Sources/Pulse/
 ├── Palette/CommandPalette    Go to file / commands / go to line, fuzzy matching
 ├── Terminal/TerminalPanel    Terminal tabs (+) and side-by-side panes (split), one SwiftTerm view and shell each, created on demand
 ├── Claude/                   Claude Code's IDE connection: ClaudeBridge (lock file, MCP replies, selection) on LoopbackWebSocketServer (BSD sockets)
-├── Workspace/                Document (text + line index), FileNode, FileIndex, ProjectSearch
+├── Workspace/                Document (text + line index), FileNode, FileIndex, ProjectSearch, PathFilter (include/exclude globs)
 ├── Support/                  Theme (dynamic colors, fonts), ResourceMonitor
 └── Resources/                Info.plist (embedded via linker), AppIcon.icns
 scripts/

@@ -16,11 +16,12 @@ final class SearchTests: PulseTestCase {
         ])
     }
 
-    private func search(_ query: String, in root: URL, ripgrep: Bool, caseSensitive: Bool = false,
+    private func search(_ query: String, in root: URL, ripgrep: Bool, caseSensitive: Bool = false, filter: PathFilter = PathFilter(),
                         file: StaticString = #filePath, line: UInt = #line) -> [SearchFileResult] {
         var results: [SearchFileResult]?
         let search = ProjectSearch()
-        search.run(query: query, root: root, caseSensitive: caseSensitive, index: FileIndex(root: root), useRipgrep: ripgrep) { found, _ in
+        search.run(query: query, root: root, caseSensitive: caseSensitive, filter: filter, index: FileIndex(root: root),
+                   useRipgrep: ripgrep) { found, _ in
             results = found
         }
         wait(timeout: 10, "search results", file: file, line: line) { results != nil }
@@ -103,5 +104,82 @@ final class SearchTests: PulseTestCase {
         editor.textView.setSelectedRange(NSRange(location: 0, length: 0))
         editor.reveal(line: match.line, column: match.column, length: match.length)
         XCTAssertEqual(editor.selectedText, block, "opening the result selects the whole block")
+    }
+
+    // MARK: Files to include / exclude
+
+    func testPathFilterFollowsVSCodePatterns() {
+        let paths = ["src/a.ts", "src/a.tsx", "src/util/b.ts", "src/test/c.ts", "lib/src/d.ts", "test/e.ts", "README.md", "Docs/Guide.MD"]
+        func kept(_ include: String, _ exclude: String = "") -> [String] {
+            paths.filter(PathFilter(include: include, exclude: exclude).matches)
+        }
+        XCTAssertEqual(kept("*.ts"), ["src/a.ts", "src/util/b.ts", "src/test/c.ts", "lib/src/d.ts", "test/e.ts"], "a name matches at any depth")
+        XCTAssertEqual(kept("src"), ["src/a.ts", "src/a.tsx", "src/util/b.ts", "src/test/c.ts", "lib/src/d.ts"],
+                       "a folder takes everything in it, at any depth")
+        XCTAssertEqual(kept("./src"), ["src/a.ts", "src/a.tsx", "src/util/b.ts", "src/test/c.ts"], "./ ties it to the project folder")
+        XCTAssertEqual(kept("src/**/*.ts"), ["src/a.ts", "src/util/b.ts", "src/test/c.ts", "lib/src/d.ts"])
+        XCTAssertEqual(kept("*.{ts,tsx}", "test"), ["src/a.ts", "src/a.tsx", "src/util/b.ts", "lib/src/d.ts"],
+                       "braces are alternatives, and an exclude beats an include")
+        XCTAssertEqual(kept("*.md"), ["README.md", "Docs/Guide.MD"], "case doesn't matter")
+        XCTAssertEqual(kept("", "src, *.md"), ["test/e.ts"])
+        XCTAssertEqual(kept("*, ./"), paths, "including everything restricts nothing")
+        XCTAssertTrue(PathFilter(include: " , ", exclude: ",").isEmpty)
+        XCTAssertEqual(PathFilter.split("*.{ts,tsx}, docs ,,src"), ["*.{ts,tsx}", "docs", "src"])
+        XCTAssertEqual(PathFilter(include: "./src, a[1]", exclude: "*.md").ripgrepArguments, [
+            "--iglob", "/src", "--iglob", "/src/**", "--iglob", #"**/a\[1\]"#, "--iglob", #"**/a\[1\]/**"#,
+            "--iglob", "!**/*.md", "--iglob", "!**/*.md/**",
+        ], "includes first: ripgrep lets the last matching glob win")
+    }
+
+    func testIncludeAndExcludeLimitTheSearch() throws {
+        let root = try makeFolder(files: [
+            "src/app.ts": "let needle = 1\n",
+            "src/app.test.ts": "let needle = 2\n",
+            "src/vendor/lib.ts": "let needle = 3\n",
+            "docs/notes.md": "let needle\n",
+        ])
+        for ripgrep in modes {
+            let lines = search("needle", in: root, ripgrep: ripgrep, filter: PathFilter(include: "src", exclude: "vendor, *.test.ts"))
+            XCTAssertEqual(lines.map(\.relativePath), ["src/app.ts"], "ripgrep=\(ripgrep)")
+            let blocks = search("let needle", in: root, ripgrep: ripgrep, filter: PathFilter(include: "*.ts", exclude: "./src/vendor"))
+            XCTAssertEqual(Set(blocks.map(\.relativePath)), ["src/app.ts", "src/app.test.ts"], "multi-word search too (ripgrep=\(ripgrep))")
+        }
+    }
+
+    func testSearchDetailsShowIncludeAndExcludeFields() throws {
+        let root = try makeFolder(files: [
+            "src/app.ts": "needle\n",
+            "src/app.test.ts": "needle\n",
+            "docs/notes.md": "needle\n",
+        ])
+        let controller = makeController(opening: [root])
+        controller.findInProject(nil)
+        layout(controller)
+        func patternField(_ label: String) -> NSTextField? {
+            views(NSTextField.self, in: controller).first { $0.accessibilityLabel() == label }
+        }
+        XCTAssertNil(patternField("Files to include"), "built the first time they are shown")
+
+        let toggle = try XCTUnwrap(views(NSButton.self, in: controller).first { $0.toolTip == "Toggle search details" })
+        toggle.performClick(nil)
+        layout(controller)
+        let include = try XCTUnwrap(patternField("Files to include"))
+        let exclude = try XCTUnwrap(patternField("Files to exclude"))
+        XCTAssertGreaterThan(include.frame.width, 100, "the fields span the sidebar")
+
+        let query = try XCTUnwrap(views(NSSearchField.self, in: controller).first { $0.placeholderString == "Search project" })
+        let results = try XCTUnwrap(outline("Search results", in: controller))
+        func files() -> [String] {
+            (0..<results.numberOfRows).compactMap { (results.item(atRow: $0) as? SearchFileResult)?.relativePath }.sorted()
+        }
+        controller.window?.makeFirstResponder(nil)  // showing the fields focused the include field; end that edit
+        query.stringValue = "needle"
+        include.stringValue = "src"
+        exclude.stringValue = "*.test.ts"
+        include.sendAction(include.action, to: include.target)  // Return in the field
+        wait(timeout: 10, "filtered results") { files() == ["src/app.ts"] }
+
+        toggle.performClick(nil)
+        wait(timeout: 10, "hidden patterns no longer apply") { files() == ["docs/notes.md", "src/app.test.ts", "src/app.ts"] }
     }
 }
