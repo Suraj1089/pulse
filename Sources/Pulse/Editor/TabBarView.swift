@@ -13,13 +13,17 @@ final class TabBarView: NSView {
 
     var onSelect: ((Int) -> Void)?
     var onClose: ((Int) -> Void)?
+    /// The right-click menu for a tab (Split Right, Split Down, Close…).
+    var menuForTab: ((Int) -> NSMenu?)?
 
     private var items: [TabItemView] = []
 
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { true }
 
-    func update(tabs: [TabInfo], selected: Int?) {
+    /// `isActive`: false for a split pane without focus, whose selected tab
+    /// is then drawn like the others.
+    func update(tabs: [TabInfo], selected: Int?, isActive: Bool = true) {
         while items.count > tabs.count { items.removeLast().removeFromSuperview() }
         while items.count < tabs.count {
             let item = TabItemView()
@@ -28,7 +32,7 @@ final class TabBarView: NSView {
             items.append(item)
         }
         for (index, tab) in tabs.enumerated() {
-            items[index].configure(tab: tab, index: index, selected: index == selected)
+            items[index].configure(tab: tab, index: index, selected: index == selected, current: isActive)
         }
         needsLayout = true
         needsDisplay = true
@@ -85,12 +89,12 @@ final class TabItemView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    func configure(tab: TabInfo, index: Int, selected: Bool) {
+    func configure(tab: TabInfo, index: Int, selected: Bool, current: Bool = true) {
         self.index = index
         self.selected = selected
         self.dirty = tab.isDirty
         label.stringValue = tab.title
-        label.textColor = selected ? .labelColor : .secondaryLabelColor
+        label.textColor = selected && current ? .labelColor : .secondaryLabelColor
         toolTip = tab.tooltip
         setAccessibilityLabel(tab.title + (tab.isDirty ? ", edited" : ""))
         setAccessibilityValue(selected)
@@ -144,6 +148,10 @@ final class TabItemView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         bar?.onSelect?(index)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        bar?.menuForTab?(index)
     }
 
     override func otherMouseDown(with event: NSEvent) {

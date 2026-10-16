@@ -5,6 +5,14 @@ import AppKit
 final class CodeTextView: NSTextView {
     var indentWidth = 4
     var lineComment: String?
+    /// Took keyboard focus: its pane becomes the one commands go to.
+    var onFocus: (() -> Void)?
+
+    override func becomeFirstResponder() -> Bool {
+        let became = super.becomeFirstResponder()
+        if became { onFocus?() }
+        return became
+    }
 
     private var indentUnit: String { String(repeating: " ", count: indentWidth) }
     private var nsText: NSString { string as NSString }

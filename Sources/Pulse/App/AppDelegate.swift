@@ -31,6 +31,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         windows.front?.installCommandLineToolIfNeeded()
 
+        // Used by scripts/memory-check.sh to measure a split editor.
+        if ProcessInfo.processInfo.environment["PULSE_SPLIT_EDITOR"] == "1" {
+            windows.front?.editor.splitEditor(.right)
+        }
         // Used by scripts/memory-check.sh to measure the terminal scenario.
         if ProcessInfo.processInfo.environment["PULSE_OPEN_TERMINAL"] == "1" {
             windows.front?.editor.showTerminal()

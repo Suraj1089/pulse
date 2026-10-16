@@ -32,6 +32,7 @@ Pulse is a code editor written in Swift and AppKit, with no web view, no Electro
 - **Windows**: each folder opens in its own window (`pulse <folder>`, Finder, File › Open), like VS Code; opening a folder that is already open brings its window forward. ⇧⌘N opens an empty window. All windows come back after a restart.
 - **Editing**: syntax highlighting for Swift, JS/TS, Python, Go, Rust, C/C++/Obj-C, Java/Kotlin, Ruby, shell, HTML/XML, CSS, JSON, YAML, TOML, Markdown and SQL. Line numbers, current-line highlight, auto-indent, toggle comment, indent/outdent, word wrap.
 - **Breadcrumbs**: the open file's path, from the opened folder, shows under the tabs.
+- **Split editor**: View › Split Editor Right (`⌥⌘\`) or Down, or right-click a tab. Each pane has its own tabs; a file open in two panes is one text, edited in both. Nothing is created until you split, and a pane closes with its last tab.
 - **Find and replace** in the file (the standard macOS find bar), and **project search** (uses `ripgrep` when installed, otherwise a built-in scan; a block of code finds the same code however it is wrapped or indented).
 - **Command palette**: `⌘P` go to file, `⇧⌘P` commands, `⌘L` go to line.
 - **Integrated terminal** (`` ⌃` ``), started only when you first open it.
@@ -77,6 +78,7 @@ Pulse checks for a new release once a day and shows an **Update** button at the 
 | `` ⌃` `` | Show or hide the terminal |
 | `⌃⇧`` ` | New terminal (in the open folder) |
 | `⌘\` | Split terminal (side by side) |
+| `⌥⌘\` | Split the editor right (Split Down is in View and the tab menu) |
 | `⇧⌘K` | Send the selection to Claude Code (`@file#L5-9` in its prompt) |
 | `⌘/` | Toggle line comment |
 | `⌘]` / `⌘[` | Indent / outdent |
