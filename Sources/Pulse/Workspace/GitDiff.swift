@@ -159,7 +159,9 @@ final class GitDiffLoader {
 
     func cancel() {
         generation += 1
-        process?.terminate()
+        // The process starts on a background queue, so it may not be running
+        // yet; terminate() on a process that never started throws.
+        if process?.isRunning == true { process?.terminate() }
         process = nil
     }
 

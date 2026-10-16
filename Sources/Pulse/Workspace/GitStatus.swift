@@ -56,7 +56,9 @@ final class GitStatus {
 
     func cancel() {
         generation += 1
-        process?.terminate()
+        // Started on a background queue, so it may not be running yet;
+        // terminate() on a process that never started throws.
+        if process?.isRunning == true { process?.terminate() }
         process = nil
     }
 
