@@ -71,7 +71,23 @@ main() {
     open "$INSTALL_DIR/$APP_NAME"
 
     printf '\n%sPulse%s is installed in %s.%s\n' "$BOLD$GREEN" "${version:+ $version}" "$INSTALL_DIR" "$RESET" >&2
-    printf 'Open a folder from Terminal with: %sopen -a Pulse .%s\n' "$BOLD" "$RESET" >&2
+
+    # On its first launch Pulse links the `pulse` command into a folder on
+    # your PATH (when that needs no password); give it a moment to appear.
+    local found=""
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        hash -r
+        if command -v pulse >/dev/null 2>&1; then found=1; break; fi
+        sleep 0.5
+    done
+    if [ -n "$found" ]; then
+        printf 'Open a folder from Terminal with: %spulse .%s\n' "$BOLD" "$RESET" >&2
+        info "In a new terminal tab (or run \`rehash\` in this one)"
+    else
+        printf 'To open folders from Terminal with %spulse .%s, choose %sPulse > Install '"'"'pulse'"'"' Command%s in the app.\n' \
+            "$BOLD" "$RESET" "$BOLD" "$RESET" >&2
+        info "Until then, this works too: open -a Pulse ."
+    fi
 }
 
 main "$@"
