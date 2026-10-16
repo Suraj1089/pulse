@@ -1,14 +1,17 @@
 import AppKit
 
-/// Tabs, the one text view, the terminal split and the status bar.
+/// The editor panes (tabs and a text view each), the terminal split and the
+/// status bar.
 ///
-/// Memory design: there is exactly one `CodeTextView` and one layout
-/// manager. Switching tabs swaps the layout manager onto another document's
-/// text storage, so each extra open file costs roughly its own text.
+/// Memory design: a window starts with one `EditorPane`, which has one text
+/// view and one layout manager; switching tabs moves that layout manager
+/// onto another document's text storage, so each extra open file costs
+/// roughly its own text. Split Editor Right / Down adds a pane only when
+/// asked; the same file in two panes shares its storage (see EditorPane).
 final class EditorViewController: NSViewController, NSTextViewDelegate {
-    /// Large but finite. `CGFloat.greatestFiniteMagnitude` makes every line
-    /// fragment ~1e308 pt wide, which breaks glyph drawing.
-    private static let unbounded: CGFloat = 10_000_000
+    enum SplitDirection {
+        case right, down
+    }
 
     var onActiveDocumentChange: ((Document?) -> Void)?
     var onSessionChange: (() -> Void)?
@@ -16,41 +19,45 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     var onOpenRequest: (() -> Void)?
     var onOpenRecent: ((URL) -> Void)?
 
-    private(set) var documents: [Document] = []
-    private(set) var activeIndex: Int?
-    var activeDocument: Document? { activeIndex.map { documents[$0] } }
+    /// The panes in reading order. One until the editor is split.
+    private(set) var panes: [EditorPane] = []
+    /// The pane commands go to: the last one focused.
+    private(set) var activePane: EditorPane!
+
+    /// Every open document once, pane by pane (for the session, saving, Claude Code).
+    var documents: [Document] {
+        var seen = Set<ObjectIdentifier>()
+        return panes.flatMap(\.documents).filter { seen.insert(ObjectIdentifier($0)).inserted }
+    }
+    var activeDocument: Document? { activePane?.activeDocument }
+    /// The active pane's text view.
+    var textView: CodeTextView! { activePane?.textView }
+    /// The active pane's path bar.
+    var breadcrumbs: BreadcrumbBar { activePane.breadcrumbs }
     var terminalDirectory: URL?
     /// The window's opened folder, for the breadcrumb path (and Claude Code's `/ide` list).
     var projectRoot: URL? {
         didSet {
             claude.workspaceFolders = projectRoot.map { [$0] } ?? []
-            if isViewLoaded { refreshBreadcrumbs() }
+            if isViewLoaded { panes.forEach(refreshBreadcrumbs) }
         }
     }
     /// Claude Code's IDE connection for this window: started with its first
     /// terminal, it shares the file and selection with `claude` (see ClaudeBridge).
     let claude = ClaudeBridge()
-    let breadcrumbs = BreadcrumbBar()
-    private var breadcrumbHeight: NSLayoutConstraint!
 
     let statusBar = StatusBarView()
-    private let tabBar = TabBarView()
     private let split = NSSplitView()
-    private let editorArea = NSView()
-    private let scrollView = EditorScrollView()
-    private let layoutManager = NSLayoutManager()
-    private let textContainer = NSTextContainer(size: NSSize(width: EditorViewController.unbounded, height: EditorViewController.unbounded))
-    private let emptyStorage = NSTextStorage()
-    private(set) var textView: CodeTextView!
-    private var ruler: LineNumberRuler!
+    /// Holds the panes: one pane, or split views of them (nested for a grid).
+    private let paneArea = NSView()
     private let emptyState = EmptyStateView()
     private let terminal = TerminalPanel()
     /// Views of the open special tabs, one per kind: built when first shown,
     /// kept while the tab is open (so switching keeps their state), dropped
-    /// when the tab closes. Only the active one is in the view hierarchy.
+    /// when the tab closes. Only the shown ones are in the view hierarchy;
+    /// a special tab is in one pane at a time.
     private var specialControllers: [Document.Special: NSViewController] = [:]
     private let highlighter = SyntaxHighlighter()
-    private var highlightWork: DispatchWorkItem?
     private var autosaveWork: DispatchWorkItem?
 
     var isTerminalVisible: Bool { terminal.superview != nil }
@@ -73,66 +80,35 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     override func loadView() {
         let root = NSView()
 
-        layoutManager.allowsNonContiguousLayout = true
-        layoutManager.addTextContainer(textContainer)
-        emptyStorage.addLayoutManager(layoutManager)
+        let pane = makePane()
+        panes = [pane]
+        activePane = pane
+        placeAtRoot(pane)
 
-        let textView = CodeTextView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), textContainer: textContainer)
-        configure(textView)
-        self.textView = textView
-
-        scrollView.documentView = textView
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = true
-        scrollView.autohidesScrollers = true
-        scrollView.borderType = .noBorder
-        scrollView.drawsBackground = true
-        scrollView.backgroundColor = Theme.editorBackground
-        scrollView.findBarPosition = .aboveContent
-        scrollView.frame = editorArea.bounds
-        scrollView.autoresizingMask = [.width, .height]
-        editorArea.addSubview(scrollView)
-
-        ruler = LineNumberRuler(textView: textView)
-        scrollView.verticalRulerView = ruler
-        scrollView.hasVerticalRuler = true
-        scrollView.rulersVisible = true
-
-        emptyState.frame = editorArea.bounds
+        emptyState.frame = pane.editorArea.bounds
         emptyState.autoresizingMask = [.width, .height]
         emptyState.onOpen = { [weak self] in self?.onOpenRequest?() }
         emptyState.onNewFile = { [weak self] in self?.newDocument() }
         emptyState.onOpenRecent = { [weak self] url in self?.onOpenRecent?(url) }
-        editorArea.addSubview(emptyState)
+        pane.editorArea.addSubview(emptyState)
 
         split.isVertical = false
         split.dividerStyle = .thin
-        split.addArrangedSubview(editorArea)
+        split.addArrangedSubview(paneArea)
 
-        tabBar.onSelect = { [weak self] index in self?.activate(index) }
         // The last shell exited (or was killed): the panel goes away.
         terminal.onEmpty = { [weak self] in self?.hideTerminal() }
         claude.host = self
         terminal.environment = { [weak self] in self?.claude.terminalEnvironment() ?? [] }
         NotificationCenter.default.addObserver(self, selector: #selector(claudeIntegrationDidChange),
                                                name: .claudeIntegrationDidChange, object: nil)
-        tabBar.onClose = { [weak self] index in _ = self?.closeDocument(at: index) }
 
-        [tabBar, breadcrumbs, split, statusBar].forEach {
+        [split, statusBar].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview($0)
         }
-        breadcrumbHeight = breadcrumbs.heightAnchor.constraint(equalToConstant: 0)
         NSLayoutConstraint.activate([
-            tabBar.topAnchor.constraint(equalTo: root.topAnchor),
-            tabBar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            tabBar.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            tabBar.heightAnchor.constraint(equalToConstant: TabBarView.height),
-            breadcrumbs.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
-            breadcrumbs.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            breadcrumbs.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            breadcrumbHeight,
-            split.topAnchor.constraint(equalTo: breadcrumbs.bottomAnchor),
+            split.topAnchor.constraint(equalTo: root.topAnchor),
             split.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             split.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             split.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
@@ -143,74 +119,74 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             root.widthAnchor.constraint(greaterThanOrEqualToConstant: 360),
         ])
         view = root
-
-        scrollView.contentView.postsBoundsChangedNotifications = true
-        NotificationCenter.default.addObserver(self, selector: #selector(didScroll),
-                                               name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
-        applyWrap()
-        refreshChrome()
+        refreshChrome(pane)
     }
 
-    private func configure(_ textView: CodeTextView) {
-        textView.minSize = .zero
-        textView.maxSize = NSSize(width: EditorViewController.unbounded, height: EditorViewController.unbounded)
-        textView.isVerticallyResizable = true
-        textView.isRichText = false
-        textView.importsGraphics = false
-        textView.allowsUndo = true
-        textView.usesFindBar = true
-        textView.isIncrementalSearchingEnabled = true
-        textView.isAutomaticQuoteSubstitutionEnabled = false
-        textView.isAutomaticDashSubstitutionEnabled = false
-        textView.isAutomaticTextReplacementEnabled = false
-        textView.isAutomaticSpellingCorrectionEnabled = false
-        textView.isAutomaticLinkDetectionEnabled = false
-        textView.isAutomaticDataDetectionEnabled = false
-        textView.isAutomaticTextCompletionEnabled = false
-        textView.isContinuousSpellCheckingEnabled = false
-        textView.isGrammarCheckingEnabled = false
-        textView.smartInsertDeleteEnabled = false
-        textView.usesFontPanel = false
-        textView.drawsBackground = true
-        textView.backgroundColor = Theme.editorBackground
-        textView.insertionPointColor = .controlAccentColor
-        textView.textContainerInset = NSSize(width: 6, height: 8)
-        textView.typingAttributes = Document.baseAttributes
-        textView.delegate = self
-        textView.setAccessibilityLabel("Editor")
+    /// A pane wired to this controller; nothing is built before a split asks.
+    private func makePane() -> EditorPane {
+        let pane = EditorPane(delegate: self)
+        pane.tabBar.onSelect = { [weak self, weak pane] index in
+            guard let self, let pane else { return }
+            self.activate(index, in: pane)
+        }
+        pane.tabBar.onClose = { [weak self, weak pane] index in
+            guard let self, let pane else { return }
+            self.closeTab(at: index, in: pane)
+        }
+        pane.tabBar.menuForTab = { [weak self, weak pane] index in
+            guard let self, let pane else { return nil }
+            return self.tabMenu(at: index, in: pane)
+        }
+        pane.textView.onFocus = { [weak self, weak pane] in
+            guard let self, let pane else { return }
+            self.focusChanged(to: pane)
+        }
+        pane.scrollView.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(didScroll(_:)),
+                                               name: NSView.boundsDidChangeNotification, object: pane.scrollView.contentView)
+        pane.applyWrap(EditorViewController.wrapLines)
+        return pane
+    }
+
+    private func owner(of textView: NSTextView) -> EditorPane? {
+        panes.first { $0.textView === textView }
+    }
+
+    /// Panes whose selected tab is `document`.
+    private func panesShowing(_ document: Document) -> [EditorPane] {
+        panes.filter { $0.activeDocument === document }
+    }
+
+    private func isOpen(_ document: Document, besides pane: EditorPane) -> Bool {
+        panes.contains { $0 !== pane && $0.documents.contains { $0 === document } }
     }
 
     // MARK: Word wrap
 
     func applyWrap() {
-        let wrap = EditorViewController.wrapLines
-        // First: the scroller change below retiles, and a tile while wrapping
-        // sizes the text view and its container (see EditorScrollView.tile).
-        scrollView.wrapsLines = wrap
-        textView.autoresizingMask = []
-        textView.isHorizontallyResizable = !wrap
-        textContainer.widthTracksTextView = wrap
-        if !wrap {
-            textContainer.containerSize = NSSize(width: EditorViewController.unbounded, height: EditorViewController.unbounded)
-        }
-        scrollView.hasHorizontalScroller = !wrap
-        scrollView.tile()
+        panes.forEach { $0.applyWrap(EditorViewController.wrapLines) }
     }
 
     func toggleWrap() {
         EditorViewController.wrapLines.toggle()
         applyWrap()
-        ruler.needsDisplay = true
+        panes.forEach { $0.ruler.needsDisplay = true }
     }
 
     // MARK: Documents
 
+    /// Opens `url` in the active pane: its tab there, the same document if
+    /// another pane has it open (one text, shared), or a new tab.
     func open(_ url: URL, select range: NSRange? = nil) {
-        if let index = documents.firstIndex(where: { $0.url?.standardizedFileURL == url.standardizedFileURL }) {
-            activate(index)
+        let target = url.standardizedFileURL
+        let pane = activePane!
+        if let index = pane.documents.firstIndex(where: { $0.url?.standardizedFileURL == target }) {
+            activate(index, in: pane)
+        } else if let document = documents.first(where: { $0.url?.standardizedFileURL == target }) {
+            add(document, to: pane, activate: true)
         } else {
             do {
-                add(try Document.open(url))
+                add(try Document.open(url), to: pane, activate: true)
             } catch {
                 _ = presentError(error)
                 return
@@ -221,8 +197,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     /// Opens (or switches to) a special tab such as Keyboard Shortcuts.
     func openSpecial(_ kind: Document.Special) {
-        if let index = documents.firstIndex(where: { $0.special == kind }) {
-            activate(index)
+        if let (pane, index) = location(where: { $0.special == kind }) {
+            activate(index, in: pane)
         } else {
             add(Document(special: kind))
         }
@@ -230,13 +206,13 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     /// Shows a changed file's diff in the diff tab, opening it if needed.
     func openDiff(_ target: GitDiffTarget) {
-        if let index = documents.firstIndex(where: { $0.special == .diff }) {
-            documents[index].diffTarget = target
-            if index == activeIndex {
+        if let (pane, index) = location(where: { $0.special == .diff }) {
+            pane.documents[index].diffTarget = target
+            if index == pane.activeIndex {
                 (specialControllers[.diff] as? DiffViewController)?.show(target)
                 refreshTabs()
             } else {
-                activate(index)
+                activate(index, in: pane)
             }
         } else {
             let document = Document(special: .diff)
@@ -245,9 +221,18 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         }
     }
 
+    /// The first pane and tab whose document matches.
+    private func location(where matches: (Document) -> Bool) -> (EditorPane, Int)? {
+        let ordered = (activePane.map { [$0] } ?? []) + panes.filter { $0 !== activePane }
+        for pane in ordered {
+            if let index = pane.documents.firstIndex(where: matches) { return (pane, index) }
+        }
+        return nil
+    }
+
     /// Re-reads the diff on screen, if any (after saving, staging or returning to Pulse).
     func reloadVisibleDiff() {
-        guard activeDocument?.special == .diff else { return }
+        guard panes.contains(where: { $0.activeDocument?.special == .diff }) else { return }
         (specialControllers[.diff] as? DiffViewController)?.reload()
     }
 
@@ -256,104 +241,136 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         view.window?.makeFirstResponder(textView)
     }
 
+    /// Adds a tab to the active pane.
     func add(_ document: Document, activate shouldActivate: Bool = true) {
+        add(document, to: activePane, activate: shouldActivate)
+    }
+
+    private func add(_ document: Document, to pane: EditorPane, activate shouldActivate: Bool) {
         document.onDirtyChange = { [weak self] in self?.refreshTabs() }
         // New tabs open next to the current one; restored tabs keep their order.
-        let position = shouldActivate ? (activeIndex.map { $0 + 1 } ?? documents.count) : documents.count
-        documents.insert(document, at: position)
-        if shouldActivate || activeIndex == nil {
-            activate(position)
-        } else if let active = activeIndex, active >= position {
-            activeIndex = active + 1
+        let position = shouldActivate ? (pane.activeIndex.map { $0 + 1 } ?? pane.documents.count) : pane.documents.count
+        pane.documents.insert(document, at: position)
+        if shouldActivate || pane.activeIndex == nil {
+            activate(position, in: pane)
+        } else if let active = pane.activeIndex, active >= position {
+            pane.activeIndex = active + 1
             refreshTabs()
         }
         onSessionChange?()
     }
 
+    /// Selects `documents[index]`: in the active pane if it is open there,
+    /// otherwise in the pane that has it.
     func activate(_ index: Int) {
-        guard documents.indices.contains(index) else { return }
-        rememberViewState()
-        activeIndex = index
-        let document = documents[index]
-        layoutManager.replaceTextStorage(document.storage)
-        textView.typingAttributes = Document.baseAttributes
-        textView.lineComment = document.language?.lineComment
-        ruler.document = document
-        ruler.updateThickness()
-        let length = document.length
-        let selection = NSRange(location: min(document.selectedRange.location, length),
-                                length: min(document.selectedRange.length, length - min(document.selectedRange.location, length)))
-        textView.setSelectedRange(selection)
-        scrollView.visibleTextOrigin = document.scrollPoint
-        textView.needsDisplay = true
-        highlightNow()
-        refreshChrome()
-        view.window?.makeFirstResponder(firstResponder(for: document))
+        let all = documents
+        guard all.indices.contains(index) else { return }
+        let document = all[index]
+        if let (pane, tab) = location(where: { $0 === document }) { activate(tab, in: pane) }
+    }
+
+    private func activate(_ index: Int, in pane: EditorPane) {
+        guard pane.documents.indices.contains(index) else { return }
+        pane.rememberViewState()
+        pane.activeIndex = index
+        let document = pane.documents[index]
+        makeActive(pane)
+        pane.show(document)
+        highlightNow(pane)
+        refreshChrome(pane)
+        view.window?.makeFirstResponder(firstResponder(for: document, in: pane))
         onActiveDocumentChange?(document)
         onSessionChange?()
         claude.selectionDidChange()
     }
 
-    private func firstResponder(for document: Document) -> NSView? {
+    private func firstResponder(for document: Document, in pane: EditorPane) -> NSView? {
         switch document.special {
-        case nil: return textView
+        case nil: return pane.textView
         case .keyboardShortcuts: return (specialControllers[.keyboardShortcuts] as? ShortcutsEditor)?.initialFirstResponder
         case .diff: return (specialControllers[.diff] as? DiffViewController)?.initialFirstResponder
         case .welcome: return nil
         }
     }
 
-    private func rememberViewState() {
-        guard let document = activeDocument else { return }
-        document.selectedRange = textView.selectedRange()
-        document.scrollPoint = scrollView.visibleTextOrigin
-    }
-
+    /// Closes `documents[index]` in every pane (asking once if it is unsaved).
     /// Returns false when the user cancelled.
     @discardableResult
     func closeDocument(at index: Int) -> Bool {
-        guard documents.indices.contains(index) else { return true }
-        let document = documents[index]
-        if document.isDirty {
-            if document.url != nil && EditorViewController.autosaveEnabled {
-                guard save(document) else { return false }
-            } else {
-                let alert = NSAlert()
-                alert.messageText = "Save changes to “\(document.displayName)”?"
-                alert.informativeText = "Your changes will be lost if you don’t save them."
-                alert.addButton(withTitle: "Save")
-                alert.addButton(withTitle: "Cancel")
-                alert.addButton(withTitle: "Don’t Save")
-                switch alert.runModal() {
-                case .alertFirstButtonReturn: guard save(document) else { return false }
-                case .alertSecondButtonReturn: return false
-                default: break
-                }
-            }
-        }
-        documents.remove(at: index)
-        if let kind = document.special, let controller = specialControllers.removeValue(forKey: kind) {
-            controller.view.removeFromSuperview()
-        }
-        if documents.isEmpty {
-            activeIndex = nil
-            layoutManager.replaceTextStorage(emptyStorage)
-            ruler.document = nil
-            refreshChrome()
-            onActiveDocumentChange?(nil)
-        } else if let active = activeIndex {
-            if index == active {
-                activeIndex = nil
-                activate(min(index, documents.count - 1))
-            } else if index < active {
-                activeIndex = active - 1
-                refreshTabs()
-            } else {
-                refreshTabs()
+        let all = documents
+        guard all.indices.contains(index) else { return true }
+        let document = all[index]
+        guard confirmClose(document) else { return false }
+        for pane in panes {
+            if let tab = pane.documents.firstIndex(where: { $0 === document }) {
+                removeTab(at: tab, from: pane, keepingDocument: false)
             }
         }
         onSessionChange?()
         return true
+    }
+
+    /// One tab of one pane (the tab's ×, ⌘W). A file still open in another
+    /// pane closes here without saving or asking.
+    @discardableResult
+    private func closeTab(at index: Int, in pane: EditorPane) -> Bool {
+        guard pane.documents.indices.contains(index) else { return true }
+        let document = pane.documents[index]
+        let elsewhere = isOpen(document, besides: pane)
+        if !elsewhere {
+            guard confirmClose(document) else { return false }
+        }
+        removeTab(at: index, from: pane, keepingDocument: elsewhere)
+        onSessionChange?()
+        return true
+    }
+
+    /// Saves or asks about an unsaved document; false when the user cancelled.
+    private func confirmClose(_ document: Document) -> Bool {
+        guard document.isDirty else { return true }
+        if document.url != nil && EditorViewController.autosaveEnabled {
+            return save(document)
+        }
+        let alert = NSAlert()
+        alert.messageText = "Save changes to “\(document.displayName)”?"
+        alert.informativeText = "Your changes will be lost if you don’t save them."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Don’t Save")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return save(document)
+        case .alertSecondButtonReturn: return false
+        default: return true
+        }
+    }
+
+    /// A pane left without tabs closes, unless it is the only one.
+    private func removeTab(at index: Int, from pane: EditorPane, keepingDocument: Bool) {
+        let document = pane.documents.remove(at: index)
+        pane.forget(document)
+        if !keepingDocument, let kind = document.special, let controller = specialControllers.removeValue(forKey: kind) {
+            controller.view.removeFromSuperview()
+        }
+        if pane.documents.isEmpty {
+            pane.activeIndex = nil
+            if panes.count > 1 {
+                removePane(pane)
+                return
+            }
+            pane.show(nil)
+            refreshChrome(pane)
+            onActiveDocumentChange?(nil)
+        } else if let active = pane.activeIndex {
+            if index == active {
+                pane.activeIndex = nil
+                activate(min(index, pane.documents.count - 1), in: pane)
+            } else if index < active {
+                pane.activeIndex = active - 1
+                refreshTabs()
+            } else {
+                refreshTabs()
+            }
+        }
     }
 
     /// Before a window that won't be restored closes: closes each unsaved
@@ -368,12 +385,193 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     func closeActive() {
-        if let index = activeIndex { closeDocument(at: index) } else { view.window?.performClose(nil) }
+        if let pane = activePane, let index = pane.activeIndex {
+            closeTab(at: index, in: pane)
+        } else {
+            view.window?.performClose(nil)
+        }
     }
 
     func selectTab(offset: Int) {
-        guard let active = activeIndex, !documents.isEmpty else { return }
-        activate((active + offset + documents.count) % documents.count)
+        guard let pane = activePane, let active = pane.activeIndex, !pane.documents.isEmpty else { return }
+        activate((active + offset + pane.documents.count) % pane.documents.count, in: pane)
+    }
+
+    // MARK: Split panes
+
+    /// The split commands need a file tab (special tabs show one view at a time).
+    var canSplitEditor: Bool {
+        activeDocument.map { $0.special == nil } ?? false
+    }
+
+    /// The active tab, opened again in a new pane to the right of (or below)
+    /// the active pane, with the same caret and scroll position.
+    func splitEditor(_ direction: SplitDirection) {
+        guard let source = activePane, let document = source.activeDocument, document.special == nil else { return }
+        source.rememberViewState()
+        let pane = makePane()
+        insert(pane, beside: source, vertical: direction == .right)
+        panes.insert(pane, at: (panes.firstIndex { $0 === source } ?? panes.count - 1) + 1)
+        pane.layoutSubtreeIfNeeded()
+        pane.adoptViewState(of: document, from: source)
+        add(document, to: pane, activate: true)
+    }
+
+    /// Next to `anchor` in its split view when that runs the same way,
+    /// otherwise in a new split view that takes `anchor`'s place.
+    private func insert(_ pane: EditorPane, beside anchor: EditorPane, vertical: Bool) {
+        if let parent = anchor.superview as? NSSplitView, parent.isVertical == vertical,
+           let index = parent.arrangedSubviews.firstIndex(of: anchor) {
+            parent.insertArrangedSubview(pane, at: index + 1)
+            equalize(parent)
+            return
+        }
+        let group = NSSplitView()
+        group.isVertical = vertical
+        group.dividerStyle = .thin
+        replace(anchor, with: group)
+        group.addArrangedSubview(anchor)
+        group.addArrangedSubview(pane)
+        equalize(group)
+    }
+
+    /// Takes a pane out; a split view left with one view is replaced by it.
+    private func removePane(_ pane: EditorPane) {
+        guard panes.count > 1, let position = panes.firstIndex(where: { $0 === pane }) else { return }
+        NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: pane.scrollView.contentView)
+        pane.detach()
+        panes.remove(at: position)
+        let parent = pane.superview as? NSSplitView
+        parent?.removeArrangedSubview(pane)
+        pane.removeFromSuperview()
+        if let parent {
+            if parent.arrangedSubviews.count == 1, let only = parent.arrangedSubviews.first {
+                parent.removeArrangedSubview(only)
+                only.removeFromSuperview()
+                replace(parent, with: only)
+            } else {
+                equalize(parent)
+            }
+        }
+        refreshTabs()
+        guard activePane === pane else { return }
+        let next = panes[max(0, position - 1)]
+        makeActive(next)
+        refreshChrome(next)
+        if let document = next.activeDocument {
+            view.window?.makeFirstResponder(firstResponder(for: document, in: next))
+        }
+        onActiveDocumentChange?(next.activeDocument)
+        claude.selectionDidChange()
+    }
+
+    private func replace(_ old: NSView, with new: NSView) {
+        if let parent = old.superview as? NSSplitView, let index = parent.arrangedSubviews.firstIndex(of: old) {
+            parent.removeArrangedSubview(old)
+            old.removeFromSuperview()
+            parent.insertArrangedSubview(new, at: index)
+            equalize(parent)
+        } else {
+            old.removeFromSuperview()
+            placeAtRoot(new)
+        }
+    }
+
+    private func placeAtRoot(_ view: NSView) {
+        view.frame = paneArea.bounds
+        view.autoresizingMask = [.width, .height]
+        paneArea.addSubview(view)
+    }
+
+    /// Gives every view in `splitView` the same share.
+    private func equalize(_ splitView: NSSplitView) {
+        splitView.adjustSubviews()
+        splitView.layoutSubtreeIfNeeded()
+        let count = splitView.arrangedSubviews.count
+        let length = splitView.isVertical ? splitView.bounds.width : splitView.bounds.height
+        guard count > 1, length > 0 else { return }
+        let share = (length - CGFloat(count - 1) * splitView.dividerThickness) / CGFloat(count)
+        for index in 0..<(count - 1) {
+            splitView.setPosition(CGFloat(index + 1) * share + CGFloat(index) * splitView.dividerThickness, ofDividerAt: index)
+        }
+    }
+
+    /// Sets the pane commands go to; its selected tab is drawn as current.
+    private func makeActive(_ pane: EditorPane) {
+        guard activePane !== pane else { return }
+        activePane = pane
+        refreshTabs()
+    }
+
+    /// A pane's text view took focus (a click, or a tab chosen there).
+    private func focusChanged(to pane: EditorPane) {
+        guard activePane !== pane, panes.contains(where: { $0 === pane }) else { return }
+        makeActive(pane)
+        updateStatus()
+        onActiveDocumentChange?(pane.activeDocument)
+        claude.selectionDidChange()
+    }
+
+    // MARK: Tab menu
+
+    private final class TabReference {
+        weak var pane: EditorPane?
+        let index: Int
+        init(pane: EditorPane, index: Int) {
+            self.pane = pane
+            self.index = index
+        }
+    }
+
+    private func tabMenu(at index: Int, in pane: EditorPane) -> NSMenu? {
+        guard pane.documents.indices.contains(index) else { return nil }
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        func addItem(_ title: String, _ action: Selector, enabled: Bool = true) {
+            let menuItem = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            menuItem.target = self
+            menuItem.representedObject = TabReference(pane: pane, index: index)
+            menuItem.isEnabled = enabled
+            menu.addItem(menuItem)
+        }
+        let isFile = pane.documents[index].special == nil
+        addItem("Split Right", #selector(splitTabRight(_:)), enabled: isFile)
+        addItem("Split Down", #selector(splitTabDown(_:)), enabled: isFile)
+        menu.addItem(.separator())
+        addItem("Close", #selector(closeTabFromMenu(_:)))
+        addItem("Close Others", #selector(closeOtherTabs(_:)), enabled: pane.documents.count > 1)
+        return menu
+    }
+
+    /// The tab a menu item was opened on, selected in its pane.
+    private func selectTab(of item: NSMenuItem) -> (EditorPane, Int)? {
+        guard let tab = item.representedObject as? TabReference, let pane = tab.pane,
+              panes.contains(where: { $0 === pane }), pane.documents.indices.contains(tab.index) else { return nil }
+        activate(tab.index, in: pane)
+        return (pane, tab.index)
+    }
+
+    @objc private func splitTabRight(_ sender: NSMenuItem) {
+        if selectTab(of: sender) != nil { splitEditor(.right) }
+    }
+
+    @objc private func splitTabDown(_ sender: NSMenuItem) {
+        if selectTab(of: sender) != nil { splitEditor(.down) }
+    }
+
+    @objc private func closeTabFromMenu(_ sender: NSMenuItem) {
+        guard let tab = sender.representedObject as? TabReference, let pane = tab.pane,
+              panes.contains(where: { $0 === pane }) else { return }
+        closeTab(at: tab.index, in: pane)
+    }
+
+    @objc private func closeOtherTabs(_ sender: NSMenuItem) {
+        guard let (pane, index) = selectTab(of: sender) else { return }
+        let kept = pane.documents[index]
+        for document in pane.documents.reversed() where document !== kept {
+            guard let tab = pane.documents.firstIndex(where: { $0 === document }) else { continue }
+            if !closeTab(at: tab, in: pane) { break }
+        }
     }
 
     // MARK: Saving
@@ -397,12 +595,13 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             _ = presentError(error)
             return false
         }
-        if document === activeDocument {
-            textView.lineComment = document.language?.lineComment
-            highlightNow()
-            refreshChrome()
-            onActiveDocumentChange?(document)
+        // A new name can mean a new language.
+        for pane in panesShowing(document) {
+            pane.textView.lineComment = document.language?.lineComment
+            highlightNow(pane)
+            refreshChrome(pane)
         }
+        if document === activeDocument { onActiveDocumentChange?(document) }
         onSessionChange?()
         onDidSave?(document)
         return true
@@ -434,18 +633,19 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     func reloadChangedDocuments() {
         for document in documents where document.reloadIfChangedOnDisk() {
-            if document === activeDocument {
-                ruler.updateThickness()
-                ruler.needsDisplay = true
-                highlightNow()
-                updateStatus()
+            for pane in panesShowing(document) {
+                pane.ruler.updateThickness()
+                pane.ruler.needsDisplay = true
+                highlightNow(pane)
             }
+            if document === activeDocument { updateStatus() }
         }
     }
 
     // MARK: Editing commands
 
     func reveal(_ range: NSRange) {
+        guard let textView else { return }
         let length = (textView.string as NSString).length
         let safe = NSRange(location: min(range.location, length), length: min(range.length, length - min(range.location, length)))
         textView.setSelectedRange(safe)
@@ -470,9 +670,11 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     /// Re-applies the editor size from Theme to every open document.
     func applyEditorFontSize() {
         documents.forEach { $0.applyFont() }
-        textView.typingAttributes = Document.baseAttributes
-        ruler.updateThickness()
-        ruler.needsDisplay = true
+        for pane in panes {
+            pane.textView.typingAttributes = Document.baseAttributes
+            pane.ruler.updateThickness()
+            pane.ruler.needsDisplay = true
+        }
         (specialControllers[.diff] as? DiffViewController)?.applyFontSize()
     }
 
@@ -550,28 +752,33 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         emptyState.setRecents(urls)
     }
 
-    private func refreshChrome() {
-        let hasDocument = activeDocument != nil
-        let special = activeDocument?.special
-        emptyState.isHidden = hasDocument
-        scrollView.isHidden = !hasDocument || special != nil
-        showSpecial(special)
+    private func refreshChrome(_ pane: EditorPane) {
+        let document = pane.activeDocument
+        let special = document?.special
+        pane.scrollView.isHidden = document == nil || special != nil
+        showSpecial(special, in: pane)
+        // Only a lone pane can be empty (others close with their last tab).
+        if document == nil {
+            if emptyState.superview !== pane.editorArea {
+                emptyState.frame = pane.editorArea.bounds
+                pane.editorArea.addSubview(emptyState)
+            }
+            emptyState.isHidden = false
+        } else if emptyState.superview === pane.editorArea {
+            emptyState.isHidden = true
+        }
         refreshTabs()
-        refreshBreadcrumbs()
+        refreshBreadcrumbs(pane)
         updateStatus()
     }
 
-    /// The path bar shows for files on disk; untitled and special tabs hide it.
-    private func refreshBreadcrumbs() {
-        let file = activeDocument.flatMap { $0.special == nil ? $0.url : nil }
-        breadcrumbs.show(file, root: projectRoot)
-        breadcrumbs.isHidden = file == nil
-        breadcrumbHeight.constant = file == nil ? 0 : BreadcrumbBar.height
+    private func refreshBreadcrumbs(_ pane: EditorPane) {
+        pane.showBreadcrumbs(pane.activeDocument.flatMap { $0.special == nil ? $0.url : nil }, root: projectRoot)
     }
 
-    private func showSpecial(_ kind: Document.Special?) {
-        // Only the active special view is on screen; the others keep their state.
-        for (other, controller) in specialControllers where other != kind {
+    private func showSpecial(_ kind: Document.Special?, in pane: EditorPane) {
+        // Only the shown special views are on screen; the others keep their state.
+        for (other, controller) in specialControllers where other != kind && controller.view.superview === pane.editorArea {
             controller.view.removeFromSuperview()
         }
         guard let kind else { return }
@@ -585,37 +792,38 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             case .diff:
                 let diff = DiffViewController()
                 diff.onOpenFile = { [weak self] url, line in
-                    self?.open(url)
-                    if let line { self?.goToLine(line) }
+                    guard let self else { return }
+                    // Into the pane that shows the diff.
+                    if let (pane, _) = self.location(where: { $0.special == .diff }) { self.makeActive(pane) }
+                    self.open(url)
+                    if let line { self.goToLine(line) }
                 }
                 controller = diff
             }
             specialControllers[kind] = controller
         }
         // The diff reloads each time its tab is shown: the file may have changed.
-        if kind == .diff, let target = activeDocument?.diffTarget {
+        if kind == .diff, let target = pane.activeDocument?.diffTarget {
             (controller as? DiffViewController)?.show(target)
         }
-        if controller.view.superview !== editorArea {
-            controller.view.frame = editorArea.bounds
+        if controller.view.superview !== pane.editorArea {
+            controller.view.frame = pane.editorArea.bounds
             controller.view.autoresizingMask = [.width, .height]
-            editorArea.addSubview(controller.view)
+            pane.editorArea.addSubview(controller.view)
         }
     }
 
     private func refreshTabs() {
-        tabBar.update(
-            tabs: documents.map { TabInfo(title: $0.displayName, tooltip: $0.url?.path, isDirty: $0.isDirty) },
-            selected: activeIndex
-        )
+        // With one pane it is always the current one.
+        panes.forEach { $0.refreshTabs(isActive: $0 === activePane || panes.count == 1) }
     }
 
     private func updateStatus() {
-        guard let document = activeDocument, document.special == nil else {
+        guard let pane = activePane, let document = pane.activeDocument, document.special == nil else {
             statusBar.showDocument(languageName: nil, visible: false)
             return
         }
-        let selection = textView.selectedRange()
+        let selection = pane.textView.selectedRange()
         let line = document.line(at: selection.location)
         let column = selection.location - document.start(ofLine: line) + 1
         statusBar.showPosition(line: line + 1, column: column, selected: selection.length)
@@ -624,38 +832,48 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     // MARK: Highlighting
 
-    private func scheduleHighlight(after delay: TimeInterval = 0.08) {
-        highlightWork?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.highlightNow() }
-        highlightWork = work
+    private func scheduleHighlight(_ pane: EditorPane, after delay: TimeInterval = 0.08) {
+        pane.highlightWork?.cancel()
+        let work = DispatchWorkItem { [weak self, weak pane] in
+            guard let self, let pane else { return }
+            self.highlightNow(pane)
+        }
+        pane.highlightWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
-    private func highlightNow() {
-        highlightWork?.cancel()
-        guard let document = activeDocument else { return }
-        let range = SyntaxHighlighter.rangeToHighlight(textView: textView)
-        highlighter.highlight(range: range, in: layoutManager, language: document.language)
+    /// Temporary attributes belong to a layout manager, so each pane
+    /// highlights what it shows.
+    private func highlightNow(_ pane: EditorPane) {
+        pane.highlightWork?.cancel()
+        guard let document = pane.activeDocument else { return }
+        let range = SyntaxHighlighter.rangeToHighlight(textView: pane.textView)
+        highlighter.highlight(range: range, in: pane.layoutManager, language: document.language)
     }
 
-    @objc private func didScroll() {
-        ruler.needsDisplay = true
-        if (activeDocument?.length ?? 0) > SyntaxHighlighter.fullPassLimit { scheduleHighlight(after: 0.05) }
+    @objc private func didScroll(_ notification: Notification) {
+        guard let pane = panes.first(where: { $0.scrollView.contentView === notification.object as? NSClipView }) else { return }
+        pane.ruler.needsDisplay = true
+        if (pane.activeDocument?.length ?? 0) > SyntaxHighlighter.fullPassLimit { scheduleHighlight(pane, after: 0.05) }
     }
 
     private func colorSample() -> String {
-        guard let storage = layoutManager.textStorage, storage.length > 0 else { return "none" }
+        guard let storage = activePane.layoutManager.textStorage, storage.length > 0 else { return "none" }
         return String(describing: storage.attribute(.foregroundColor, at: 0, effectiveRange: nil))
     }
 
     /// Prints text-view geometry; used by scripts/screenshot.sh in CI.
     func dumpLayout() {
-        layoutManager.ensureLayout(for: textContainer)
+        let pane = activePane!
+        let layoutManager = pane.layoutManager
+        let textView = pane.textView
+        let scrollView = pane.scrollView
+        layoutManager.ensureLayout(for: pane.textContainer)
         let lines = [
             "storage length: \(layoutManager.textStorage?.length ?? -1), glyphs: \(layoutManager.numberOfGlyphs)",
             "textView frame: \(textView.frame), hidden: \(textView.isHidden), superview: \(String(describing: textView.superview))",
             "visibleRect: \(textView.visibleRect), clip bounds: \(scrollView.contentView.bounds)",
-            "container size: \(textContainer.size), usedRect: \(layoutManager.usedRect(for: textContainer))",
+            "container size: \(pane.textContainer.size), usedRect: \(layoutManager.usedRect(for: pane.textContainer))",
             "first fragment: \(layoutManager.numberOfGlyphs > 0 ? layoutManager.lineFragmentRect(forGlyphAt: 0, effectiveRange: nil) : .zero)",
             "scrollView hidden: \(scrollView.isHidden), frame: \(scrollView.frame), emptyState hidden: \(emptyState.isHidden)",
             "text color sample: \(colorSample())",
@@ -683,23 +901,29 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     // MARK: NSTextViewDelegate
 
     func undoManager(for view: NSTextView) -> UndoManager? {
-        activeDocument?.undoManager
+        owner(of: view)?.activeDocument?.undoManager
     }
 
     func textDidChange(_ notification: Notification) {
-        guard let document = activeDocument, document.special == nil else { return }
+        guard let textView = notification.object as? NSTextView, let pane = owner(of: textView),
+              let document = pane.activeDocument, document.special == nil else { return }
         document.invalidateLines()
         document.isDirty = true
-        ruler.updateThickness()
-        ruler.needsDisplay = true
-        scheduleHighlight()
+        // Every pane showing this file: one text, so all of them changed.
+        for other in panesShowing(document) {
+            other.ruler.updateThickness()
+            other.ruler.needsDisplay = true
+            scheduleHighlight(other)
+        }
         scheduleAutosave()
         updateStatus()
         onSessionChange?()
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
-        ruler.needsDisplay = true
+        guard let textView = notification.object as? NSTextView, let pane = owner(of: textView) else { return }
+        pane.ruler.needsDisplay = true
+        guard pane === activePane else { return }
         updateStatus()
         claude.selectionDidChange()
     }

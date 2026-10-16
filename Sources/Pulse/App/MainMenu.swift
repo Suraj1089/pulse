@@ -113,6 +113,11 @@ enum MainMenu {
         menu.addItem(item("Show Files", #selector(MainWindowController.showFiles(_:)), "e", [.command, .shift]))
         menu.addItem(item("Show Source Control", #selector(MainWindowController.showSourceControl(_:)), "g", [.control, .shift]))
         menu.addItem(item("Toggle Sidebar", #selector(MainWindowController.toggleSidebarVisibility(_:)), "s", [.command, .control]))
+        menu.addItem(.separator())
+        // VS Code's ⌘\ splits the editor; here it splits the terminal, as before.
+        menu.addItem(item("Split Editor Right", #selector(MainWindowController.splitEditorRight(_:)), "\\", [.command, .option]))
+        menu.addItem(item("Split Editor Down", #selector(MainWindowController.splitEditorDown(_:))))
+        menu.addItem(.separator())
         menu.addItem(item("Show Terminal", #selector(MainWindowController.toggleTerminal(_:)), "`", [.control]))
         // ⌃⇧` like VS Code. Shifted symbols are matched by the character they
         // type ("~"), so that's the key equivalent; the menu shows it as ⌃~.

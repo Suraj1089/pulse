@@ -14,7 +14,7 @@
 The full contribution rules (what is out of scope, the restrictions CI enforces, the per-PR memory budget and the design guidelines) are in [CLAUDE.md › Contribution rules](CLAUDE.md#contribution-rules). They apply to every contributor and every AI tool, not only Claude. Reviews follow [REVIEW.md](REVIEW.md).
 
 
-1. **Memory budget.** CI (`.github/workflows/ci.yml` → `scripts/memory-check.sh`) launches the app in four scenarios and fails above 100 MB. On pull requests `scripts/memory-compare.sh` also fails any change that adds more than 5 MB to a scenario or 512 KB to the executable compared with the base branch, unless a maintainer adds the `memory-approved` label.
+1. **Memory budget.** CI (`.github/workflows/ci.yml` → `scripts/memory-check.sh`) launches the app in five scenarios and fails above 100 MB. On pull requests `scripts/memory-compare.sh` also fails any change that adds more than 5 MB to a scenario or 512 KB to the executable compared with the base branch, unless a maintainer adds the `memory-approved` label.
 2. **No idle work.** No polling timers while the app is inactive, no animations that run continuously, no background indexing that is not triggered by the user.
 3. **AppKit only.** No SwiftUI, no WKWebView, no storyboards/XIBs. They each pull in large frameworks for things the editor does not need.
 4. **One dependency.** SwiftTerm (terminal emulation), pinned with `exact:`. Releases from 1.19 on need swift-tools 6.x, which the `macos-14` release runner lacks. Think hard before adding another.
@@ -34,7 +34,8 @@ Sources/Pulse/
 │   ├── MainMenu.swift        Menu bar built in code
 │   └── Session.swift         session.json (folder, tabs, unsaved text) + recent folders
 ├── Editor/
-│   ├── EditorViewController  Tabs, the single text view, terminal split, status bar
+│   ├── EditorViewController  The editor panes (split right/down), terminal split, status bar
+│   ├── EditorPane            One pane: its tabs, path bar, text view, layout manager and gutter
 │   ├── CodeTextView          NSTextView subclass: indent, comments, current line
 │   ├── LineNumberRuler       Gutter; draws visible lines only
 │   ├── SyntaxHighlighter     Regex pass → layout-manager temporary attributes
@@ -61,7 +62,7 @@ scripts/
 
 ## Architecture notes
 
-- **Documents vs. view.** A `Document` owns an `NSTextStorage`, its own `UndoManager`, and a lazily rebuilt line-start index. The editor has one `NSLayoutManager`/`CodeTextView`; `activate(_:)` calls `layoutManager.replaceTextStorage(...)`.
+- **Documents vs. view.** A `Document` owns an `NSTextStorage`, its own `UndoManager`, and a lazily rebuilt line-start index. Each `EditorPane` has one `NSLayoutManager`/`CodeTextView`, and switching its tabs moves that layout manager onto the document's storage. A window has one pane until Split Editor Right / Down (⌥⌘\, the tab's right-click menu) adds one next to the active pane; panes nest in split views for a grid. A file in two panes is one `Document`: one storage, one undo history, a layout manager per pane. `replaceTextStorage` would move every layout manager on a storage (both panes), so a shared storage is left with `removeLayoutManager`/`addLayoutManager`. Temporary attributes (highlighting) are per layout manager, so each pane highlights what it shows. A pane closes with its last tab and detaches its layout manager. `documents` lists each file once across panes (session, autosave); commands, the status bar and Claude Code follow the focused pane. Panes are not restored by the session.
 - **TextKit 1 on purpose.** Non-contiguous layout, `NSRulerView` line numbers and temporary attributes are mature and cheap there.
 - **Highlighting.** One combined `NSRegularExpression` per language; alternatives are ordered so comments and strings win. Full pass up to 300 KB (debounced 80 ms after edits), visible range ±20k chars above that.
 - **Autosave.** On by default: modified files with a path are written 1 s after typing stops, on app deactivation, and at quit. Untitled buffers (and everything, if autosave is off) survive via `~/Library/Application Support/Pulse/session.json`.
