@@ -11,7 +11,10 @@
 
 ## Non-negotiables
 
-1. **Memory budget.** CI (`.github/workflows/ci.yml` → `scripts/memory-check.sh`) launches the app in three scenarios and fails above 100 MB. Do not merge anything that moves a scenario past the 60 MB target without saying why.
+The full contribution rules (what is out of scope, the restrictions CI enforces, the per-PR memory budget and the design guidelines) are in [CLAUDE.md › Contribution rules](CLAUDE.md#contribution-rules). They apply to every contributor and every AI tool, not only Claude. Reviews follow [REVIEW.md](REVIEW.md).
+
+
+1. **Memory budget.** CI (`.github/workflows/ci.yml` → `scripts/memory-check.sh`) launches the app in three scenarios and fails above 100 MB. On pull requests `scripts/memory-compare.sh` also fails any change that adds more than 5 MB to a scenario or 512 KB to the executable compared with the base branch, unless a maintainer adds the `memory-approved` label.
 2. **No idle work.** No polling timers while the app is inactive, no animations that run continuously, no background indexing that is not triggered by the user.
 3. **AppKit only.** No SwiftUI, no WKWebView, no storyboards/XIBs. They each pull in large frameworks for things the editor does not need.
 4. **One dependency.** SwiftTerm (terminal emulation), pinned with `exact:`. Releases from 1.19 on need swift-tools 6.x, which the `macos-14` release runner lacks. Think hard before adding another.
@@ -46,7 +49,9 @@ Sources/Pulse/
 └── Resources/                Info.plist (embedded via linker), AppIcon.icns
 scripts/
 ├── bundle.sh                 Fast single-arch dist/Pulse.app
+├── policy-check.sh           CLAUDE.md restrictions R1–R6 (used by CI)
 ├── memory-check.sh           Memory budget scenarios (used by CI)
+├── memory-compare.sh         PR vs. base build, alternating rounds (used by CI on PRs)
 ├── screenshot.sh             Real light/dark screenshots (CI publishes them to the `screenshots` branch)
 └── package.sh                Universal release: DMG, ZIP, Homebrew cask
 ```
