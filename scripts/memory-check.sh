@@ -4,6 +4,7 @@
 #
 #   1. empty window
 #   2. ten source files open
+#   2b. as 2, with the editor split right (the active file in two panes)
 #   3. ten files open + terminal (shell measured separately)
 #   4. as 3, with Claude Code connected (scripts/claude-ide-client.py stands
 #      in for it and checks that the app sends the open file)
@@ -112,6 +113,7 @@ run_scenario() {
 
 run_scenario "Empty window" "$BIN"
 run_scenario "10 files open" "$BIN" "${FILES[@]}"
+run_scenario "10 files + split editor" PULSE_SPLIT_EDITOR=1 "$BIN" "${FILES[@]}"
 run_scenario "10 files + terminal" PULSE_OPEN_TERMINAL=1 "$BIN" "${FILES[@]}"
 CLAUDE_CLIENT_DIR="$WORK/claude"
 mkdir -p "$CLAUDE_CLIENT_DIR"

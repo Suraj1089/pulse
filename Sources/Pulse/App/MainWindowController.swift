@@ -468,6 +468,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     @objc func killTerminal(_ sender: Any?) { editor.killTerminal() }
     @objc func newTerminal(_ sender: Any?) { editor.newTerminal() }
     @objc func splitTerminal(_ sender: Any?) { editor.splitTerminal() }
+    @objc func splitEditorRight(_ sender: Any?) { editor.splitEditor(.right) }
+    @objc func splitEditorDown(_ sender: Any?) { editor.splitEditor(.down) }
     @objc func sendSelectionToClaude(_ sender: Any?) { editor.sendSelectionToClaude() }
     @objc func toggleClaudeIntegration(_ sender: Any?) { ClaudeBridge.isEnabled.toggle() }
     @objc func connectClaudeFromAnotherTerminal(_ sender: Any?) { editor.connectClaudeFromAnotherTerminal() }
@@ -563,6 +565,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case #selector(toggleTerminal(_:)):
             menuItem.title = editor.isTerminalVisible ? "Hide Terminal" : "Show Terminal"
             return true
+        case #selector(splitEditorRight(_:)), #selector(splitEditorDown(_:)):
+            return editor.canSplitEditor
         case #selector(toggleClaudeIntegration(_:)):
             menuItem.state = ClaudeBridge.isEnabled ? .on : .off
             return true
@@ -620,6 +624,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("View: Toggle Sidebar", #selector(toggleSidebarVisibility(_:))),
             command("View: Show Files", #selector(showFiles(_:))),
             command("View: Show Source Control", #selector(showSourceControl(_:))),
+            command("View: Split Editor Right", #selector(splitEditorRight(_:))),
+            command("View: Split Editor Down", #selector(splitEditorDown(_:))),
             command("View: Toggle Word Wrap", #selector(toggleWordWrap(_:))),
             command("View: Zoom In", #selector(zoomIn(_:))),
             command("View: Zoom Out", #selector(zoomOut(_:))),
