@@ -341,11 +341,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             self.showUpdate(release)
             let alert = NSAlert()
             alert.messageText = "Pulse couldn't update itself"
-            alert.informativeText = error.text
-            alert.addButton(withTitle: "Open Releases Page")
+            alert.informativeText = "\(error.text)\n\nTo update from Terminal instead, run:\n\(Updater.installCommand)"
+            alert.addButton(withTitle: "Copy Install Command")
             alert.addButton(withTitle: "Cancel")
             alert.beginSheetModal(for: window) { response in
-                if response == .alertFirstButtonReturn { NSWorkspace.shared.open(release.page) }
+                guard response == .alertFirstButtonReturn else { return }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(Updater.installCommand, forType: .string)
             }
         }
     }

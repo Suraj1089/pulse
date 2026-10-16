@@ -28,7 +28,7 @@ Every build fails if any scenario exceeds 100 MB. The target in normal use is 50
 ## Install
 `curl -fsSL https://pulse0.app/install.sh | bash`
 
-DMG: https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg
+This is the only supported way to install. Pulse is not notarized by Apple yet, so a Pulse.app downloaded in a browser is blocked by macOS Gatekeeper; the installer downloads the same release with curl and clears the quarantine flag.
 
 Then open a folder from a terminal with `pulse .`
 

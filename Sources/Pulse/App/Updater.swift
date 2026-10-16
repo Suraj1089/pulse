@@ -12,6 +12,10 @@ enum Updater {
     }
 
     static let repository = "Suraj1089/pulse"
+    /// The supported way to install from outside the app. Releases aren't
+    /// notarized, so macOS blocks a copy downloaded in a browser; the
+    /// script fetches it with curl and clears the quarantine flag.
+    static let installCommand = "curl -fsSL https://pulse0.app/install.sh | bash"
     private static let lastCheckKey = "updateLastCheck"
     private static let checkInterval: TimeInterval = 24 * 60 * 60
 
@@ -84,7 +88,7 @@ enum Updater {
     static func install(_ release: Release, failure: @escaping (UpdateError) -> Void) {
         let target = Bundle.main.bundleURL
         guard FileManager.default.isWritableFile(atPath: target.deletingLastPathComponent().path) else {
-            failure(.message("Pulse can't replace itself in \(target.deletingLastPathComponent().path). Download the new version from the releases page instead."))
+            failure(.message("Pulse can't replace itself in \(target.deletingLastPathComponent().path)."))
             return
         }
         let work = FileManager.default.temporaryDirectory.appendingPathComponent("PulseUpdate-\(UUID().uuidString)", isDirectory: true)

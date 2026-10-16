@@ -72,7 +72,7 @@ One-line installer (downloads the latest release ZIP, installs to /Applications,
 curl -fsSL https://pulse0.app/install.sh | bash
 ```
 
-Disk image: https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg
+This is the supported way to install. Releases are ad-hoc signed and not notarized by Apple, so a Pulse.app downloaded in a browser (DMG or ZIP) is blocked by Gatekeeper ("Apple could not verify 'Pulse'…"). The installer avoids that. A copy that is already blocked can be opened from System Settings › Privacy & Security › Open Anyway, or with `xattr -dr com.apple.quarantine /Applications/Pulse.app`.
 
 From source:
 
