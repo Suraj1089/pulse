@@ -1,8 +1,10 @@
 name: Release Pulse
 
-# Every push to main that passes CI (build, tests, memory budget) becomes a
-# release, so the website's "latest" download links, install.sh and the
-# in-app Update button always serve the newest build.
+# Every push to main that passes CI (build, tests, memory budget) and
+# changes the app becomes a release, so the website's "latest" download
+# links, install.sh and the in-app Update button always serve the newest
+# build. Pushes that only touch the website, docs, install.sh, tests or CI
+# (nothing in the app since the last release) are skipped.
 #
 # Version: VERSION holds major.minor.patch. If that exact version has no
 # release yet, it is released as is (so a manual bump to 2.1.0 ships 2.1.0).
@@ -43,7 +45,28 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
 
+      # Compares with the last release, not just this push, so a docs push
+      # followed by a code push still ships the code.
+      - name: Check for app changes
+        id: changes
+        run: |
+          git fetch --tags --force --quiet
+          LAST=$(git describe --tags --abbrev=0 --match 'v*' HEAD 2>/dev/null || true)
+          if [ "${{ github.event_name }}" != "workflow_run" ] || [ -z "$LAST" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          APP_FILES=$(git diff --name-only "$LAST" HEAD \
+            | grep -vE '^(site/|assets/|Tests/|\.github/)|\.md$|^LICENSE$|^install\.sh$' || true)
+          if [ -z "$APP_FILES" ]; then
+            echo "Nothing in the app changed since $LAST (website, docs, tests or CI only); no release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "App changes since $LAST:"; echo "$APP_FILES" | sed 's/^/  /'
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Determine Version
+        if: steps.changes.outputs.release == 'true'
         id: version_step
         run: |
           git fetch --tags --force --quiet
@@ -64,12 +87,15 @@ jobs:
           echo "tag=v$RAW_VER" >> "$GITHUB_OUTPUT"
 
       - name: Make Scripts Executable
+        if: steps.changes.outputs.release == 'true'
         run: chmod +x scripts/package.sh install.sh
 
       - name: Build and Package Release Artifacts
+        if: steps.changes.outputs.release == 'true'
         run: ./scripts/package.sh "${{ steps.version_step.outputs.version }}"
 
       - name: Create GitHub Release
+        if: steps.changes.outputs.release == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version_step.outputs.tag }}

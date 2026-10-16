@@ -69,7 +69,7 @@ swift run Pulse .              # run, opening the current folder
 
 ## Release process
 
-Every push to `main` that passes CI (build, `swift test`, memory budget) is released automatically by `release.yml`, which builds the universal app with `scripts/package.sh` and publishes `Pulse.dmg`, `Pulse.zip` and the Homebrew cask. The website, `install.sh` and the in-app Update button all use `releases/latest`, so they always serve the newest build.
+Every push to `main` that passes CI (build, `swift test`, memory budget) and changes the app is released automatically by `release.yml` (pushes that only touch `site/`, `assets/`, `*.md`, `LICENSE`, `install.sh`, `Tests/` or `.github/` since the last release are skipped), which builds the universal app with `scripts/package.sh` and publishes `Pulse.dmg`, `Pulse.zip` and the Homebrew cask. The website, `install.sh` and the in-app Update button all use `releases/latest`, so they always serve the newest build.
 
 - Version: if the exact version in `VERSION` has no release yet, it is released as is (bump `VERSION` to `2.1.0` to ship 2.1.0). Otherwise the next patch is used (`2.0.0` → `2.0.1` → …). Pushing a `v*` tag releases that tag.
 - Releases run one at a time and build the exact commit CI tested.
