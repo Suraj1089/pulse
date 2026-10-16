@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-Pulse is a native macOS code editor written in Swift and AppKit. Its design constraint is memory: about 30 MB with several files open in CI measurements, a 50–60 MB target in normal use, and a hard limit of 100 MB enforced on every build. It uses no CPU while idle.
+Pulse is a native macOS code editor written in Swift and AppKit. Its design constraint is memory: under 30 MB with ten files open in CI measurements, a 50–60 MB target in normal use, and a hard limit of 100 MB enforced on every build. It uses no CPU while idle.
 
 - Developer: Suraj Pisal
 - License: MIT
@@ -10,50 +10,57 @@ Pulse is a native macOS code editor written in Swift and AppKit. Its design cons
 - Repository: https://github.com/Suraj1089/pulse
 - Website: https://pulse0.app
 
-Pulse 2.0 replaces the earlier Pulse menu-bar memory monitor (1.x), which remains available from GitHub Releases.
-
 ---
 
 ## 2. Features
 
-- **Folders and files**: open a folder (⌘O), browse it in a sidebar file tree, open files in tabs. Folders are read only when expanded. New file, new folder, reveal in Finder, copy path and move to Trash from the tree's context menu.
+- **Folders and files**: open a folder (⌘O), browse it in a sidebar file tree, open files in tabs, with a path bar (breadcrumbs) above each file. Folders are read only when expanded. New file, new folder, reveal in Finder, copy path and move to Trash from the tree's context menu.
+- **Windows**: one window per folder (⇧⌘N for a new one); opening a folder that is already open brings its window forward.
+- **Split editors**: Split Editor Right (⌥⌘\) or Split Editor Down, from the View menu, the command palette or a tab's right-click menu, which also has Close and Close Others. Splits nest into a grid. A file open in two panes is one document: one copy of its text, one undo history, and edits show in both. A pane closes with its last tab.
 - **Syntax highlighting**: Swift, JavaScript/TypeScript, Python, Go, Rust, C/C++/Objective-C, Java/Kotlin/Scala/Dart/C#, Ruby, shell, HTML/XML, CSS/SCSS, JSON, YAML, TOML, Markdown and SQL. Regex-based, not a full parser.
 - **Editing**: line numbers, current-line highlight, auto-indent (including after `{`, `[`, `(` and Python `:`), spaces for tabs, toggle line comment (⌘/), indent and outdent (⌘] and ⌘[), word wrap (⌥⌘W), font size (⌘+, ⌘−, ⌘0).
 - **Find and replace**: the standard macOS find bar (⌘F, ⌥⌘F, ⌘G, ⌘E).
 - **Project search** (⇧⌘F): runs ripgrep (`rg`) as a short-lived child process when installed, otherwise a built-in scan. Results grouped by file; click to jump to the match.
 - **Command palette**: ⌘P go to file (fuzzy), ⇧⌘P commands, ⌘L go to line.
-- **Integrated terminal** (⌃`): your login shell via SwiftTerm, created on first use. Hiding the panel keeps the shell running; "Kill Terminal" ends it.
+- **Integrated terminal** (⌃`): your login shell via SwiftTerm, created on first use. New Terminal (⌃⇧`) adds a tab, Split Terminal (⌘\) a pane beside the current one; each has its own shell. Hiding the panel keeps the shells running; "Kill Terminal" ends the focused one.
+- **Source control** (⌃⇧G): staged and unstaged changes for the open folder's Git repository, with buttons to stage (+) or unstage (−) a file or a whole section. A click on a changed file opens its diff in a tab; a double-click opens the file. Status and diffs come from short-lived `git` processes, run only while the panel is on screen or when asked.
+- **Claude Code**: run `claude` in Pulse's terminal and it connects to the window the way it connects to VS Code, so it sees the open file and the lines you select. ⇧⌘K (View › Send Selection to Claude Code) sends the selection as an @-mention to the `claude` running in the focused terminal, and `/ide` connects a `claude` started in another terminal. The connection listens on 127.0.0.1 only, needs a per-window token, starts only if Claude Code is installed (`~/.claude` exists), and can be turned off with View › Share Selection with Claude Code. Pulse has no built-in AI features of its own.
+- **`pulse` command**: `pulse .` opens the current folder, `pulse a.swift src/` opens files and folders. Release builds add the command on first launch; Pulse › Install 'pulse' Command adds it later.
 - **Autosave** (on by default): modified files with a path are written one second after typing stops, when Pulse loses focus, and at quit.
 - **Session recovery**: the open folder, tabs, cursor positions and the text of unsaved buffers are stored in `~/Library/Application Support/Pulse/session.json` and restored at launch.
 - **External changes**: files changed on disk are reloaded when Pulse regains focus, if they have no unsaved edits.
-- **Resource meter**: the status bar shows Pulse's own physical footprint and CPU, and the footprint of shells it started, separately.
+- **Resource meter**: the status bar shows the Git branch, Pulse's own physical footprint and CPU, and the footprint of shells it started, separately.
+- **Preferences**: rebind any command in Pulse › Keyboard Shortcuts (⌥⌘K) or as JSON; separate font sizes for the editor, terminal and sidebar; light, dark or auto appearance.
+- **Updates**: release builds check GitHub for a new release at launch and at most once a day; Pulse › Check for Updates… checks on demand. An update replaces the app in place and reopens it with your tabs.
 
-Not included by design: extensions, Git interface, debugger, language servers, AI features, telemetry, accounts.
+Not included by design: extensions, a full Git client (history, merges), debugger, language servers, built-in AI features, telemetry, accounts.
 
 ---
 
 ## 3. Architecture
 
 - **AppKit only.** No SwiftUI, no WKWebView, no storyboards. The only dependency is SwiftTerm for terminal emulation.
-- **One text view for every tab.** Each document owns an `NSTextStorage` and an `UndoManager`. The editor has a single `NSLayoutManager` and `NSTextView`; switching tabs calls `replaceTextStorage`, so an open file costs roughly its own text.
+- **One text view per pane.** Each document owns an `NSTextStorage` and an `UndoManager`. Each editor pane has one `NSLayoutManager` and `NSTextView`; switching tabs moves that layout manager onto another document's storage, so an open file costs roughly its own text. A file shown in two panes keeps one storage with a layout manager per pane, so a split costs one more text view plus the layout of what it shows.
 - **TextKit 1** with non-contiguous layout, an `NSRulerView` gutter that draws only visible line numbers from a cached line index.
 - **Highlighting** uses one combined `NSRegularExpression` per language and applies colors as layout-manager temporary attributes, which never modify or copy the text. Files up to 300 KB are highlighted in full, larger files around the visible range.
-- **Laziness.** The terminal, the go-to-file index and folder contents are created on first use.
-- **No idle work.** No polling or animations. The resource meter samples every 2 seconds only while Pulse is the active app.
+- **Laziness.** The terminal, the go-to-file index, folder contents, extra editor panes and the Claude Code connection are created on first use.
+- **No idle work.** No polling or animations. The resource meter samples every 2 seconds only while Pulse is the active app. The Claude Code connection is a loopback socket with no timer or thread; selection changes are sent only while Claude Code is connected.
 
 ---
 
 ## 4. Memory measurements
 
-CI (`scripts/memory-check.sh`, GitHub macOS 14 runner) launches the bundled app and reads physical footprint with `vmmap --summary` after 8 seconds:
+CI (`scripts/memory-check.sh`, GitHub macOS 14 runner) launches the bundled app and reads physical footprint with `vmmap --summary` after 8 seconds. Medians of three runs:
 
 | Scenario | Pulse | Child processes |
 |---|---|---|
-| Empty window | 15.0 MB | 0 MB |
-| Ten source files open | 31.8 MB | 0 MB |
-| Ten files + terminal | 31.0 MB | 1.8 MB (shell) |
+| Empty window | 15.9 MB | 0 MB |
+| Ten source files open | 27.1 MB | 0 MB |
+| Ten files, editor split right | 29.1 MB | 0 MB |
+| Ten files + terminal | 28.2 MB | 1.8 MB (shell) |
+| Ten files + terminal + Claude Code connected | 28.5 MB | 1.8 MB (shell) |
 
-The build fails if Pulse exceeds 100 MB in any scenario. Numbers vary with display, font size, open files and macOS version.
+The build fails if Pulse exceeds 100 MB in any scenario, and a pull request that adds more than 5 MB to any scenario needs the maintainer's approval. Numbers vary with display, font size, open files and macOS version.
 
 ---
 
@@ -76,7 +83,7 @@ swift run Pulse .          # run, opening the current folder
 ./scripts/bundle.sh        # build dist/Pulse.app
 ```
 
-Open a folder from Terminal: `open -a Pulse .`
+Open a folder from Terminal: `pulse .`
 
 ---
 
@@ -86,6 +93,7 @@ Open a folder from Terminal: `open -a Pulse .`
 |---|---|
 | ⌘O | Open a folder or files |
 | ⌘N | New file |
+| ⇧⌘N | New window |
 | ⌘S / ⇧⌘S / ⌥⌘S | Save / Save As / Save All |
 | ⌘W | Close tab |
 | ⌘P | Go to file |
@@ -94,16 +102,22 @@ Open a folder from Terminal: `open -a Pulse .`
 | ⌘F / ⌥⌘F | Find / Find and replace |
 | ⇧⌘F | Search the project |
 | ⇧⌘E | Show files |
+| ⌃⇧G | Show source control |
+| ⌥⌘\ | Split editor right |
 | ⌃` | Show or hide the terminal |
+| ⌃⇧` | New terminal |
+| ⌘\ | Split terminal |
+| ⇧⌘K | Send selection to Claude Code |
 | ⌘/ | Toggle line comment |
 | ⌘] / ⌘[ | Indent / outdent |
 | ⇧⌘] / ⇧⌘[ | Next / previous tab |
 | ⌃⌘S | Toggle sidebar |
 | ⌥⌘W | Word wrap |
 | ⌘+ / ⌘− / ⌘0 | Font size |
+| ⌥⌘K | Keyboard shortcuts (rebind any command) |
 
 ---
 
 ## 7. Privacy
 
-Pulse makes no network requests, has no telemetry or analytics, and needs no account. Files never leave the Mac.
+Pulse has no telemetry or analytics and needs no account. Its only network traffic is the update check against GitHub Releases (release builds: at launch and at most once a day) and downloading an update you choose to install. The Claude Code connection is local to the Mac (127.0.0.1) and only exists while Claude Code is installed. Files never leave the Mac through Pulse.

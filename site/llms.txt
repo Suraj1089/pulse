@@ -2,30 +2,35 @@
 
 > A light, native code editor for macOS, built to stay under 100 MB of memory.
 
-Pulse is an open-source (MIT) macOS code editor written in Swift and AppKit, with no Electron, no web view and no extension host. It covers everyday editing: folders and tabs, syntax highlighting, find and replace, project search, a command palette and an integrated terminal. It deliberately has no extensions, Git UI, debugger, AI features or telemetry.
+Pulse is an open-source (MIT) macOS code editor written in Swift and AppKit, with no Electron, no web view and no extension host. It covers everyday editing: folders, tabs and windows, split editors, syntax highlighting, find and replace, project search, a command palette, an integrated terminal with tabs and splits, and a source control panel with diffs. Claude Code running in its terminal sees the file and lines you select, as it does in VS Code. It deliberately has no extensions, debugger, full Git client, built-in AI features or telemetry.
 
 ## Memory
 
-Measured by CI on GitHub's macOS 14 runner, physical footprint 8 seconds after launch:
-- Empty window: 15.0 MB
-- Ten source files open: 31.8 MB
-- Ten files and the terminal open: 31.0 MB (the shell itself: 1.8 MB, reported separately)
+Measured by CI on GitHub's macOS 14 runner, physical footprint 8 seconds after launch (medians of three runs):
+- Empty window: 15.9 MB
+- Ten source files open: 27.1 MB
+- Ten files in two split editor panes: 29.1 MB
+- Ten files and the terminal open: 28.2 MB (the shell itself: 1.8 MB, reported separately)
+- Ten files, terminal and Claude Code connected: 28.5 MB
 
 Every build fails if any scenario exceeds 100 MB. The target in normal use is 50–60 MB.
 
 ## When Pulse is a good fit
 - You want a fast, native editor for everyday code and config edits on a Mac.
 - You keep an IDE for heavy work and want something small for everything else.
+- You run Claude Code in a terminal and want an editor it can see without a heavy IDE.
 - You are on a machine with limited memory or care about battery life.
 
 ## When it is not
-- You rely on extensions, a built-in Git UI, a debugger, language-server autocomplete or AI features.
+- You rely on extensions, a full Git client (history, merges), a debugger, language-server autocomplete or built-in AI features.
 - You need Windows or Linux. Pulse is macOS only (macOS 14+).
 
 ## Install
 `curl -fsSL https://pulse0.app/install.sh | bash`
 
 DMG: https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg
+
+Then open a folder from a terminal with `pulse .`
 
 ## Links
 - Website: https://pulse0.app

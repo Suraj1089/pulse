@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pulse — A Light, Native Code Editor for macOS</title>
-  <meta name="description" content="Pulse is a native macOS code editor written in Swift and AppKit. Tabs, syntax highlighting, project search, a command palette and a terminal in about 32 MB of memory. Free and open source.">
+  <meta name="description" content="Pulse is a native macOS code editor written in Swift and AppKit. Tabs, split editors, syntax highlighting, project search, a command palette and a terminal in under 30 MB of memory, and Claude Code sees what you select. Free and open source.">
   <meta name="keywords" content="lightweight code editor mac, native macOS code editor, low memory code editor, fast text editor mac, VS Code alternative mac, Sublime Text alternative, Swift AppKit editor, Pulse editor">
   <meta name="author" content="Suraj Pisal">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
@@ -15,7 +15,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://pulse0.app/">
   <meta property="og:title" content="Pulse — A light, native code editor for macOS">
-  <meta property="og:description" content="Files, tabs, search, a command palette and a terminal in about 32 MB. Native Swift and AppKit. Free and open source.">
+  <meta property="og:description" content="Files, tabs, split editors, search and a terminal in under 30 MB. Works with Claude Code. Native Swift and AppKit. Free and open source.">
   <meta property="og:image" content="https://pulse0.app/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -23,7 +23,7 @@
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Pulse — A light, native code editor for macOS">
-  <meta name="twitter:description" content="Files, tabs, search, a command palette and a terminal in about 32 MB. Native Swift and AppKit.">
+  <meta name="twitter:description" content="Files, tabs, split editors, search and a terminal in under 30 MB. Works with Claude Code. Native Swift and AppKit.">
   <meta name="twitter:image" content="https://pulse0.app/og-image.png">
 
   <link rel="alternate" type="text/plain" href="https://pulse0.app/llms.txt" title="LLM Documentation">
@@ -42,7 +42,6 @@
     "description": "A light, native macOS code editor written in Swift and AppKit, built to stay under 100 MB of memory.",
     "url": "https://pulse0.app",
     "downloadUrl": "https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg",
-    "softwareVersion": "2.0.0",
     "license": "https://opensource.org/licenses/MIT",
     "author": { "@type": "Person", "name": "Suraj Pisal", "url": "https://github.com/Suraj1089" }
   }
@@ -55,12 +54,17 @@
       {
         "@type": "Question",
         "name": "How much memory does Pulse use?",
-        "acceptedAnswer": { "@type": "Answer", "text": "In CI on a macOS 14 runner, Pulse used 15.0 MB with an empty window, 31.8 MB with ten source files open, and 31.0 MB with ten files and the terminal open (the shell itself used another 1.8 MB, counted separately). Every build is checked and fails above 100 MB." }
+        "acceptedAnswer": { "@type": "Answer", "text": "In CI on GitHub's macOS 14 runner (medians of three runs), Pulse used 15.9 MB with an empty window, 27.1 MB with ten source files open, 29.1 MB with those files in two split editor panes, 28.2 MB with ten files and the terminal open, and 28.5 MB with Claude Code connected as well. The shell is counted separately (about 1.8 MB). Every build is checked and fails above 100 MB." }
       },
       {
         "@type": "Question",
         "name": "Is Pulse a replacement for VS Code?",
-        "acceptedAnswer": { "@type": "Answer", "text": "For many everyday edits, yes; for extension-heavy workflows, no. Pulse has tabs, syntax highlighting, find and replace, project search, a command palette and a terminal. It deliberately has no extensions, Git UI, debugger or AI features." }
+        "acceptedAnswer": { "@type": "Answer", "text": "For many everyday edits, yes; for extension-heavy workflows, no. Pulse has tabs, split editors, syntax highlighting, find and replace, project search, a command palette, a terminal with tabs and splits, and a source control panel with diffs. Claude Code connects to it the way it does to VS Code. It deliberately has no extensions, debugger, full Git client or built-in AI features." }
+      },
+      {
+        "@type": "Question",
+        "name": "Does Pulse work with Claude Code?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Run claude in Pulse's terminal and it sees the file and lines you select, as it does in VS Code, and Shift-Command-K sends the selection as an @-mention. The connection stays on your Mac (127.0.0.1), starts only if Claude Code is installed, and can be turned off with View > Share Selection with Claude Code." }
       },
       {
         "@type": "Question",
@@ -70,7 +74,7 @@
       {
         "@type": "Question",
         "name": "Does Pulse collect data?",
-        "acceptedAnswer": { "@type": "Answer", "text": "No. Pulse has no telemetry, no analytics and makes no network requests." }
+        "acceptedAnswer": { "@type": "Answer", "text": "No. Pulse has no telemetry, no analytics and no account. It goes online only to check GitHub for a new release (at launch and at most once a day) and to download one when you choose to update. The Claude Code connection stays on your Mac." }
       }
     ]
   }
@@ -507,7 +511,7 @@
 
 <div class="shell">
   <aside class="sidebar" aria-label="Site files">
-    <div class="side-label">Pulse 2.0.0</div>
+    <div class="side-label">Explorer</div>
     <ul class="tree" id="tree">
       <li><span class="dir"><svg class="chev" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="var(--accent)" opacity=".85"/></svg>pulse0.app</span></li>
       <li><a class="indent" href="#readme" data-file="readme"><span class="fi" style="color:var(--type)">M↓</span>README.md</a></li>
@@ -520,7 +524,7 @@
       <li><a class="indent" href="#faq" data-file="faq"><span class="fi" style="color:var(--type)">M↓</span>FAQ.md</a></li>
     </ul>
     <div class="side-foot">
-      <div><b>31.8 MB</b> · ten files open</div>
+      <div><b>27.1 MB</b> · ten files open</div>
       <div>macOS 14+ · MIT</div>
     </div>
   </aside>
@@ -543,7 +547,7 @@
         <div class="crumbs">pulse0.app <span>›</span> <b>README.md</b></div>
         <div class="src">
           <h1>A lightweight, <span class="n">native</span> code editor for macOS.</h1>
-          <p class="lede">Written in Swift and AppKit. <b>Files, tabs, search, a command palette and a terminal.</b> No Electron, no web view, nothing running while you read.</p>
+          <p class="lede">Written in Swift and AppKit. <b>Files, tabs, split editors, search, a command palette and a terminal</b>, and Claude Code in that terminal sees what you select. No Electron, no web view, nothing running while you read.</p>
           <div class="cta">
             <a class="btn primary" href="https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg">
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m0 0L4.5 6.5M8 10l3.5-3.5M3 13h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -558,7 +562,7 @@
             <video id="demo" muted loop playsinline preload="none" width="1920" height="1200"
               aria-label="Pulse in use: opening a folder, going to a file with Command P, typing with autosave, searching the project, running a build in the terminal and resizing the terminal font, with memory and CPU shown in the status bar."></video>
             <noscript>
-              <img class="shot-light" src="/screenshot-light.png" alt="The Pulse editor window: a file tree on the left, tabs across the top, Swift code with syntax highlighting, and a terminal panel at the bottom." width="1180" height="760">
+              <img class="shot-light" src="/screenshot-light.png" alt="The Pulse editor window: a file tree on the left, tabs and a path bar across the top, Swift code with syntax highlighting, and a terminal panel at the bottom." width="1180" height="760">
               <img class="shot-dark" src="/screenshot-dark.png" alt="The Pulse editor window in dark mode: a file tree, tabs, highlighted Swift code and a terminal panel." width="1180" height="760">
             </noscript>
           </figure>
@@ -580,28 +584,40 @@
               <div class="runs" role="list">
                 <div class="run" role="listitem">
                   <div class="lbl">empty-window<small>Just launched</small></div>
-                  <div class="track" aria-hidden="true"><div class="fill" style="width:15%"></div><div class="target"></div></div>
-                  <div class="val">15.0 <small>MB</small></div>
+                  <div class="track" aria-hidden="true"><div class="fill" style="width:15.9%"></div><div class="target"></div></div>
+                  <div class="val">15.9 <small>MB</small></div>
                   <div class="pass">PASS</div>
                 </div>
                 <div class="run" role="listitem">
                   <div class="lbl">ten-files<small>Swift sources, highlighted</small></div>
-                  <div class="track" aria-hidden="true"><div class="fill" style="width:31.8%"></div><div class="target"></div></div>
-                  <div class="val">31.8 <small>MB</small></div>
+                  <div class="track" aria-hidden="true"><div class="fill" style="width:27.1%"></div><div class="target"></div></div>
+                  <div class="val">27.1 <small>MB</small></div>
+                  <div class="pass">PASS</div>
+                </div>
+                <div class="run" role="listitem">
+                  <div class="lbl">ten-files+split<small>Two editor panes</small></div>
+                  <div class="track" aria-hidden="true"><div class="fill" style="width:29.1%"></div><div class="target"></div></div>
+                  <div class="val">29.1 <small>MB</small></div>
                   <div class="pass">PASS</div>
                 </div>
                 <div class="run" role="listitem">
                   <div class="lbl">ten-files+terminal<small>+1.8 MB shell, counted apart</small></div>
-                  <div class="track" aria-hidden="true"><div class="fill" style="width:31%"></div><div class="fill shell" style="left:31%;width:1.8%"></div><div class="target"></div></div>
-                  <div class="val">31.0 <small>MB</small></div>
+                  <div class="track" aria-hidden="true"><div class="fill" style="width:28.2%"></div><div class="fill shell" style="left:28.2%;width:1.8%"></div><div class="target"></div></div>
+                  <div class="val">28.2 <small>MB</small></div>
+                  <div class="pass">PASS</div>
+                </div>
+                <div class="run" role="listitem">
+                  <div class="lbl">terminal+claude<small>Claude Code connected</small></div>
+                  <div class="track" aria-hidden="true"><div class="fill" style="width:28.5%"></div><div class="fill shell" style="left:28.5%;width:1.8%"></div><div class="target"></div></div>
+                  <div class="val">28.5 <small>MB</small></div>
                   <div class="pass">PASS</div>
                 </div>
               </div>
               <div class="scale" aria-hidden="true"><div></div><div class="ticks"><span>0</span><span>50</span><span>100 MB limit</span></div><div></div><div></div></div>
-              <div class="term-foot"><span class="ok">✓</span> 3 scenarios under budget · physical footprint via <span class="t">vmmap</span>, 8 s after launch</div>
+              <div class="term-foot"><span class="ok">✓</span> 5 scenarios under budget · physical footprint via <span class="t">vmmap</span>, 8 s after launch</div>
             </div>
           </div>
-          <p class="prose">That is what Activity Monitor calls “Memory”. Processes you start in the terminal are not counted as Pulse. Run the same check on your Mac with <a href="https://github.com/Suraj1089/pulse/blob/main/scripts/memory-check.sh"><code>scripts/memory-check.sh</code></a>; the status bar in Pulse shows the live number too.</p>
+          <p class="prose">Medians of three runs on GitHub’s macOS 14 runner. That is what Activity Monitor calls “Memory”. Processes you start in the terminal are not counted as Pulse. Run the same check on your Mac with <a href="https://github.com/Suraj1089/pulse/blob/main/scripts/memory-check.sh"><code>scripts/memory-check.sh</code></a>; the status bar in Pulse shows the live number too.</p>
         </div>
       </section>
 
@@ -614,7 +630,11 @@
           <div class="symbols nogutter">
             <div class="sym">
               <div class="sig"><span class="k">func</span> <span class="t">foldersAndTabs</span>()</div>
-              <p>Open a project, browse it in the sidebar, keep many files open. Folders load only when you expand them.</p>
+              <p>Open a project, browse it in the sidebar, keep many files open, with a path bar above each file. One window per folder (<kbd>⇧⌘N</kbd>). Folders load only when you expand them.</p>
+            </div>
+            <div class="sym">
+              <div class="sig"><span class="k">func</span> <span class="t">splitEditor</span>(<span class="a">_</span> direction: <span class="t">Direction</span>)</div>
+              <p>Split right (<kbd>⌥⌘\</kbd>) or down from the tab’s right-click menu, for two files side by side or two places in one. A file open twice is still one copy of its text.</p>
             </div>
             <div class="sym">
               <div class="sig"><span class="k">func</span> <span class="t">highlight</span>(<span class="a">_</span> language: <span class="t">Language</span>)</div>
@@ -630,11 +650,23 @@
             </div>
             <div class="sym">
               <div class="sig"><span class="k">lazy var</span> terminal = <span class="t">TerminalPanel</span>()</div>
-              <p>Your login shell in a panel under the editor. It isn’t created until you first open it.</p>
+              <p>Your login shell in a panel under the editor, with tabs and side-by-side splits. Nothing is created until you first open it.</p>
+            </div>
+            <div class="sym">
+              <div class="sig"><span class="k">func</span> <span class="t">sourceControl</span>()</div>
+              <p>Changed files in the sidebar (<kbd>⌃⇧G</kbd>): stage or unstage them, or open one as a diff. Each refresh is one short <code>git</code> call, never a background poll.</p>
+            </div>
+            <div class="sym">
+              <div class="sig"><span class="k">func</span> <span class="t">shareSelection</span>(with: <span class="t">ClaudeCode</span>)</div>
+              <p>Run <code>claude</code> in the terminal and it sees the file and lines you select, as in VS Code. <kbd>⇧⌘K</kbd> sends the selection as an @-mention. Local only, and only if Claude Code is installed.</p>
             </div>
             <div class="sym">
               <div class="sig"><span class="k">func</span> <span class="t">autosave</span>(after delay: <span class="t">TimeInterval</span> = <span class="n">1</span>)</div>
               <p>Files save a second after you stop typing. Quit any time: your folder, tabs and unsaved buffers come back.</p>
+            </div>
+            <div class="sym">
+              <div class="sig"><span class="k">func</span> <span class="t">preferences</span>()</div>
+              <p>Rebind any shortcut (<kbd>⌥⌘K</kbd>, or as JSON), size the editor, terminal and sidebar fonts separately, and pick light, dark or auto.</p>
             </div>
           </div>
         </div>
@@ -650,7 +682,7 @@
               <h2>Left out on purpose.</h2>
               <p class="prose" style="margin:0">Each of these is a reason other editors use hundreds of megabytes, run background processes, or slow down over time. Pulse is for the edits you make all day, not for replacing an IDE.</p>
             </div>
-            <div class="code" role="list"><span class="row" role="listitem">extensions/      <span class="c"># no extension host process</span></span><span class="row" role="listitem">git-ui/          <span class="c"># use the terminal or your Git app</span></span><span class="row" role="listitem">debugger/        <span class="c"># use Xcode or your IDE</span></span><span class="row" role="listitem">ai/              <span class="c"># none, and no account</span></span><span class="row" role="listitem">telemetry/       <span class="c"># no network requests at all</span></span></div>
+            <div class="code" role="list"><span class="row" role="listitem">extensions/      <span class="c"># no extension host process</span></span><span class="row" role="listitem">git-client/      <span class="c"># changes and diffs only, no history</span></span><span class="row" role="listitem">debugger/        <span class="c"># use Xcode or your IDE</span></span><span class="row" role="listitem">ai/              <span class="c"># none built in, and no account</span></span><span class="row" role="listitem">telemetry/       <span class="c"># none; the only request is the update check</span></span></div>
           </div>
         </div>
       </section>
@@ -662,10 +694,10 @@
           <div class="md-h"><span class="k">##</span> How it stays small</div>
           <h2>Built so the memory doesn’t creep.</h2>
           <div class="arch nogutter">
-            <article><span class="tag">TextKit 1</span><h3>One text view for every tab</h3><p>Switching tabs moves a single layout engine onto another file’s text, so each extra file costs about the size of its text, not another editor.</p></article>
+            <article><span class="tag">TextKit 1</span><h3>One text view per pane</h3><p>Switching tabs moves the pane’s layout engine onto another file’s text, so each extra file costs about the size of its text, not another editor. A split adds one view, and a file open in both panes keeps one copy of its text.</p></article>
             <article><span class="tag">Temporary attributes</span><h3>Highlighting without copies</h3><p>Colors are drawing-time attributes, so highlighting never duplicates the document or triggers relayout. Large files are colored around what’s on screen.</p></article>
-            <article><span class="tag">Lazy</span><h3>Everything on demand</h3><p>The terminal, the go-to-file index and folder contents are created the first time you need them, not at launch.</p></article>
-            <article><span class="tag">0% CPU idle</span><h3>Nothing ticking in the background</h3><p>No polling, no animations, no indexers. The resource meter samples every two seconds only while Pulse is the active app.</p></article>
+            <article><span class="tag">Lazy</span><h3>Everything on demand</h3><p>The terminal, the go-to-file index, folder contents, a second editor pane and the Claude Code connection are created the first time you need them, not at launch.</p></article>
+            <article><span class="tag">0% CPU idle</span><h3>Nothing ticking in the background</h3><p>No polling, no animations, no indexers. The resource meter samples every two seconds only while Pulse is the active app, and the Claude Code connection just waits on a local socket.</p></article>
           </div>
         </div>
       </section>
@@ -701,7 +733,7 @@
 <span class="c">$</span> cd pulse &amp;&amp; swift run Pulse .</code></pre>
             </article>
           </div>
-          <p class="note">Open a folder from Terminal with <code>open -a Pulse .</code></p>
+          <p class="note">Open a folder from Terminal with <code>pulse .</code> Pulse adds the command on first launch, or from Pulse › Install ‘pulse’ Command.</p>
         </div>
       </section>
 
@@ -712,11 +744,11 @@
           <div class="md-h"><span class="k">#</span> Questions</div>
           <h2>FAQ</h2>
           <div class="faq nogutter">
-            <details><summary>Is Pulse a replacement for VS Code?</summary><p>For a lot of everyday editing, yes. For extension-heavy workflows, no. Pulse has tabs, highlighting, find and replace, project search, a command palette and a terminal. It has no extensions, Git UI, debugger or AI features, and isn’t trying to.</p></details>
+            <details><summary>Is Pulse a replacement for VS Code?</summary><p>For a lot of everyday editing, yes. For extension-heavy workflows, no. Pulse has tabs, split editors, highlighting, find and replace, project search, a command palette, a terminal with tabs and splits, and a source control panel with diffs. It has no extensions, debugger, full Git client or built-in AI, and isn’t trying to.</p></details>
+            <details><summary>Does it work with Claude Code?</summary><p>Yes. Run <code>claude</code> in Pulse’s terminal and it sees the file and lines you select, the way it does in VS Code. <kbd>⇧⌘K</kbd> sends the selection as an @-mention, and <code>/ide</code> connects a <code>claude</code> running in another terminal. The connection stays on your Mac, starts only if Claude Code is installed, and can be turned off with View › Share Selection with Claude Code.</p></details>
             <details><summary>Does it support language servers or autocomplete?</summary><p>Not yet. Language servers often use more memory than the whole editor, so if support arrives it will be optional and shown separately in the resource meter.</p></details>
             <details><summary>Why is the memory number different on my Mac?</summary><p>Screen size, font size, the files you open and macOS version all change it. The status bar shows Pulse’s live footprint, and <code>scripts/memory-check.sh</code> runs the same scenarios as CI.</p></details>
-            <details><summary>Does Pulse collect any data?</summary><p>No. There is no telemetry, no analytics, no account, and Pulse makes no network requests.</p></details>
-            <details><summary>What happened to the Pulse memory monitor?</summary><p>Pulse 2.0 replaces it with this editor, built on the same idea: native, small and quick. Version 1.x is still on the <a href="https://github.com/Suraj1089/pulse/releases">releases page</a>.</p></details>
+            <details><summary>Does Pulse collect any data?</summary><p>No. There is no telemetry, no analytics and no account. Pulse goes online only to check GitHub for a new release (at launch and at most once a day) and to download one when you choose to update. The Claude Code connection stays on your Mac.</p></details>
           </div>
         </div>
       </section>
@@ -738,7 +770,7 @@
   <span class="hide-sm">Spaces: 4</span>
   <span class="hide-sm">UTF-8</span>
   <span class="grow"></span>
-  <span>Pulse <b>31.8 MB</b></span>
+  <span>Pulse <b>27.1 MB</b></span>
   <span>CPU <b>0%</b></span>
   <span class="hide-sm">Shell 1.8 MB</span>
 </div>
@@ -754,10 +786,12 @@
 (function () {
   // keybindings.json rendered with syntax colors
   var keys = [
-    ["Open a folder or files", "⌘O"], ["Go to file", "⌘P"], ["Command palette", "⇧⌘P"],
+    ["Open a folder or files", "⌘O"], ["New window", "⇧⌘N"], ["Go to file", "⌘P"], ["Command palette", "⇧⌘P"],
     ["Go to line", "⌘L"], ["Find / replace", "⌘F · ⌥⌘F"], ["Search the project", "⇧⌘F"],
-    ["Show or hide terminal", "⌃`"], ["Toggle comment", "⌘/"], ["Indent / outdent", "⌘] · ⌘["],
-    ["Next / previous tab", "⇧⌘] · ⇧⌘["], ["Toggle sidebar", "⌃⌘S"], ["Font size", "⌘+ · ⌘− · ⌘0"]
+    ["Split editor right", "⌥⌘\\"], ["Show or hide terminal", "⌃`"], ["New / split terminal", "⌃⇧` · ⌘\\"],
+    ["Source control", "⌃⇧G"], ["Send selection to Claude Code", "⇧⌘K"],
+    ["Toggle comment", "⌘/"], ["Indent / outdent", "⌘] · ⌘["], ["Next / previous tab", "⇧⌘] · ⇧⌘["],
+    ["Toggle sidebar", "⌃⌘S"], ["Font size", "⌘+ · ⌘− · ⌘0"], ["Change shortcuts", "⌥⌘K"]
   ];
   var box = document.getElementById("keys");
   var html = '<div class="row"><span>{</span><span></span><span></span></div>';

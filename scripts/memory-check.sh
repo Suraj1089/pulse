@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launches Pulse in three scenarios and reads its physical footprint (the
+# Launches Pulse in five scenarios and reads its physical footprint (the
 # number Activity Monitor shows as "Memory") with vmmap.
 #
 #   1. empty window
