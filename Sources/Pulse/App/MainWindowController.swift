@@ -439,6 +439,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     @objc func toggleTerminal(_ sender: Any?) { editor.toggleTerminal() }
     @objc func killTerminal(_ sender: Any?) { editor.killTerminal() }
+    @objc func newTerminal(_ sender: Any?) { editor.newTerminal() }
+    @objc func splitTerminal(_ sender: Any?) { editor.splitTerminal() }
     @objc func toggleComment(_ sender: Any?) { editor.textView.toggleLineComment() }
     @objc func indentLines(_ sender: Any?) { editor.textView.shiftLines(right: true) }
     @objc func outdentLines(_ sender: Any?) { editor.textView.shiftLines(right: false) }
@@ -601,6 +603,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("Preferences: Appearance: Dark", #selector(useDarkAppearance(_:))),
             command("Help: Welcome", #selector(showWelcome(_:))),
             command("Terminal: Toggle Terminal", #selector(toggleTerminal(_:))),
+            command("Terminal: New Terminal", #selector(newTerminal(_:))),
+            command("Terminal: Split Terminal", #selector(splitTerminal(_:))),
             command("Terminal: Kill Terminal", #selector(killTerminal(_:))),
             command("Preferences: Open Keyboard Shortcuts", #selector(openKeyboardShortcuts(_:))),
             command("Pulse: Check for Updates", #selector(checkForUpdates(_:))),

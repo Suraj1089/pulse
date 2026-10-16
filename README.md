@@ -71,6 +71,8 @@ Pulse checks for a new release once a day and shows an **Update** button at the 
 | `⌘F` / `⌥⌘F` | Find / find and replace in file |
 | `⇧⌘F` | Search the project |
 | `` ⌃` `` | Show or hide the terminal |
+| `⌃⇧`` ` | New terminal (in the open folder) |
+| `⌘\` | Split terminal (side by side) |
 | `⌘/` | Toggle line comment |
 | `⌘]` / `⌘[` | Indent / outdent |
 | `⇧⌘]` / `⇧⌘[` | Next / previous tab |

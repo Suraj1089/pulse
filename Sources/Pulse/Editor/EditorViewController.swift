@@ -98,6 +98,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         split.addArrangedSubview(editorArea)
 
         tabBar.onSelect = { [weak self] index in self?.activate(index) }
+        // The last shell exited (or was killed): the panel goes away.
+        terminal.onEmpty = { [weak self] in self?.hideTerminal() }
         tabBar.onClose = { [weak self] index in _ = self?.closeDocument(at: index) }
 
         [tabBar, split, statusBar].forEach {
@@ -483,10 +485,31 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         view.isDescendant(of: terminal)
     }
 
+    /// Another terminal tab in the open folder (the first one if none is running).
+    func newTerminal() {
+        let running = terminal.hasStarted
+        showTerminal()
+        if running { terminal.newTerminal(in: terminalDirectory) }
+    }
+
+    /// Another shell beside the focused one, in the open folder.
+    func splitTerminal() {
+        let running = terminal.hasStarted
+        showTerminal()
+        if running { terminal.splitTerminal(in: terminalDirectory) }
+    }
+
+    /// Ends the focused shell; the panel hides when it was the last one.
     func killTerminal() {
-        terminal.kill()
+        terminal.killActive()
+    }
+
+    func killAllTerminals() {
+        terminal.killAll()
         hideTerminal()
     }
+
+    var terminalPanel: TerminalPanel { terminal }
 
     // MARK: Chrome
 

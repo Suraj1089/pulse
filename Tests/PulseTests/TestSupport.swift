@@ -43,7 +43,7 @@ class PulseTestCase: XCTestCase {
 
     override func tearDownWithError() throws {
         for controller in controllers {
-            controller.editor.killTerminal()
+            controller.editor.killAllTerminals()
             controller.window?.orderOut(nil)
         }
         controllers = []
