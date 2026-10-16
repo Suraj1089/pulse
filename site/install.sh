@@ -40,7 +40,7 @@ main() {
     # --progress-bar draws on stderr, which is still the terminal when piped to bash.
     local bytes
     bytes="$(curl -fL --progress-bar -o "$tmp/Pulse.zip" -w '%{size_download}' "$url")" \
-        || fail "Download failed. Check your connection, or get Pulse.dmg from https://github.com/$REPO/releases"
+        || fail "Download failed. Check your connection and run the command again."
     info "Downloaded $(awk -v b="$bytes" 'BEGIN { printf "%.1f MB", b / 1048576 }')"
 
     step "Unpacking"

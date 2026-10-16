@@ -18,7 +18,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Suraj1089/pulse/ci.yml?style=flat-square&label=memory%20budget)](https://github.com/Suraj1089/pulse/actions/workflows/ci.yml)
 
-[**Download Pulse.dmg**](https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg) • [**Website**](https://pulse0.app)
+[**Install**](#install) • [**Website**](https://pulse0.app)
 
 </div>
 
@@ -49,7 +49,7 @@ Not included, on purpose: extensions, debugger, a full Git client (history, merg
 curl -fsSL https://pulse0.app/install.sh | bash
 ```
 
-Or download [Pulse.dmg](https://github.com/Suraj1089/pulse/releases/latest/download/Pulse.dmg) and drag Pulse to Applications.
+It downloads the latest release into Applications and opens it. Pulse isn't notarized by Apple yet, so a copy downloaded in a browser is blocked by macOS ("Apple could not verify 'Pulse'…"); the installer fetches the same release with `curl` and clears that download flag. You can [read the script](install.sh) first.
 
 Open a folder from the terminal with `pulse .` (or `pulse file.swift src/`), like VS Code's `code .`. Pulse links the `pulse` command into a folder on your PATH the first time it runs; if that needs a password, use Pulse › Install 'pulse' Command. Homebrew installs it with the cask.
 
