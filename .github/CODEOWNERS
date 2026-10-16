@@ -1,0 +1,12 @@
+# The rules and the checks that enforce them need the maintainer's review.
+# (Takes effect when branch protection requires review from code owners.)
+/CLAUDE.md                        @Suraj1089
+/REVIEW.md                        @Suraj1089
+/AGENTS.md                        @Suraj1089
+/Package.swift                    @Suraj1089
+/Package.resolved                 @Suraj1089
+/scripts/policy-check.sh          @Suraj1089
+/scripts/memory-check.sh          @Suraj1089
+/scripts/memory-compare.sh        @Suraj1089
+/.github/                         @Suraj1089
+/Sources/Pulse/Resources/         @Suraj1089

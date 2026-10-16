@@ -5,9 +5,46 @@ on:
     branches-ignore:
       - screenshots
   pull_request:
+    # labeled/unlabeled: adding or removing `memory-approved` re-runs the checks.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 
 jobs:
+  # CLAUDE.md › Restrictions (R1–R6): frameworks, dependencies, network,
+  # idle work, child processes, bundle contents. Fast; runs on Linux.
+  policy:
+    name: Policy check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restrictions (R1–R6)
+        run: ./scripts/policy-check.sh
+
+  # Pull requests only: the PR's build against its base branch, same runner,
+  # alternating rounds. Fails on more than +5 MB in any scenario or +512 KB
+  # of executable, unless a maintainer adds the `memory-approved` label.
+  memory-regression:
+    name: Memory vs. base branch
+    if: github.event_name == 'pull_request'
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - name: Build base and PR
+        run: |
+          (cd base && ./scripts/bundle.sh)
+          ./scripts/bundle.sh
+
+      - name: Compare memory and size
+        env:
+          ALLOW_INCREASE: ${{ contains(github.event.pull_request.labels.*.name, 'memory-approved') && '1' || '0' }}
+        run: ./scripts/memory-compare.sh base/dist/Pulse.app dist/Pulse.app
+
   build-and-measure:
     name: Build & memory budget
     # Same runner image as release.yml, so CI proves the release build too.

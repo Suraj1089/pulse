@@ -9,7 +9,8 @@
 #      in for it and checks that the app sends the open file)
 #
 # Fails if Pulse itself goes over MAX_MB in any scenario. TARGET_MB is the
-# goal we report against.
+# goal we report against. With RESULTS_FILE set, also appends
+# "scenario<TAB>pulse MB<TAB>child MB" lines to that file.
 #
 #   ./scripts/memory-check.sh dist/Pulse.app
 set -euo pipefail
@@ -104,6 +105,8 @@ run_scenario() {
         verdict="above ${TARGET_MB} MB target"
     fi
     RESULTS+=("| $name | $mb MB | $shells MB | $verdict |")
+    # Machine-readable copy for scripts/memory-compare.sh.
+    if [ -n "${RESULTS_FILE:-}" ]; then printf '%s\t%s\t%s\n' "$name" "$mb" "$shells" >> "$RESULTS_FILE"; fi
     echo "$name: Pulse ${mb} MB, child processes ${shells} MB ($verdict)"
 }
 
@@ -123,6 +126,6 @@ CLAUDE_CLIENT_DIR=""
     echo "| Scenario | Pulse | Child processes | Result |"
     echo "|---|---|---|---|"
     printf '%s\n' "${RESULTS[@]}"
-} | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+} | tee -a "${SUMMARY_FILE:-${GITHUB_STEP_SUMMARY:-/dev/null}}"
 
 exit "$FAILED"
