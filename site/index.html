@@ -80,6 +80,22 @@
   }
   </script>
 
+  <!-- Google Analytics (GA4): runs only on pulse0.app, and only once GA_ID
+       is set to the property's Measurement ID. -->
+  <script>
+  (function () {
+    var GA_ID = "G-XXXXXXXXXX";
+    if (!/^(www\.)?pulse0\.app$/.test(location.hostname) || !/^G-[A-Z0-9]+$/.test(GA_ID) || /^G-X+$/.test(GA_ID)) return;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -789,6 +805,7 @@
   // copy buttons
   document.querySelectorAll("[data-copy]").forEach(function (b) {
     b.addEventListener("click", function () {
+      if (window.gtag) gtag("event", "copy_install_command", { section: (b.closest("section") || {}).id || "" });
       var done = function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600); };
       try {
         navigator.clipboard.writeText(b.dataset.copy).then(done, function () { selectCode(b); });
