@@ -58,7 +58,7 @@ In Source Control, click a changed file to see its diff (added and removed lines
 
 The editor, the sidebar and the terminal each have their own font size: ⌘+ / ⌘− / ⌘0 change the one you're working in, and View › Font Size names each. View › Appearance picks Auto, Light or Dark. The Welcome tab (Help › Welcome to Pulse) opens the first time Pulse runs.
 
-Pulse checks for a new release once a day and shows an **Update** button at the top right when one is available; it installs the update and reopens with your tabs. Pulse › Check for Updates… checks right away. Every change merged to `main` is released automatically.
+Pulse checks for a new release once a day and shows an **Update** button at the top right when one is available; it installs the update and reopens with your tabs. Pulse › Check for Updates… checks right away. Releases are published from `main` when a commit or merged PR title includes `[release]`.
 
 ## Shortcuts
 

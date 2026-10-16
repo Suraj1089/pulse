@@ -1,10 +1,12 @@
 name: Release Pulse
 
-# Every push to main that passes CI (build, tests, memory budget) and
-# changes the app becomes a release, so the website's "latest" download
-# links, install.sh and the in-app Update button always serve the newest
-# build. Pushes that only touch the website, docs, install.sh, tests or CI
-# (nothing in the app since the last release) are skipped.
+# A push to main is released only when its commit message contains
+# [release] (for a merged PR, put it in the PR title: GitHub copies the title
+# into the merge commit) and it passes CI (build, tests, memory budget).
+# Even then it is skipped if nothing in the app changed since the last
+# release (website, docs, install.sh, tests or CI only). The website's
+# "latest" links, install.sh and the in-app Update button all serve the
+# newest release. A pushed v* tag or a manual run always releases.
 #
 # Version: VERSION holds major.minor.patch. If that exact version has no
 # release yet, it is released as is (so a manual bump to 2.1.0 ships 2.1.0).
@@ -49,11 +51,18 @@ jobs:
       # followed by a code push still ships the code.
       - name: Check for app changes
         id: changes
+        env:
+          # Through env, never pasted into the script: it is user text.
+          MESSAGE: ${{ github.event.workflow_run.head_commit.message }}
         run: |
           git fetch --tags --force --quiet
           LAST=$(git describe --tags --abbrev=0 --match 'v*' HEAD 2>/dev/null || true)
           if [ "${{ github.event_name }}" != "workflow_run" ] || [ -z "$LAST" ]; then
             echo "release=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if ! printf '%s' "$MESSAGE" | grep -qiF '[release]'; then
+            echo "The commit message doesn't ask for a release ([release]); no release."
+            echo "release=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
           APP_FILES=$(git diff --name-only "$LAST" HEAD \
             | grep -vE '^(site/|assets/|Tests/|\.github/)|\.md$|^LICENSE$|^install\.sh$' || true)
