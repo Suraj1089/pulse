@@ -39,7 +39,7 @@ Sources/Pulse/
 │   ├── WelcomeController     Welcome tab (first launch, Help › Welcome); built when shown
 ├── Sidebar/                  File tree, project search panel, the switcher
 ├── Palette/CommandPalette    Go to file / commands / go to line, fuzzy matching
-├── Terminal/TerminalPanel    SwiftTerm view, created lazily
+├── Terminal/TerminalPanel    Terminal tabs (+) and side-by-side panes (split), one SwiftTerm view and shell each, created on demand
 ├── Workspace/                Document (text + line index), FileNode, FileIndex, ProjectSearch
 ├── Support/                  Theme (dynamic colors, fonts), ResourceMonitor
 └── Resources/                Info.plist (embedded via linker), AppIcon.icns

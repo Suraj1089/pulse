@@ -113,6 +113,10 @@ enum MainMenu {
         menu.addItem(item("Show Source Control", #selector(MainWindowController.showSourceControl(_:)), "g", [.control, .shift]))
         menu.addItem(item("Toggle Sidebar", #selector(MainWindowController.toggleSidebarVisibility(_:)), "s", [.command, .control]))
         menu.addItem(item("Show Terminal", #selector(MainWindowController.toggleTerminal(_:)), "`", [.control]))
+        // ⌃⇧` like VS Code. Shifted symbols are matched by the character they
+        // type ("~"), so that's the key equivalent; the menu shows it as ⌃~.
+        menu.addItem(item("New Terminal", #selector(MainWindowController.newTerminal(_:)), "~", [.control]))
+        menu.addItem(item("Split Terminal", #selector(MainWindowController.splitTerminal(_:)), "\\"))
         menu.addItem(item("Kill Terminal", #selector(MainWindowController.killTerminal(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Word Wrap", #selector(MainWindowController.toggleWordWrap(_:)), "w", [.command, .option]))
