@@ -183,6 +183,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         sidebar.sourceControl.root = url
         showBranch()
         editor.terminalDirectory = url
+        editor.projectRoot = url
         titleBar.searchField.title = url?.lastPathComponent ?? "Search"
         if let url {
             RecentFolders.add(url)
