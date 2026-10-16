@@ -88,7 +88,7 @@ A push to `main` is released by `release.yml` only when its commit message conta
 - Releases run one at a time and build the exact commit CI tested.
 - `scripts/package.sh` marks release builds (`PulseReleaseBuild` in Info.plist). Only those check for updates on their own: at launch and at most once a day on activation, via a short-lived `curl` (`App/Updater.swift`). Pulse › Check for Updates… checks on demand in any build.
 - An update downloads that release's `Pulse.zip`, checks the bundle id and version, quits Pulse, swaps the bundle in place and reopens it (tabs and unsaved text come back through session recovery). If the app's folder isn't writable, it offers the releases page.
-- `site/VERSION` and the site's `softwareVersion` are not updated per release; downloads don't depend on them.
+- The website names no version (so it can't go stale), and `site/VERSION` is not updated per release; downloads don't depend on it. When features or the memory numbers change, update `site/index.html`, `site/llms.txt`, `site/llms-full.txt` and the README together; the screenshots and `site/og-image.png` come from the CI capture on the `screenshots` branch.
 
 ## The `pulse` terminal command
 
