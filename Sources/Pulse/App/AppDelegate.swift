@@ -20,11 +20,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let arguments = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }
         let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         pendingURLs += arguments.map { URL(fileURLWithPath: $0, relativeTo: cwd).standardizedFileURL }
-        if !pendingURLs.isEmpty {
+        let launchedWithFiles = !pendingURLs.isEmpty
+        if launchedWithFiles {
             controller.open(pendingURLs)
             pendingURLs = []
         }
-        controller.showWelcomeIfNeeded()
+        controller.showWelcomeIfNeeded(launchedWithFiles: launchedWithFiles)
 
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)

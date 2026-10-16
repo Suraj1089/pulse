@@ -1,4 +1,5 @@
 import AppKit
+import SwiftTerm
 import XCTest
 @testable import Pulse
 
@@ -106,5 +107,93 @@ final class PreferencesTests: PulseTestCase {
         XCTAssertEqual(NSApp.appearance?.name, .aqua)
         AppAppearance.current = .auto
         XCTAssertNil(NSApp.appearance)
+    }
+
+    // MARK: Review fixes
+
+    func testWelcomeOnLaunchStaysBehindFilesPulseWasOpenedWith() throws {
+        WelcomeController.showsOnLaunch = true
+        let root = try makeFolder(files: ["main.swift": "\n"])
+        let controller = makeController(opening: [root.appendingPathComponent("main.swift")])
+        controller.showWelcomeIfNeeded(launchedWithFiles: true)
+        XCTAssertEqual(controller.editor.activeDocument?.url?.lastPathComponent, "main.swift", "the file asked for stays in front")
+        XCTAssertFalse(controller.editor.documents.contains { $0.special == .welcome })
+    }
+
+    func testSwitchingSpecialTabsKeepsEachTabsState() throws {
+        let controller = makeController()
+        controller.openKeyboardShortcuts(nil)
+        layout(controller)
+        let search = try XCTUnwrap(views(NSSearchField.self, in: controller).first { $0.placeholderString == "Search commands or keys" })
+        search.stringValue = "tab"
+        controller.showWelcome(nil)
+        layout(controller)
+        XCTAssertNil(search.window, "only the active special view is on screen")
+        controller.openKeyboardShortcuts(nil)
+        layout(controller)
+        let again = try XCTUnwrap(views(NSSearchField.self, in: controller).first { $0.placeholderString == "Search commands or keys" })
+        XCTAssertTrue(again === search, "the same view comes back")
+        XCTAssertEqual(again.stringValue, "tab")
+    }
+
+    func testWelcomeFollowsSettingsChangedElsewhere() throws {
+        let controller = makeController()
+        controller.showWelcome(nil)
+        layout(controller)
+        let appearance = try XCTUnwrap(views(NSSegmentedControl.self, in: controller).first { $0.label(forSegment: 0) == "Auto" })
+        let autosave = try XCTUnwrap(views(NSSwitch.self, in: controller).first)
+        AppAppearance.current = .dark
+        XCTAssertEqual(appearance.selectedSegment, AppAppearance.allCases.firstIndex(of: .dark))
+        EditorViewController.autosaveEnabled = false
+        XCTAssertEqual(autosave.state, .off)
+        AppAppearance.current = .auto
+    }
+
+    func testWelcomeShortcutsFollowRebinding() throws {
+        KeyBindings.register(MainMenu.build())
+        let controller = makeController()
+        controller.showWelcome(nil)
+        layout(controller)
+        XCTAssertTrue(labels(in: frameView(controller)).contains("⌘P"))
+        KeyBindings.set(Shortcut(config: "cmd+1"), for: "go.goToFile")
+        XCTAssertTrue(labels(in: frameView(controller)).contains("⌘1"), "the Go to file row shows the new shortcut")
+        KeyBindings.resetAll()
+    }
+
+    func testIsInstalledFindsTheLinkWhereverItWasInstalled() throws {
+        let folder = temp.appendingPathComponent("cargo-bin", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: folder.appendingPathComponent("pulse").path,
+                                                   withDestinationPath: CommandLineTool.script.path)
+        UserDefaults.standard.set(folder.path, forKey: "cliInstallFolder")
+        XCTAssertTrue(CommandLineTool.isInstalled)
+    }
+
+    func testNeverLinksOverADifferentPulseProgram() throws {
+        let free = temp.appendingPathComponent("free", isDirectory: true)
+        let other = temp.appendingPathComponent("other", isDirectory: true)
+        let oldPulse = temp.appendingPathComponent("old", isDirectory: true)
+        for folder in [free, other, oldPulse] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+        try "#!/bin/sh\necho other\n".write(to: other.appendingPathComponent("pulse"), atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(atPath: oldPulse.appendingPathComponent("pulse").path,
+                                                   withDestinationPath: "/Applications/Old/Pulse.app/Contents/Resources/pulse")
+        XCTAssertTrue(CommandLineTool.canLink(in: free.path))
+        XCTAssertFalse(CommandLineTool.canLink(in: other.path), "a different program called pulse")
+        XCTAssertTrue(CommandLineTool.canLink(in: oldPulse.path), "a link left by another copy of Pulse")
+    }
+
+    func testTerminalColorsFollowAppearance() throws {
+        let controller = makeController()
+        controller.editor.showTerminal()
+        layout(controller)
+        let terminal = try XCTUnwrap(views(LocalProcessTerminalView.self, in: controller).first)
+        func background() -> CGColor? { terminal.layer?.backgroundColor }
+        AppAppearance.current = .dark
+        layout(controller)
+        let dark = background()
+        AppAppearance.current = .light
+        layout(controller)
+        XCTAssertNotEqual(dark, background(), "the terminal background changes with the appearance")
+        AppAppearance.current = .auto
     }
 }

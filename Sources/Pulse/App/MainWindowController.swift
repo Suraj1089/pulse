@@ -262,13 +262,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case .installed(let folder), .alreadyInstalled(let folder):
             alert.messageText = "The pulse command is installed"
             alert.informativeText = "It's in \(folder). Open a new terminal and run “pulse .” to open a folder, or “pulse file.swift” to open a file."
-            NotificationCenter.default.post(name: .commandLineToolDidChange, object: nil)
         case .unavailable(let reason):
             alert.messageText = "Couldn't install the pulse command"
             alert.informativeText = reason
-            // The by-hand fallback, when this copy of Pulse has the script to link to.
-            if FileManager.default.isExecutableFile(atPath: CommandLineTool.script.path) {
-                alert.informativeText += "\n\nTo install it yourself, run this in Terminal:\n\(CommandLineTool.manualCommand)"
+            // The by-hand fallback, when this copy of Pulse has the script to link to
+            // and linking it wouldn't replace a different program called pulse.
+            if FileManager.default.isExecutableFile(atPath: CommandLineTool.script.path), let command = CommandLineTool.manualCommand {
+                alert.informativeText += "\n\nTo install it yourself, run this in Terminal:\n\(command)"
                 alert.addButton(withTitle: "Copy Command")
                 alert.addButton(withTitle: "Close")
             }
@@ -277,9 +277,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         }
         alert.beginSheetModal(for: window) { response in
             guard case .unavailable(_) = outcome, response == .alertFirstButtonReturn,
-                  alert.buttons.count > 1 else { return }
+                  alert.buttons.count > 1, let command = CommandLineTool.manualCommand else { return }
             NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(CommandLineTool.manualCommand, forType: .string)
+            NSPasteboard.general.setString(command, forType: .string)
         }
     }
 
@@ -473,13 +473,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     @objc func showWelcome(_ sender: Any?) { editor.openSpecial(.welcome) }
 
     /// At launch: the first time Pulse opens with nothing to show, and every
-    /// launch when "Show on launch" is ticked.
-    func showWelcomeIfNeeded() {
+    /// launch when "Show on launch" is ticked, unless Pulse was launched to
+    /// open specific files (`pulse file.swift`, Finder): those stay in front.
+    func showWelcomeIfNeeded(launchedWithFiles: Bool = false) {
         let defaults = UserDefaults.standard
         let firstLaunch = !defaults.bool(forKey: "welcomeShown")
         defaults.set(true, forKey: "welcomeShown")
         let isEmpty = root == nil && editor.documents.isEmpty
-        if (firstLaunch && isEmpty) || WelcomeController.showsOnLaunch {
+        if (firstLaunch && isEmpty) || (WelcomeController.showsOnLaunch && !launchedWithFiles) {
             editor.openSpecial(.welcome)
         }
     }

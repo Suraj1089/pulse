@@ -126,6 +126,7 @@ enum AppAppearance: String, CaseIterable {
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: "appearance")
             newValue.apply()
+            NotificationCenter.default.post(name: .settingsDidChange, object: nil)
         }
     }
 

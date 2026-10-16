@@ -17,6 +17,7 @@ final class WelcomeController: NSViewController {
     private let autosave = NSSwitch()
     private let install = NSButton(title: "Install", target: nil, action: nil)
     private let showOnLaunch = NSButton(checkboxWithTitle: "Show on launch", target: nil, action: nil)
+    private var actionRows: [WelcomeRow] = []
 
     deinit {
         NotificationCenter.default.removeObserver(self)
@@ -38,13 +39,14 @@ final class WelcomeController: NSViewController {
         header.spacing = 2
         header.setCustomSpacing(10, after: icon)
 
-        let actions = rows([
+        actionRows = [
             WelcomeRow(title: "Open a folder…", action: #selector(MainWindowController.openDocument(_:))),
             WelcomeRow(title: "New file", action: #selector(MainWindowController.newFile(_:))),
             WelcomeRow(title: "Go to file", action: #selector(MainWindowController.showGoToFile(_:))),
             WelcomeRow(title: "All commands", action: #selector(MainWindowController.showCommandPalette(_:))),
             WelcomeRow(title: "Terminal", action: #selector(MainWindowController.toggleTerminal(_:))),
-        ])
+        ]
+        let actions = rows(actionRows)
 
         appearance.segmentCount = AppAppearance.allCases.count
         for (index, mode) in AppAppearance.allCases.enumerated() {
@@ -108,8 +110,11 @@ final class WelcomeController: NSViewController {
         // The editor adds and removes this view directly (no view-controller
         // appearance calls), so refresh whenever it lands in the window.
         root.onMoveToWindow = { [weak self] in self?.refresh() }
-        NotificationCenter.default.addObserver(self, selector: #selector(refresh),
-                                               name: .commandLineToolDidChange, object: nil)
+        // Settings, the pulse command and shortcuts can change from menus,
+        // other tabs or keybindings.json while this tab is open.
+        for name in [Notification.Name.commandLineToolDidChange, .settingsDidChange, .keyBindingsDidChange] {
+            NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: name, object: nil)
+        }
         refresh()
     }
 
@@ -121,6 +126,7 @@ final class WelcomeController: NSViewController {
         let installed = CommandLineTool.isInstalled
         install.title = installed ? "Installed" : "Install"
         install.isEnabled = !installed
+        actionRows.forEach { $0.refreshShortcut() }
     }
 
     // MARK: Building
@@ -177,6 +183,7 @@ final class WelcomeController: NSViewController {
 /// command's current shortcut (it follows rebinding) on the right.
 private final class WelcomeRow: NSView {
     private let action: Selector
+    private let shortcut = NSTextField(labelWithString: "")
 
     init(title: String, action: Selector) {
         self.action = action
@@ -186,7 +193,7 @@ private final class WelcomeRow: NSView {
 
         let label = NSTextField(labelWithString: title)
         label.font = .systemFont(ofSize: 13)
-        let shortcut = NSTextField(labelWithString: KeyBindings.display(for: action))
+        shortcut.stringValue = KeyBindings.display(for: action)
         shortcut.font = .systemFont(ofSize: 12)
         shortcut.textColor = .tertiaryLabelColor
         let stack = NSStackView(views: [label, shortcut])
@@ -206,6 +213,11 @@ private final class WelcomeRow: NSView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// The command's current shortcut, after rebinding.
+    func refreshShortcut() {
+        shortcut.stringValue = KeyBindings.display(for: action)
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -264,4 +276,6 @@ private final class WelcomeBackgroundView: NSView {
 extension Notification.Name {
     /// The `pulse` command was installed (refreshes the Welcome tab).
     static let commandLineToolDidChange = Notification.Name("PulseCommandLineToolDidChange")
+    /// Appearance or autosave changed, from any menu or tab.
+    static let settingsDidChange = Notification.Name("PulseSettingsDidChange")
 }
