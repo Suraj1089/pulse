@@ -28,7 +28,7 @@ Pulse is a code editor written in Swift and AppKit, with no web view, no Electro
 
 ## Features
 
-- **Folders and files**: open a folder, browse it in the sidebar, open many files in tabs.
+- **Folders and files**: open a folder, browse it in the sidebar, open many files in tabs, with the open file's path (from the folder) shown under the tabs.
 - **Editing**: syntax highlighting for Swift, JS/TS, Python, Go, Rust, C/C++/Obj-C, Java/Kotlin, Ruby, shell, HTML/XML, CSS, JSON, YAML, TOML, Markdown and SQL. Line numbers, current-line highlight, auto-indent, toggle comment, indent/outdent, word wrap.
 - **Find and replace** in the file (the standard macOS find bar), and **project search** (uses `ripgrep` when installed, otherwise a built-in scan; a block of code finds the same code however it is wrapped or indented).
 - **Command palette**: `⌘P` go to file, `⇧⌘P` commands, `⌘L` go to line.

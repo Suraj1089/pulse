@@ -20,6 +20,12 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private(set) var activeIndex: Int?
     var activeDocument: Document? { activeIndex.map { documents[$0] } }
     var terminalDirectory: URL?
+    /// The window's opened folder, for the breadcrumb path.
+    var projectRoot: URL? {
+        didSet { if isViewLoaded { refreshBreadcrumbs() } }
+    }
+    let breadcrumbs = BreadcrumbBar()
+    private var breadcrumbHeight: NSLayoutConstraint!
 
     let statusBar = StatusBarView()
     private let tabBar = TabBarView()
@@ -102,16 +108,21 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         terminal.onEmpty = { [weak self] in self?.hideTerminal() }
         tabBar.onClose = { [weak self] index in _ = self?.closeDocument(at: index) }
 
-        [tabBar, split, statusBar].forEach {
+        [tabBar, breadcrumbs, split, statusBar].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview($0)
         }
+        breadcrumbHeight = breadcrumbs.heightAnchor.constraint(equalToConstant: 0)
         NSLayoutConstraint.activate([
             tabBar.topAnchor.constraint(equalTo: root.topAnchor),
             tabBar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             tabBar.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             tabBar.heightAnchor.constraint(equalToConstant: TabBarView.height),
-            split.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
+            breadcrumbs.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
+            breadcrumbs.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            breadcrumbs.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            breadcrumbHeight,
+            split.topAnchor.constraint(equalTo: breadcrumbs.bottomAnchor),
             split.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             split.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             split.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
@@ -524,7 +535,16 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         scrollView.isHidden = !hasDocument || special != nil
         showSpecial(special)
         refreshTabs()
+        refreshBreadcrumbs()
         updateStatus()
+    }
+
+    /// The path bar shows for files on disk; untitled and special tabs hide it.
+    private func refreshBreadcrumbs() {
+        let file = activeDocument.flatMap { $0.special == nil ? $0.url : nil }
+        breadcrumbs.show(file, root: projectRoot)
+        breadcrumbs.isHidden = file == nil
+        breadcrumbHeight.constant = file == nil ? 0 : BreadcrumbBar.height
     }
 
     private func showSpecial(_ kind: Document.Special?) {
