@@ -285,7 +285,7 @@ final class DiffTextView: NSTextView {
         let layoutManager = NSLayoutManager()
         layoutManager.allowsNonContiguousLayout = true
         storage.addLayoutManager(layoutManager)
-        let container = NSTextContainer(size: NSSize(width: 800, height: .greatestFiniteMagnitude))
+        let container = NSTextContainer(size: NSSize(width: 800, height: CGFloat.greatestFiniteMagnitude))
         container.widthTracksTextView = false
         layoutManager.addTextContainer(container)
         return DiffTextView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), textContainer: container)
@@ -358,7 +358,7 @@ final class DiffTextView: NSTextView {
         // Lines wrap at the visible width, so the gutter never scrolls away.
         let available = max(100, width - gutterWidth)
         if textContainer?.containerSize.width != available {
-            textContainer?.containerSize = NSSize(width: available, height: .greatestFiniteMagnitude)
+            textContainer?.containerSize = NSSize(width: available, height: CGFloat.greatestFiniteMagnitude)
         }
     }
 
