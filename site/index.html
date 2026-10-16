@@ -308,7 +308,8 @@
     border-radius: 12px; overflow: hidden; box-shadow: var(--shadow);
     background: var(--chrome); max-width: 1040px;
   }
-  .window img { display: block; width: 100%; height: auto; }
+  .window img, .window video { display: block; width: 100%; height: auto; }
+  .window video { aspect-ratio: 1920 / 1200; background: var(--chrome); }
   .window .shot-dark { display: none; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .window .shot-dark { display: block; } :root:not([data-theme="light"]) .window .shot-light { display: none; } }
   :root[data-theme="dark"] .window .shot-dark { display: block; }
@@ -554,10 +555,14 @@
             </div>
           </div>
           <figure class="window nogutter">
-            <img class="shot-light" src="/screenshot-light.png" alt="The Pulse editor window: a file tree on the left, tabs across the top, Swift code with syntax highlighting, and a terminal panel at the bottom." width="1180" height="760">
-            <img class="shot-dark" src="/screenshot-dark.png" alt="The Pulse editor window in dark mode: a file tree, tabs, highlighted Swift code and a terminal panel." width="1180" height="760">
+            <video id="demo" muted loop playsinline preload="none" width="1920" height="1200"
+              aria-label="Pulse in use: opening a folder, going to a file with Command P, typing with autosave, searching the project, running a build in the terminal and resizing the terminal font, with memory and CPU shown in the status bar."></video>
+            <noscript>
+              <img class="shot-light" src="/screenshot-light.png" alt="The Pulse editor window: a file tree on the left, tabs across the top, Swift code with syntax highlighting, and a terminal panel at the bottom." width="1180" height="760">
+              <img class="shot-dark" src="/screenshot-dark.png" alt="The Pulse editor window in dark mode: a file tree, tabs, highlighted Swift code and a terminal panel." width="1180" height="760">
+            </noscript>
           </figure>
-          <p class="caption">A real screenshot from CI: four files, the project tree and a terminal open. Status bar reads Pulse 30 MB.</p>
+          <p class="caption">An animated walkthrough: open a folder, ⌘P, autosave, project search, the terminal, per-area font sizes.</p>
         </div>
       </section>
 
@@ -786,7 +791,40 @@
     var cur = root.getAttribute("data-theme") ||
       (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+    syncDemo();
   });
+
+  // hero video: load only the one matching the theme, pause it off screen,
+  // and leave it still (with controls) for visitors who prefer reduced motion
+  var demo = document.getElementById("demo");
+  var calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var demoTheme = null, demoVisible = true;
+  function effectiveTheme() {
+    return root.getAttribute("data-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  }
+  function syncDemo() {
+    var theme = effectiveTheme();
+    if (theme === demoTheme) return;
+    var at = demo.currentTime || 0;
+    demoTheme = theme;
+    demo.poster = "/demo-" + theme + "-poster.jpg";
+    demo.src = "/demo-" + theme + ".mp4";
+    if (calm) { demo.controls = true; demo.preload = "metadata"; return; }
+    demo.preload = "auto";
+    demo.addEventListener("loadedmetadata", function seek() {
+      demo.removeEventListener("loadedmetadata", seek);
+      if (at) demo.currentTime = at;
+    });
+    if (demoVisible) { var p = demo.play(); if (p && p.catch) p.catch(function () {}); }
+  }
+  syncDemo();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncDemo);
+  if (!calm && "IntersectionObserver" in window) {
+    new IntersectionObserver(function (entries) {
+      demoVisible = entries[0].isIntersecting;
+      if (demoVisible) { var p = demo.play(); if (p && p.catch) p.catch(function () {}); } else demo.pause();
+    }).observe(demo);
+  }
 
   // active file: sidebar, tabs, status bar
   var files = Array.prototype.slice.call(document.querySelectorAll("section.file"));
