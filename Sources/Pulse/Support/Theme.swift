@@ -83,6 +83,14 @@ enum Theme {
     static let gitAdded = dynamic(light: 0x587C0C, dark: 0x81B88B)
     static let gitDeleted = dynamic(light: 0xAD0707, dark: 0xC74E39)
 
+    // Diff rows: tints of the git colors, light enough to keep syntax colors readable.
+    static let diffAdded = NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        ? hex(0x81B88B).withAlphaComponent(0.16) : hex(0x2DA44E).withAlphaComponent(0.14) }
+    static let diffRemoved = NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        ? hex(0xF85149).withAlphaComponent(0.16) : hex(0xCF222E).withAlphaComponent(0.11) }
+    static let diffHunk = NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        ? hex(0x388BFD).withAlphaComponent(0.12) : hex(0x0969DA).withAlphaComponent(0.08) }
+
     static func color(for kind: TokenKind) -> NSColor {
         switch kind {
         case .keyword: return keyword

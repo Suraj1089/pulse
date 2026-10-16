@@ -114,6 +114,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             self?.editor.reloadChangedDocuments()
         }
         sidebar.sourceControl.onOpenFile = { [weak self] url in self?.editor.open(url) }
+        sidebar.sourceControl.onOpenDiff = { [weak self] target in self?.editor.openDiff(target) }
         editor.onOpenRequest = { [weak self] in self?.openDocument(nil) }
         editor.onOpenRecent = { [weak self] url in self?.open([url]) }
         editor.setRecents(RecentFolders.all)
@@ -181,7 +182,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         }
         for entry in state.entries {
             let document: Document?
-            if let special = entry.special {
+            if entry.special == .diff {
+                continue    // diff tabs are not restored (older sessions may list one)
+            } else if let special = entry.special {
                 document = Document(special: special)
             } else if let path = entry.path {
                 let url = URL(fileURLWithPath: path)
@@ -219,7 +222,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     func saveSession() {
         sessionWork?.cancel()
         if let active = editor.activeDocument { active.selectedRange = editor.textView.selectedRange() }
-        let entries = editor.documents.map { document in
+        // The diff tab is a view of git state, not a document: leave it out.
+        let kept = editor.documents.filter { $0.special != .diff }
+        let active = editor.activeDocument.flatMap { document in kept.firstIndex { $0 === document } }
+        let entries = kept.map { document in
             SessionState.Entry(
                 path: document.url?.path,
                 unsavedText: document.isDirty ? document.storage.string : nil,
@@ -227,7 +233,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                 special: document.special
             )
         }
-        SessionState(root: root?.path, entries: entries, active: editor.activeIndex,
+        SessionState(root: root?.path, entries: entries, active: active,
                      terminalOpen: editor.isTerminalVisible).save()
     }
 
@@ -348,6 +354,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         sidebar.fileTree.refresh()
         fileIndex?.invalidate()
         editor.reloadChangedDocuments()
+        editor.reloadVisibleDiff()
         checkForUpdatesIfDue()
         showBranch()
         sidebar.sourceControl.refresh()

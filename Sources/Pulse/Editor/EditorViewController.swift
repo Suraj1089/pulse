@@ -205,6 +205,29 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         }
     }
 
+    /// Shows a changed file's diff in the diff tab, opening it if needed.
+    func openDiff(_ target: GitDiffTarget) {
+        if let index = documents.firstIndex(where: { $0.special == .diff }) {
+            documents[index].diffTarget = target
+            if index == activeIndex {
+                (specialControllers[.diff] as? DiffViewController)?.show(target)
+                refreshTabs()
+            } else {
+                activate(index)
+            }
+        } else {
+            let document = Document(special: .diff)
+            document.diffTarget = target
+            add(document)
+        }
+    }
+
+    /// Re-reads the diff on screen, if any (after saving, staging or returning to Pulse).
+    func reloadVisibleDiff() {
+        guard activeDocument?.special == .diff else { return }
+        (specialControllers[.diff] as? DiffViewController)?.reload()
+    }
+
     func newDocument() {
         add(Document(url: nil, text: ""))
         view.window?.makeFirstResponder(textView)
@@ -242,9 +265,18 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         textView.needsDisplay = true
         highlightNow()
         refreshChrome()
-        view.window?.makeFirstResponder(document.special == nil ? textView : (specialControllers[.keyboardShortcuts] as? ShortcutsEditor)?.initialFirstResponder)
+        view.window?.makeFirstResponder(firstResponder(for: document))
         onActiveDocumentChange?(document)
         onSessionChange?()
+    }
+
+    private func firstResponder(for document: Document) -> NSView? {
+        switch document.special {
+        case nil: return textView
+        case .keyboardShortcuts: return (specialControllers[.keyboardShortcuts] as? ShortcutsEditor)?.initialFirstResponder
+        case .diff: return (specialControllers[.diff] as? DiffViewController)?.initialFirstResponder
+        case .welcome: return nil
+        }
     }
 
     private func rememberViewState() {
@@ -406,6 +438,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         textView.typingAttributes = Document.baseAttributes
         ruler.updateThickness()
         ruler.needsDisplay = true
+        (specialControllers[.diff] as? DiffViewController)?.applyFontSize()
     }
 
     var selectedText: String? {
@@ -484,8 +517,19 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             switch kind {
             case .keyboardShortcuts: controller = ShortcutsEditor()
             case .welcome: controller = WelcomeController()
+            case .diff:
+                let diff = DiffViewController()
+                diff.onOpenFile = { [weak self] url, line in
+                    self?.open(url)
+                    if let line { self?.goToLine(line) }
+                }
+                controller = diff
             }
             specialControllers[kind] = controller
+        }
+        // The diff reloads each time its tab is shown: the file may have changed.
+        if kind == .diff, let target = activeDocument?.diffTarget {
+            (controller as? DiffViewController)?.show(target)
         }
         if controller.view.superview !== editorArea {
             controller.view.frame = editorArea.bounds
