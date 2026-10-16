@@ -478,6 +478,9 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func placeAtRoot(_ view: NSView) {
+        // A pane coming back out of a split view was switched to Auto Layout
+        // there; without this it keeps no size and shrinks when laid out.
+        view.translatesAutoresizingMaskIntoConstraints = true
         view.frame = paneArea.bounds
         view.autoresizingMask = [.width, .height]
         paneArea.addSubview(view)
