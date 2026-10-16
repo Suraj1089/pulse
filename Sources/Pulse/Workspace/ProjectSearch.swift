@@ -28,6 +28,10 @@ final class SearchFileResult: NSObject {
 /// newlines in it matches any run of whitespace in a file, and everything
 /// else is literal. So a pasted block of code (or the same block typed on
 /// one line, or reindented) finds the code however it is wrapped.
+///
+/// `filter` (files to include / exclude) limits which files are searched:
+/// ripgrep gets it as globs, so it never reads excluded folders, and its
+/// output is checked against the same rules as the built-in scan.
 final class ProjectSearch {
     static let maxMatches = 2_000
 
@@ -45,7 +49,7 @@ final class ProjectSearch {
         process = nil
     }
 
-    func run(query: String, root: URL, caseSensitive: Bool, index: FileIndex,
+    func run(query: String, root: URL, caseSensitive: Bool, filter: PathFilter = PathFilter(), index: FileIndex,
              useRipgrep: Bool = ProjectSearch.ripgrep != nil,
              completion: @escaping ([SearchFileResult], Bool) -> Void) {
         cancel()
@@ -60,13 +64,15 @@ final class ProjectSearch {
         let words = ProjectSearch.words(of: query)
         if useRipgrep, let rg = ProjectSearch.ripgrep {
             if let words {
-                runRipgrepBlock(rg, pattern: ProjectSearch.ripgrepPattern(words), root: root, caseSensitive: caseSensitive, completion: deliver)
+                runRipgrepBlock(rg, pattern: ProjectSearch.ripgrepPattern(words), root: root, caseSensitive: caseSensitive,
+                                filter: filter, completion: deliver)
             } else {
-                runRipgrep(rg, query: query, root: root, caseSensitive: caseSensitive, completion: deliver)
+                runRipgrep(rg, query: query, root: root, caseSensitive: caseSensitive, filter: filter, completion: deliver)
             }
         } else {
-            index.withPaths { paths in
+            index.withPaths { allPaths in
                 DispatchQueue.global(qos: .userInitiated).async {
+                    let paths = filter.isEmpty ? allPaths : allPaths.filter(filter.matches)
                     let (results, truncated) = words.map {
                         ProjectSearch.scanBlocks(paths: paths, root: root, words: $0, caseSensitive: caseSensitive)
                     } ?? ProjectSearch.scan(paths: paths, root: root, query: query, caseSensitive: caseSensitive)
@@ -76,17 +82,19 @@ final class ProjectSearch {
         }
     }
 
-    private func runRipgrep(_ executable: String, query: String, root: URL, caseSensitive: Bool,
+    private func runRipgrep(_ executable: String, query: String, root: URL, caseSensitive: Bool, filter: PathFilter,
                             completion: @escaping ([SearchFileResult], Bool) -> Void) {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: executable)
         task.currentDirectoryURL = root
-        task.arguments = [
+        var arguments = [
             "--line-number", "--no-heading", "--null", "--color", "never",
             "--fixed-strings", "--max-columns", "400", "--max-count", "200",
             caseSensitive ? "--case-sensitive" : "--ignore-case",
-            "--", query, ".",
         ]
+        arguments += filter.ripgrepArguments
+        arguments += ["--", query, "."]
+        task.arguments = arguments
         let pipe = Pipe()
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
@@ -108,6 +116,7 @@ final class ProjectSearch {
                 guard let nul = record.firstIndex(of: "\0") else { continue }
                 var path = String(record[..<nul])
                 if path.hasPrefix("./") { path.removeFirst(2) }
+                guard filter.matches(path) else { continue }
                 let rest = record[record.index(after: nul)...]
                 guard let colon = rest.firstIndex(of: ":"), let line = Int(rest[..<colon]) else { continue }
                 let text = String(rest[rest.index(after: colon)...])
@@ -147,17 +156,20 @@ final class ProjectSearch {
         }.joined(separator: "\\s+")
     }
 
-    private func runRipgrepBlock(_ executable: String, pattern: String, root: URL, caseSensitive: Bool,
+    private func runRipgrepBlock(_ executable: String, pattern: String, root: URL, caseSensitive: Bool, filter: PathFilter,
                                  completion: @escaping ([SearchFileResult], Bool) -> Void) {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: executable)
         task.currentDirectoryURL = root
         // JSON gives each match's exact start, which plain output can't for matches spanning lines.
-        task.arguments = [
+        var arguments = [
             "--json", "--multiline", "--max-count", "200",
             caseSensitive ? "--case-sensitive" : "--ignore-case",
-            "-e", pattern, "--", ".",
+            "-e", pattern,
         ]
+        arguments += filter.ripgrepArguments
+        arguments += ["--", "."]
+        task.arguments = arguments
         let pipe = Pipe()
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
@@ -180,6 +192,7 @@ final class ProjectSearch {
                       let firstLine = match["line_number"] as? Int,
                       let submatches = match["submatches"] as? [[String: Any]] else { continue }
                 if path.hasPrefix("./") { path.removeFirst(2) }
+                guard filter.matches(path) else { continue }
                 let result: SearchFileResult
                 if let existing = byPath[path] {
                     result = existing
