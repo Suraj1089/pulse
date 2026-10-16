@@ -11,7 +11,7 @@
 
 ## Non-negotiables
 
-1. **Memory budget.** CI (`.github/workflows/ci.yml` → `scripts/memory-check.sh`) launches the app in three scenarios and fails above 100 MB. Do not merge anything that moves a scenario past the 60 MB target without saying why.
+1. **Memory budget.** CI (`.github/workflows/ci.yml` → `scripts/memory-check.sh`) launches the app in four scenarios and fails above 100 MB. Do not merge anything that moves a scenario past the 60 MB target without saying why.
 2. **No idle work.** No polling timers while the app is inactive, no animations that run continuously, no background indexing that is not triggered by the user.
 3. **AppKit only.** No SwiftUI, no WKWebView, no storyboards/XIBs. They each pull in large frameworks for things the editor does not need.
 4. **One dependency.** SwiftTerm (terminal emulation), pinned with `exact:`. Releases from 1.19 on need swift-tools 6.x, which the `macos-14` release runner lacks. Think hard before adding another.
@@ -42,12 +42,14 @@ Sources/Pulse/
 ├── Sidebar/                  File tree, project search panel, the switcher
 ├── Palette/CommandPalette    Go to file / commands / go to line, fuzzy matching
 ├── Terminal/TerminalPanel    Terminal tabs (+) and side-by-side panes (split), one SwiftTerm view and shell each, created on demand
+├── Claude/                   Claude Code's IDE connection: ClaudeBridge (lock file, MCP replies, selection) on LoopbackWebSocketServer (BSD sockets)
 ├── Workspace/                Document (text + line index), FileNode, FileIndex, ProjectSearch
 ├── Support/                  Theme (dynamic colors, fonts), ResourceMonitor
 └── Resources/                Info.plist (embedded via linker), AppIcon.icns
 scripts/
 ├── bundle.sh                 Fast single-arch dist/Pulse.app
 ├── memory-check.sh           Memory budget scenarios (used by CI)
+├── claude-ide-client.py      Stands in for Claude Code in the memory check's connected scenario
 ├── screenshot.sh             Real light/dark screenshots (CI publishes them to the `screenshots` branch)
 └── package.sh                Universal release: DMG, ZIP, Homebrew cask
 ```
@@ -59,6 +61,7 @@ scripts/
 - **Highlighting.** One combined `NSRegularExpression` per language; alternatives are ordered so comments and strings win. Full pass up to 300 KB (debounced 80 ms after edits), visible range ±20k chars above that.
 - **Autosave.** On by default: modified files with a path are written 1 s after typing stops, on app deactivation, and at quit. Untitled buffers (and everything, if autosave is off) survive via `~/Library/Application Support/Pulse/session.json`.
 - **Diffs.** A click on a changed file in Source Control opens one reusable diff tab. `git diff` computes it in a short-lived process (`Workspace/GitDiff.swift`); Pulse reads at most 3 MB / 50,000 lines of output, keeps the text once (in the diff view's storage) plus 9 bytes a line, and draws line colors and the old/new number gutter for visible lines only. Diff tabs are not saved in the session.
+- **Claude Code.** Each window speaks Claude Code's IDE protocol (what VS Code's extension does), so `claude` in its terminal shows "⧉ N lines selected". `Claude/ClaudeBridge.swift` starts with the window's first terminal, and only if Claude Code's config folder (`$CLAUDE_CONFIG_DIR` or `~/.claude`) exists. It then listens on 127.0.0.1 (`Claude/LoopbackWebSocketServer.swift`: BSD sockets and main-queue dispatch sources, no networking framework, no thread, no timer, no pings) and writes `~/.claude/ide/<port>.lock` (mode 0600: pid, folder, `ideName: "Pulse"`, auth token). New shells in that window get `CLAUDE_CODE_SSE_PORT` and `ENABLE_IDE_INTEGRATION=true`, and `/ide` works from other terminals. Handshakes need the token, no `Origin` and a loopback `Host`; the `mcp` subprotocol is echoed (the CLI requires it). Selection changes are debounced 100 ms and sent only while a client is connected. A caret moving within a file sends nothing, and the text is capped at 64K characters (the CLI keeps the first 2,000; the range carries the rest). Nothing is kept between sends. The CLI calls `closeAllDiffTabs`, `getDiagnostics` and `close_tab` whether or not they are listed; Pulse answers them and lists no tools. `openDiff` gets "tool not found", and the CLI then asks in the terminal as usual (checked against CLI 2.1.301). ⇧⌘K sends `at_mentioned` to the Claude whose process descends from the focused shell. The lock file is removed when the window closes; a killed Pulse's is cleaned up on the next start.
 - **Resource meter.** `proc_pid_rusage` for Pulse and for its direct children (shells), sampled every 2 s only while active. CPU ticks are converted with `mach_timebase_info`.
 
 ## Building

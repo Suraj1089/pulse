@@ -20,10 +20,16 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private(set) var activeIndex: Int?
     var activeDocument: Document? { activeIndex.map { documents[$0] } }
     var terminalDirectory: URL?
-    /// The window's opened folder, for the breadcrumb path.
+    /// The window's opened folder, for the breadcrumb path (and Claude Code's `/ide` list).
     var projectRoot: URL? {
-        didSet { if isViewLoaded { refreshBreadcrumbs() } }
+        didSet {
+            claude.workspaceFolders = projectRoot.map { [$0] } ?? []
+            if isViewLoaded { refreshBreadcrumbs() }
+        }
     }
+    /// Claude Code's IDE connection for this window: started with its first
+    /// terminal, it shares the file and selection with `claude` (see ClaudeBridge).
+    let claude = ClaudeBridge()
     let breadcrumbs = BreadcrumbBar()
     private var breadcrumbHeight: NSLayoutConstraint!
 
@@ -106,6 +112,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         tabBar.onSelect = { [weak self] index in self?.activate(index) }
         // The last shell exited (or was killed): the panel goes away.
         terminal.onEmpty = { [weak self] in self?.hideTerminal() }
+        claude.host = self
+        terminal.environment = { [weak self] in self?.claude.terminalEnvironment() ?? [] }
+        NotificationCenter.default.addObserver(self, selector: #selector(claudeIntegrationDidChange),
+                                               name: .claudeIntegrationDidChange, object: nil)
         tabBar.onClose = { [weak self] index in _ = self?.closeDocument(at: index) }
 
         [tabBar, breadcrumbs, split, statusBar].forEach {
@@ -281,6 +291,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         view.window?.makeFirstResponder(firstResponder(for: document))
         onActiveDocumentChange?(document)
         onSessionChange?()
+        claude.selectionDidChange()
     }
 
     private func firstResponder(for document: Document) -> NSView? {
@@ -690,5 +701,84 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     func textViewDidChangeSelection(_ notification: Notification) {
         ruler.needsDisplay = true
         updateStatus()
+        claude.selectionDidChange()
+    }
+}
+
+// MARK: Claude Code
+
+extension EditorViewController: ClaudeBridgeHost {
+    func claudeSelection() -> ClaudeSelection? {
+        guard isViewLoaded, let document = activeDocument, document.special == nil, let url = document.url else { return nil }
+        let text = document.storage.string as NSString
+        let selected = textView.selectedRange()
+        let location = min(selected.location, text.length)
+        let range = NSRange(location: location, length: min(selected.length, text.length - location))
+        func position(_ offset: Int) -> ClaudeSelection.Position {
+            let line = document.line(at: offset)
+            return ClaudeSelection.Position(line: line, character: offset - document.start(ofLine: line))
+        }
+        var shared = ""
+        if range.length > 0 {
+            // Capped (Claude Code reads only the start), on whole characters.
+            let capped = NSRange(location: range.location, length: min(range.length, ClaudeBridge.maxSelectionCharacters))
+            shared = text.substring(with: text.rangeOfComposedCharacterSequences(for: capped))
+        }
+        return ClaudeSelection(url: url, text: shared, start: position(range.location), end: position(NSMaxRange(range)))
+    }
+
+    func claudeOpenEditors() -> [ClaudeOpenEditor] {
+        documents.compactMap { document in
+            guard document.special == nil, let url = document.url else { return nil }
+            return ClaudeOpenEditor(url: url, isActive: document === activeDocument, isDirty: document.isDirty)
+        }
+    }
+
+    func claudeSave(_ url: URL) -> Bool? {
+        let target = url.standardizedFileURL
+        guard let document = documents.first(where: { $0.special == nil && $0.url?.standardizedFileURL == target }) else {
+            return nil
+        }
+        return !document.isDirty || save(document)
+    }
+
+    func claudeConnectionsDidChange(_ count: Int) {
+        statusBar.showClaude(connected: count > 0)
+    }
+
+    /// `@file#L5-9` for the selection (`@file` with none) into Claude Code's
+    /// prompt, then to its terminal, like VS Code's Insert At-Mentioned.
+    func sendSelectionToClaude() {
+        guard let selection = claudeSelection() else { return }
+        guard claude.mention(selection, inShell: terminal.focusedShellPID) else {
+            statusBar.showMessage("Claude Code isn't connected. Run claude in the terminal, or /ide in another one.",
+                                  isWarning: false)
+            return
+        }
+        // Only to a running terminal: Claude may be connected from another app.
+        if terminal.hasStarted { showTerminal() }
+    }
+
+    /// Starts the connection without a terminal, for `claude` in another app.
+    func connectClaudeFromAnotherTerminal() {
+        if claude.start() {
+            let name = projectRoot?.lastPathComponent ?? "this window"
+            statusBar.showMessage("In Claude Code, run /ide and choose Pulse (\(name)).", isWarning: false)
+        } else if !ClaudeBridge.isEnabled {
+            statusBar.showMessage("Sharing with Claude Code is off (View › Share Selection with Claude Code).", isWarning: false)
+        } else {
+            statusBar.showMessage("Claude Code isn't installed: there is no \(ClaudeBridge.configDirectory.path) folder.",
+                                  isWarning: false)
+        }
+    }
+
+    /// Off: Claude disconnects. On: the connection comes back if this window
+    /// has terminals (shells already running need `/ide`; new ones connect).
+    @objc private func claudeIntegrationDidChange() {
+        if !ClaudeBridge.isEnabled {
+            claude.stop()
+        } else if terminal.hasStarted {
+            claude.start()
+        }
     }
 }

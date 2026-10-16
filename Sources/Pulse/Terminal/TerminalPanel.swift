@@ -11,6 +11,9 @@ final class TerminalPanel: NSView {
     var onTitleChange: ((String) -> Void)?
     /// The last terminal closed or exited.
     var onEmpty: (() -> Void)?
+    /// Extra variables for each new shell (Claude Code's IDE connection),
+    /// asked for when the shell starts.
+    var environment: (() -> [String])?
 
     private var tabs: [TerminalTab] = []
     private var activeTab: TerminalTab?
@@ -113,6 +116,12 @@ final class TerminalPanel: NSView {
         if let session = focusedSession ?? activeTab?.sessions.last { window?.makeFirstResponder(session.view) }
     }
 
+    /// The focused shell's process id, to find the Claude Code running in it.
+    var focusedShellPID: pid_t? {
+        guard let pid = focusedSession?.view.process?.shellPid, pid > 0 else { return nil }
+        return pid
+    }
+
     /// View › Font Size › Terminal; running shells keep going, their grids reflow.
     func applyFontSize() {
         tabs.flatMap(\.sessions).forEach { $0.view.font = Theme.terminalFont }
@@ -155,7 +164,7 @@ final class TerminalPanel: NSView {
         tab.sessions.append(session)
         tab.split.addArrangedSubview(session.view)
         equalize(tab)
-        session.start()
+        session.start(adding: environment?() ?? [])
         refreshTabs()
         window?.makeFirstResponder(session.view)
     }
@@ -256,9 +265,11 @@ private final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate 
         view.processDelegate = self
     }
 
-    func start() {
+    /// `extra` goes on top of SwiftTerm's usual environment (what nil gives).
+    func start(adding extra: [String]) {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        view.startProcess(executable: shell, args: [], environment: nil,
+        let environment: [String]? = extra.isEmpty ? nil : Terminal.getEnvironmentVariables(termName: "xterm-256color") + extra
+        view.startProcess(executable: shell, args: [], environment: environment,
                           execName: "-" + (shell as NSString).lastPathComponent, currentDirectory: directory.path)
         running = true
     }

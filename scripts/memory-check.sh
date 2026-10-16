@@ -5,6 +5,8 @@
 #   1. empty window
 #   2. ten source files open
 #   3. ten files open + terminal (shell measured separately)
+#   4. as 3, with Claude Code connected (scripts/claude-ide-client.py stands
+#      in for it and checks that the app sends the open file)
 #
 # Fails if Pulse itself goes over MAX_MB in any scenario. TARGET_MB is the
 # goal we report against.
@@ -25,6 +27,13 @@ while IFS= read -r f; do FILES+=("$f"); done < <(find "$REPO_ROOT/Sources/Pulse"
 
 # Start from a clean session so earlier runs don't change what opens.
 SESSION="$HOME/Library/Application Support/Pulse/session.json"
+
+# Claude Code's config folder, private to this run: missing (Claude Code not
+# installed) unless a scenario creates it, so the real ~/.claude is never used.
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+export CLAUDE_CONFIG_DIR="$WORK/no-claude"
+CLAUDE_CLIENT_DIR=""
 
 footprint_mb() {
     # vmmap prints e.g. "Physical footprint:         41.2M"
@@ -58,10 +67,17 @@ run_scenario() {
     rm -f "$SESSION"
     env "$@" &
     local pid=$!
+    local client="" log="$WORK/client.log"
+    if [ -n "$CLAUDE_CLIENT_DIR" ]; then
+        rm -f "$log"
+        CLAUDE_CONFIG_DIR="$CLAUDE_CLIENT_DIR" python3 "$REPO_ROOT/scripts/claude-ide-client.py" "$log" &
+        client=$!
+    fi
     sleep "$SETTLE"
     if ! kill -0 "$pid" 2>/dev/null; then
         echo "::error::Pulse exited during scenario '$name'"
         FAILED=1
+        if [ -n "$client" ]; then kill "$client" 2>/dev/null || true; fi
         return
     fi
     local mb shells
@@ -70,6 +86,15 @@ run_scenario() {
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
     rm -f "$SESSION"
+    if [ -n "$client" ]; then
+        kill "$client" 2>/dev/null || true
+        wait "$client" 2>/dev/null || true
+        # The real app must have answered and shared the open file.
+        if ! grep -q "^selection_changed /" "$log" 2>/dev/null; then
+            echo "::error::Claude Code stand-in got no selection in '$name': $(cat "$log" 2>/dev/null | tr '\n' ';')"
+            FAILED=1
+        fi
+    fi
 
     local verdict="ok"
     if awk -v m="$mb" -v t="$MAX_MB" 'BEGIN { exit !(m > t) }'; then
@@ -85,6 +110,10 @@ run_scenario() {
 run_scenario "Empty window" "$BIN"
 run_scenario "10 files open" "$BIN" "${FILES[@]}"
 run_scenario "10 files + terminal" PULSE_OPEN_TERMINAL=1 "$BIN" "${FILES[@]}"
+CLAUDE_CLIENT_DIR="$WORK/claude"
+mkdir -p "$CLAUDE_CLIENT_DIR"
+run_scenario "10 files + terminal + Claude Code" CLAUDE_CONFIG_DIR="$CLAUDE_CLIENT_DIR" PULSE_OPEN_TERMINAL=1 "$BIN" "${FILES[@]}"
+CLAUDE_CLIENT_DIR=""
 
 {
     echo "### Pulse memory (physical footprint)"

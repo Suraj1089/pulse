@@ -272,6 +272,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     /// Called when Pulse quits or the window closes (WindowManager saves the session).
     func prepareForQuit() {
         if EditorViewController.autosaveEnabled { editor.saveNamedDocuments() }
+        // Disconnects Claude Code and removes this window's lock file.
+        editor.claude.stop()
     }
 
     // MARK: App activation
@@ -466,6 +468,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     @objc func killTerminal(_ sender: Any?) { editor.killTerminal() }
     @objc func newTerminal(_ sender: Any?) { editor.newTerminal() }
     @objc func splitTerminal(_ sender: Any?) { editor.splitTerminal() }
+    @objc func sendSelectionToClaude(_ sender: Any?) { editor.sendSelectionToClaude() }
+    @objc func toggleClaudeIntegration(_ sender: Any?) { ClaudeBridge.isEnabled.toggle() }
+    @objc func connectClaudeFromAnotherTerminal(_ sender: Any?) { editor.connectClaudeFromAnotherTerminal() }
     @objc func toggleComment(_ sender: Any?) { editor.textView.toggleLineComment() }
     @objc func indentLines(_ sender: Any?) { editor.textView.shiftLines(right: true) }
     @objc func outdentLines(_ sender: Any?) { editor.textView.shiftLines(right: false) }
@@ -558,6 +563,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case #selector(toggleTerminal(_:)):
             menuItem.title = editor.isTerminalVisible ? "Hide Terminal" : "Show Terminal"
             return true
+        case #selector(toggleClaudeIntegration(_:)):
+            menuItem.state = ClaudeBridge.isEnabled ? .on : .off
+            return true
+        case #selector(sendSelectionToClaude(_:)):
+            return ClaudeBridge.isEnabled && editor.activeDocument?.special == nil && editor.activeDocument?.url != nil
         case #selector(useAutoAppearance(_:)):
             menuItem.state = AppAppearance.current == .auto ? .on : .off
             return true
@@ -631,6 +641,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("Terminal: New Terminal", #selector(newTerminal(_:))),
             command("Terminal: Split Terminal", #selector(splitTerminal(_:))),
             command("Terminal: Kill Terminal", #selector(killTerminal(_:))),
+            command("Claude Code: Send Selection", #selector(sendSelectionToClaude(_:))),
+            command("Claude Code: Toggle Sharing Selection", #selector(toggleClaudeIntegration(_:))),
+            command("Claude Code: Connect from Another Terminal", #selector(connectClaudeFromAnotherTerminal(_:))),
             command("Preferences: Open Keyboard Shortcuts", #selector(openKeyboardShortcuts(_:))),
             command("Pulse: Check for Updates", #selector(checkForUpdates(_:))),
             command("Shell Command: Install 'pulse' Command in PATH", #selector(installCommandLineTool(_:))),

@@ -12,11 +12,12 @@ class PulseTestCase: XCTestCase {
     private var savedDefaults: [String: Any?] = [:]
     private var originalSessionURL: URL!
     private var originalKeyBindingsURL: URL!
+    private var originalClaudeDirectory: URL!
     private var controllers: [MainWindowController] = []
 
     private static let preferenceKeys = ["autosave", "wrapLines", "editorFontSize", "sidebarFontSize", "terminalFontSize",
                                          "recentFolders", "appearance", "welcomeShown", "showWelcomeOnLaunch",
-                                         "cliInstallFolder"]
+                                         "cliInstallFolder", "claudeIntegration"]
 
     override func setUpWithError() throws {
         try super.setUpWithError()
@@ -35,6 +36,10 @@ class PulseTestCase: XCTestCase {
         SessionState.fileURL = temp.appendingPathComponent("session.json")
         originalKeyBindingsURL = KeyBindings.fileURL
         KeyBindings.fileURL = temp.appendingPathComponent("keybindings.json")
+        // Never the real ~/.claude: a real `claude` must not find test windows.
+        // Not created, so terminals start without Claude Code unless a test makes it.
+        originalClaudeDirectory = ClaudeBridge.configDirectory
+        ClaudeBridge.configDirectory = temp.appendingPathComponent("claude-config", isDirectory: true)
         for key in PulseTestCase.preferenceKeys {
             savedDefaults[key] = UserDefaults.standard.object(forKey: key)
             UserDefaults.standard.removeObject(forKey: key)
@@ -44,6 +49,7 @@ class PulseTestCase: XCTestCase {
     override func tearDownWithError() throws {
         for controller in controllers {
             controller.editor.killAllTerminals()
+            controller.editor.claude.stop()
             controller.window?.orderOut(nil)
         }
         controllers = []
@@ -51,6 +57,7 @@ class PulseTestCase: XCTestCase {
         spin(0.1)
         SessionState.fileURL = originalSessionURL
         KeyBindings.fileURL = originalKeyBindingsURL
+        ClaudeBridge.configDirectory = originalClaudeDirectory
         for (key, value) in savedDefaults {
             if let value { UserDefaults.standard.set(value, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) }
         }
