@@ -121,3 +121,5 @@ Open a folder from Terminal: `pulse .`
 ## 7. Privacy
 
 Pulse has no telemetry or analytics and needs no account. Its only network traffic is the update check against GitHub Releases (release builds: at launch and at most once a day) and downloading an update you choose to install. The Claude Code connection is local to the Mac (127.0.0.1) and only exists while Claude Code is installed. Files never leave the Mac through Pulse.
+
+The website (pulse0.app) uses Google Analytics 4 only for visitors who click Accept in its cookie banner; declining loads nothing and sets no cookies. Details are in the Privacy section of the site.
