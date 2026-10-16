@@ -37,6 +37,7 @@ Sources/Pulse/
 │   ├── Language.swift        Per-language rules + extension detection
 │   ├── TabBarView / StatusBarView / EmptyStateView
 │   ├── WelcomeController     Welcome tab (first launch, Help › Welcome); built when shown
+│   ├── DiffViewController    Diff tab for a changed file (Source Control click)
 ├── Sidebar/                  File tree, project search panel, the switcher
 ├── Palette/CommandPalette    Go to file / commands / go to line, fuzzy matching
 ├── Terminal/TerminalPanel    SwiftTerm view, created lazily
@@ -56,6 +57,7 @@ scripts/
 - **TextKit 1 on purpose.** Non-contiguous layout, `NSRulerView` line numbers and temporary attributes are mature and cheap there.
 - **Highlighting.** One combined `NSRegularExpression` per language; alternatives are ordered so comments and strings win. Full pass up to 300 KB (debounced 80 ms after edits), visible range ±20k chars above that.
 - **Autosave.** On by default: modified files with a path are written 1 s after typing stops, on app deactivation, and at quit. Untitled buffers (and everything, if autosave is off) survive via `~/Library/Application Support/Pulse/session.json`.
+- **Diffs.** A click on a changed file in Source Control opens one reusable diff tab. `git diff` computes it in a short-lived process (`Workspace/GitDiff.swift`); Pulse reads at most 3 MB / 50,000 lines of output, keeps the text once (in the diff view's storage) plus 9 bytes a line, and draws line colors and the old/new number gutter for visible lines only. Diff tabs are not saved in the session.
 - **Resource meter.** `proc_pid_rusage` for Pulse and for its direct children (shells), sampled every 2 s only while active. CPU ticks are converted with `mach_timebase_info`.
 
 ## Building

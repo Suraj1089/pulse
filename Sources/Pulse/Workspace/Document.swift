@@ -24,11 +24,15 @@ final class Document {
     enum Special: String, Codable {
         case keyboardShortcuts
         case welcome
+        /// A changed file's diff, from Source Control. One at a time, like a
+        /// preview tab: clicking another change reuses it. Not restored.
+        case diff
 
         var title: String {
             switch self {
             case .keyboardShortcuts: return "Keyboard Shortcuts"
             case .welcome: return "Welcome"
+            case .diff: return "Changes"
             }
         }
     }
@@ -39,6 +43,8 @@ final class Document {
     private(set) var language: Language?
     private(set) var lastModified: Date?
     private(set) var special: Special?
+    /// What a `.diff` tab shows.
+    var diffTarget: GitDiffTarget?
 
     var selectedRange = NSRange(location: 0, length: 0)
     /// Document point at the top-left of the visible text (see EditorScrollView).
@@ -49,7 +55,12 @@ final class Document {
         didSet { if oldValue != isDirty { onDirtyChange?() } }
     }
 
-    var displayName: String { special?.title ?? url?.lastPathComponent ?? "Untitled" }
+    var displayName: String {
+        if special == .diff, let diffTarget {
+            return "\(diffTarget.fileName) (\(diffTarget.staged ? "Staged" : "Changes"))"
+        }
+        return special?.title ?? url?.lastPathComponent ?? "Untitled"
+    }
     var length: Int { storage.length }
 
     init(url: URL?, text: String) {

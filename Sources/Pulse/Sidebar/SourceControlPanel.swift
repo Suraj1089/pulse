@@ -25,6 +25,8 @@ private final class ChangeItem: NSObject {
 /// whole section. git runs only while this is on screen or when asked.
 final class SourceControlPanel: NSViewController, NSOutlineViewDataSource, NSOutlineViewDelegate {
     var onOpenFile: ((URL) -> Void)?
+    /// A click on a changed file shows its diff; a double-click opens the file.
+    var onOpenDiff: ((GitDiffTarget) -> Void)?
 
     /// The folder open in Pulse; the repository is found from it.
     var root: URL? {
@@ -75,6 +77,7 @@ final class SourceControlPanel: NSViewController, NSOutlineViewDataSource, NSOut
         outline.delegate = self
         outline.target = self
         outline.action = #selector(rowClicked)
+        outline.doubleAction = #selector(rowDoubleClicked)
         outline.setAccessibilityLabel("Source control changes")
 
         scroll.documentView = outline
@@ -174,11 +177,30 @@ final class SourceControlPanel: NSViewController, NSOutlineViewDataSource, NSOut
         let row = outline.clickedRow
         guard row >= 0 else { return }
         let item = outline.item(atRow: row)
-        if let item = item as? ChangeItem, let repository, item.change.kind != .deleted {
-            onOpenFile?(repository.appendingPathComponent(item.change.path))
+        if let item = item as? ChangeItem, let repository {
+            let staged = (outline.parent(forItem: item) as? ChangeSection)?.isStaged ?? false
+            let change = item.change
+            onOpenDiff?(GitDiffTarget(repository: repository, path: change.path, originalPath: change.originalPath,
+                                      staged: staged, kind: change.kind))
         } else if let section = item as? ChangeSection {
             if outline.isItemExpanded(section) { outline.collapseItem(section) } else { outline.expandItem(section) }
         }
+    }
+
+    @objc private func rowDoubleClicked() {
+        let row = outline.clickedRow
+        guard row >= 0, let item = outline.item(atRow: row) as? ChangeItem, let repository,
+              item.change.kind != .deleted else { return }
+        onOpenFile?(repository.appendingPathComponent(item.change.path))
+    }
+
+    /// The diff target for a listed change, as a click on its row would open.
+    func target(forPath path: String, staged: Bool) -> GitDiffTarget? {
+        guard let repository,
+              let section = sections.first(where: { $0.isStaged == staged }),
+              let item = section.items.first(where: { $0.change.path == path }) else { return nil }
+        return GitDiffTarget(repository: repository, path: path, originalPath: item.change.originalPath,
+                             staged: staged, kind: item.change.kind)
     }
 
     // MARK: Outline

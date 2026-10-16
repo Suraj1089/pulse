@@ -54,6 +54,8 @@ If installing from Pulse doesn't work, link it yourself (asks for your password 
 sudo mkdir -p /usr/local/bin && sudo ln -sf /Applications/Pulse.app/Contents/Resources/pulse /usr/local/bin/pulse
 ```
 
+In Source Control, click a changed file to see its diff (added and removed lines with old and new line numbers, like GitHub); double-click opens the file.
+
 The editor, the sidebar and the terminal each have their own font size: ⌘+ / ⌘− / ⌘0 change the one you're working in, and View › Font Size names each. View › Appearance picks Auto, Light or Dark. The Welcome tab (Help › Welcome to Pulse) opens the first time Pulse runs.
 
 Pulse checks for a new release once a day and shows an **Update** button at the top right when one is available; it installs the update and reopens with your tabs. Pulse › Check for Updates… checks right away. Every change merged to `main` is released automatically.
