@@ -57,7 +57,8 @@ scripts/
 ├── memory-compare.sh         PR vs. base build, alternating rounds (used by CI on PRs)
 ├── claude-ide-client.py      Stands in for Claude Code in the memory check's connected scenario
 ├── screenshot.sh             Real light/dark screenshots (CI publishes them to the `screenshots` branch)
-└── package.sh                Universal release: DMG, ZIP, Homebrew cask
+├── package.sh                Universal release: DMG, ZIP, Homebrew cask
+└── make-icons.swift         Every icon (app, site, favicon, README, social card) from assets/logo.svg
 ```
 
 ## Architecture notes
