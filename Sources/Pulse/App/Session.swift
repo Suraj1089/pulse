@@ -1,7 +1,8 @@
 import Foundation
 
-/// What Pulse reopens at launch: the folder, the tabs, and the text of any
-/// buffer that was never saved, so quitting never loses work.
+/// What Pulse reopens at launch, per window: the folder, the tabs, and the
+/// text of any buffer that was never saved, so quitting never loses work.
+/// session.json holds every open window (older files hold just one).
 struct SessionState: Codable {
     struct Entry: Codable {
         var path: String?
@@ -14,6 +15,8 @@ struct SessionState: Codable {
     var entries: [Entry]
     var active: Int?
     var terminalOpen: Bool
+    /// The window's frame (NSStringFromRect), so windows reopen where they were.
+    var frame: String? = nil
 
     /// Settable so tests never read or overwrite the real session.
     static var fileURL: URL = {
@@ -21,17 +24,30 @@ struct SessionState: Codable {
         return base.appendingPathComponent("Pulse", isDirectory: true).appendingPathComponent("session.json")
     }()
 
-    static func load() -> SessionState? {
-        guard let data = try? Data(contentsOf: fileURL) else { return nil }
-        return try? JSONDecoder().decode(SessionState.self, from: data)
+    /// The first window's state.
+    static func load() -> SessionState? { loadAll().first }
+
+    /// Every saved window, oldest first; a single-window file from an older
+    /// Pulse reads as one window.
+    static func loadAll() -> [SessionState] {
+        guard let data = try? Data(contentsOf: fileURL) else { return [] }
+        if let session = try? JSONDecoder().decode(AppSession.self, from: data) { return session.windows }
+        if let single = try? JSONDecoder().decode(SessionState.self, from: data) { return [single] }
+        return []
     }
 
-    func save() {
-        let url = SessionState.fileURL
+    static func saveAll(_ windows: [SessionState]) {
+        let url = fileURL
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard let data = try? JSONEncoder().encode(self) else { return }
+        guard let data = try? JSONEncoder().encode(AppSession(windows: windows)) else { return }
         try? data.write(to: url, options: .atomic)
     }
+
+    func save() { SessionState.saveAll([self]) }
+}
+
+private struct AppSession: Codable {
+    var windows: [SessionState]
 }
 
 enum RecentFolders {

@@ -1,7 +1,8 @@
 import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var windowController: MainWindowController?
+    private let windows = WindowManager.shared
+    private var launched = false
     private var pendingURLs: [URL] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -12,9 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         default: AppAppearance.current.apply()
         }
         NSApp.mainMenu = MainMenu.build()
-        let controller = MainWindowController()
-        windowController = controller
-        controller.restoreSession()
+        // Every window from last time, or one empty window.
+        if !windows.restoreSession() { windows.newWindow() }
 
         // `Pulse path/to/folder` from a shell, or `swift run Pulse .`
         let arguments = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }
@@ -22,50 +22,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pendingURLs += arguments.map { URL(fileURLWithPath: $0, relativeTo: cwd).standardizedFileURL }
         let launchedWithFiles = !pendingURLs.isEmpty
         if launchedWithFiles {
-            controller.open(pendingURLs)
+            windows.open(pendingURLs)
             pendingURLs = []
         }
-        controller.showWelcomeIfNeeded(launchedWithFiles: launchedWithFiles)
+        launched = true
+        windows.front?.showWelcomeIfNeeded(launchedWithFiles: launchedWithFiles)
 
-        controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
-        controller.installCommandLineToolIfNeeded()
+        windows.front?.installCommandLineToolIfNeeded()
 
         // Used by scripts/memory-check.sh to measure the terminal scenario.
         if ProcessInfo.processInfo.environment["PULSE_OPEN_TERMINAL"] == "1" {
-            controller.editor.showTerminal()
+            windows.front?.editor.showTerminal()
         }
-        if ProcessInfo.processInfo.environment["PULSE_DEBUG_LAYOUT"] == "1" {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { controller.editor.dumpLayout() }
+        if ProcessInfo.processInfo.environment["PULSE_DEBUG_LAYOUT"] == "1", let editor = windows.front?.editor {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { editor.dumpLayout() }
         }
     }
 
+    /// `pulse <paths>`, Finder and the Dock: folders get their own window.
     func application(_ application: NSApplication, open urls: [URL]) {
-        guard let windowController else {
+        guard launched else {
             pendingURLs += urls
             return
         }
-        windowController.open(urls)
-        windowController.showWindow(nil)
+        windows.open(urls)
+    }
+
+    @objc func newWindow(_ sender: Any?) {
+        windows.newWindow()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        windowController?.showWindow(nil)
+        if let front = windows.front { front.showWindow(nil) } else { windows.newWindow() }
         return true
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
-        windowController?.appDidBecomeActive()
+        windows.appDidBecomeActive()
     }
 
     func applicationDidResignActive(_ notification: Notification) {
-        windowController?.appDidResignActive()
+        windows.appDidResignActive()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        windowController?.prepareForQuit()
+        windows.prepareForQuit()
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
