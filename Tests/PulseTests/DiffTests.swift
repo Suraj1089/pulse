@@ -27,7 +27,7 @@ final class DiffTests: PulseTestCase {
         XCTAssertEqual(diff.kinds, [.hunk, .context, .removed, .added, .added, .context, .hunk, .removed, .added, .note])
         XCTAssertEqual(diff.oldNumbers, [0, 1, 2, 0, 0, 3, 0, 10, 0, 0])
         XCTAssertEqual(diff.newNumbers, [0, 1, 0, 2, 3, 4, 0, 0, 11, 0])
-        XCTAssertEqual(diff.added, 4)
+        XCTAssertEqual(diff.added, 3)
         XCTAssertEqual(diff.removed, 2)
         XCTAssertEqual(diff.hunkLines, [0, 6])
         XCTAssertFalse(diff.isBinary)
