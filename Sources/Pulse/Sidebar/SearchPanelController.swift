@@ -98,7 +98,10 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
     }
 
     func focus(with text: String?) {
-        if let text, !text.isEmpty, !text.contains("\n") { field.stringValue = text }
+        // A selected block becomes one line; whitespace matches across lines anyway.
+        if let text, !text.isEmpty {
+            field.stringValue = text.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).joined(separator: " ")
+        }
         view.window?.makeFirstResponder(field)
         if !field.stringValue.isEmpty { runSearch() }
     }
@@ -198,8 +201,10 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
             let preview = NSMutableAttributedString(string: match.match.preview, attributes: [
                 .font: font, .foregroundColor: NSColor.labelColor,
             ])
-            let highlight = NSRange(location: match.match.previewStart, length: match.match.length)
-            if match.match.length > 0, NSMaxRange(highlight) <= preview.length {
+            // A block match continues past this line: highlight the part on it.
+            let start = min(match.match.previewStart, preview.length)
+            let highlight = NSRange(location: start, length: min(match.match.length, preview.length - start))
+            if highlight.length > 0 {
                 preview.addAttribute(.backgroundColor, value: NSColor.findHighlightColor.withAlphaComponent(0.5), range: highlight)
             }
             text.append(preview)
@@ -214,6 +219,9 @@ final class SearchPanelController: NSViewController, NSOutlineViewDataSource, NS
         cell.identifier = id
         let text = NSTextField(labelWithString: "")
         text.lineBreakMode = .byTruncatingTail
+        // One line per row: long matches (whole blocks of code) get cut off, not wrapped.
+        text.maximumNumberOfLines = 1
+        text.cell?.usesSingleLineMode = true
         text.translatesAutoresizingMaskIntoConstraints = false
         cell.addSubview(text)
         cell.textField = text
