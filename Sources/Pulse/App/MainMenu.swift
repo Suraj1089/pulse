@@ -60,6 +60,7 @@ enum MainMenu {
     private static func fileMenu() -> NSMenu {
         let menu = NSMenu(title: "File")
         menu.addItem(item("New File", #selector(MainWindowController.newFile(_:)), "n"))
+        menu.addItem(item("New Window", #selector(AppDelegate.newWindow(_:)), "n", [.command, .shift]))
         menu.addItem(item("Open…", #selector(MainWindowController.openDocument(_:)), "o"))
         menu.addItem(.separator())
         menu.addItem(item("Save", #selector(MainWindowController.saveDocument(_:)), "s"))

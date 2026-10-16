@@ -334,6 +334,17 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         return true
     }
 
+    /// Before a window that won't be restored closes: closes each unsaved
+    /// untitled buffer (and, with autosave off, each unsaved file), which asks
+    /// Save / Cancel / Don't Save. False if the user cancelled.
+    func closeUnsavedUntitledDocuments() -> Bool {
+        while let index = documents.lastIndex(where: { $0.isDirty && ($0.url == nil || !EditorViewController.autosaveEnabled) }) {
+            activate(index)
+            if !closeDocument(at: index) { return false }
+        }
+        return true
+    }
+
     func closeActive() {
         if let index = activeIndex { closeDocument(at: index) } else { view.window?.performClose(nil) }
     }

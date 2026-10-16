@@ -1,7 +1,7 @@
 import AppKit
 
-/// The single Pulse window: sidebar + editor. Menu commands arrive here
-/// through the responder chain.
+/// One Pulse window: sidebar + editor, for one folder. Menu commands arrive
+/// here through the responder chain. WindowManager owns all of them.
 final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
     private let splitController = NSSplitViewController()
     private let sidebar = SidebarViewController()
@@ -9,8 +9,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     let editor = EditorViewController()
     private let palette = CommandPalette()
     private let titleBar = TitleBarView()
-    private let resources = ResourceMonitor()
     private var sidebarItem: NSSplitViewItem!
+    /// Set by WindowManager; windows built elsewhere (tests) use the shared one.
+    weak var manager: WindowManager?
+    private var windows: WindowManager { manager ?? .shared }
 
     private(set) var root: URL?
     private var fileIndex: FileIndex?
@@ -116,10 +118,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         sidebar.sourceControl.onOpenFile = { [weak self] url in self?.editor.open(url) }
         sidebar.sourceControl.onOpenDiff = { [weak self] target in self?.editor.openDiff(target) }
         editor.onOpenRequest = { [weak self] in self?.openDocument(nil) }
-        editor.onOpenRecent = { [weak self] url in self?.open([url]) }
+        editor.onOpenRecent = { [weak self] url in
+            guard let self else { return }
+            self.windows.open([url], from: self)
+        }
         editor.setRecents(RecentFolders.all)
-
-        resources.onUpdate = { [weak self] snapshot in self?.editor.statusBar.showResources(snapshot) }
 
         titleBar.searchField.onClick = { [weak self] in
             guard let self else { return }
@@ -153,6 +156,22 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         }
     }
 
+    /// No folder and no files (special tabs such as Welcome don't count):
+    /// WindowManager reuses such a window for the next folder.
+    var isEmpty: Bool {
+        root == nil && editor.documents.allSatisfy { $0.special != nil }
+    }
+
+    /// `url` is inside this window's folder.
+    func contains(_ url: URL) -> Bool {
+        guard let root = root?.standardizedFileURL.path else { return false }
+        return url.standardizedFileURL.path.hasPrefix(root.hasSuffix("/") ? root : root + "/")
+    }
+
+    func showResources(_ snapshot: ResourceSnapshot) {
+        editor.statusBar.showResources(snapshot)
+    }
+
     func setRoot(_ url: URL?) {
         guard url?.standardizedFileURL != root?.standardizedFileURL else { return }
         root = url
@@ -175,8 +194,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     // MARK: Session
 
+    /// Restores the first saved window into this one (single-window callers).
     func restoreSession() {
-        guard let state = SessionState.load() else { return }
+        if let state = SessionState.load() { restore(state) }
+    }
+
+    func restore(_ state: SessionState) {
+        if let frame = state.frame.map(NSRectFromString), frame.width > 0, frame.height > 0 {
+            window?.setFrame(frame, display: false)
+        }
         if let path = state.root, FileManager.default.fileExists(atPath: path) {
             setRoot(URL(fileURLWithPath: path, isDirectory: true))
         }
@@ -219,8 +245,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
     }
 
+    /// Saves every window's session (this one included).
     func saveSession() {
         sessionWork?.cancel()
+        windows.saveSession(including: self)
+    }
+
+    var sessionState: SessionState {
         if let active = editor.activeDocument { active.selectedRange = editor.textView.selectedRange() }
         // The diff tab is a view of git state, not a document: leave it out.
         let kept = editor.documents.filter { $0.special != .diff }
@@ -233,14 +264,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                 special: document.special
             )
         }
-        SessionState(root: root?.path, entries: entries, active: active,
-                     terminalOpen: editor.isTerminalVisible).save()
+        return SessionState(root: root?.path, entries: entries, active: active,
+                            terminalOpen: editor.isTerminalVisible, frame: window.map { NSStringFromRect($0.frame) })
     }
 
-    /// Called when Pulse quits or the window closes.
+    /// Called when Pulse quits or the window closes (WindowManager saves the session).
     func prepareForQuit() {
         if EditorViewController.autosaveEnabled { editor.saveNamedDocuments() }
-        saveSession()
     }
 
     // MARK: App activation
@@ -296,15 +326,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     // MARK: Updates
 
-    /// At launch and on activation; Updater limits real checks to once a day.
-    func checkForUpdatesIfDue() {
-        Updater.checkIfDue { [weak self] release in
-            guard let self, let release else { return }
-            self.offer(release)
-        }
-    }
-
-    private func offer(_ release: Updater.Release) {
+    /// WindowManager shows a found update in every window.
+    func showUpdate(_ release: Updater.Release) {
         titleBar.showUpdate(version: release.version) { [weak self] in self?.install(release) }
     }
 
@@ -312,7 +335,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         titleBar.showUpdating()
         Updater.install(release) { [weak self] error in
             guard let self, let window = self.window else { return }
-            self.offer(release)
+            self.showUpdate(release)
             let alert = NSAlert()
             alert.messageText = "Pulse couldn't update itself"
             alert.informativeText = error.text
@@ -330,7 +353,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             let alert = NSAlert()
             switch result {
             case .success(let release) where Updater.isVersion(release.version, newerThan: Updater.currentVersion):
-                self.offer(release)
+                self.windows.offer(release)
                 alert.messageText = "Pulse \(release.version) is available"
                 alert.informativeText = "You have \(Updater.currentVersion). Pulse will quit, update and reopen with your tabs."
                 alert.addButton(withTitle: "Update Now")
@@ -355,22 +378,22 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         fileIndex?.invalidate()
         editor.reloadChangedDocuments()
         editor.reloadVisibleDiff()
-        checkForUpdatesIfDue()
         showBranch()
         sidebar.sourceControl.refresh()
-        resources.start()
     }
 
     func appDidResignActive() {
-        resources.stop()
         if EditorViewController.autosaveEnabled { editor.saveNamedDocuments() }
-        saveSession()
     }
 
     // MARK: NSWindowDelegate
 
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        windows.windowShouldClose(self)
+    }
+
     func windowWillClose(_ notification: Notification) {
-        prepareForQuit()
+        windows.windowWillClose(self)
     }
 
     // MARK: Commands (responder chain)
@@ -384,7 +407,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         panel.allowsMultipleSelection = true
         panel.message = "Choose a folder to work in, or files to open."
         guard panel.runModal() == .OK else { return }
-        open(panel.urls)
+        // A folder gets its own window (or this one, if it's empty).
+        windows.open(panel.urls, from: self)
     }
 
     @objc func saveDocument(_ sender: Any?) { editor.saveActive() }
@@ -613,7 +637,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         ]
         for url in RecentFolders.all.prefix(5) where url != root {
             commands.append(PaletteCommand(title: "Open Recent: \(url.lastPathComponent)", shortcut: "") { [weak self] in
-                self?.open([url])
+                guard let self else { return }
+                self.windows.open([url], from: self)
             })
         }
         return commands

@@ -26,7 +26,8 @@ Sources/Pulse/
 ├── main.swift                NSApplication bootstrap
 ├── App/
 │   ├── AppDelegate.swift     Launch, open-file events, activation hooks
-│   ├── MainWindowController  The one window; all menu commands (responder chain)
+│   ├── WindowManager.swift   All windows: one per folder, routing opens, the saved session, update check, resource meter
+│   ├── MainWindowController  One window (one folder); all menu commands (responder chain)
 │   ├── MainMenu.swift        Menu bar built in code
 │   └── Session.swift         session.json (folder, tabs, unsaved text) + recent folders
 ├── Editor/
