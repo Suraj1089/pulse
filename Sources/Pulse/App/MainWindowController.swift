@@ -26,6 +26,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.tabbingMode = .disallowed
+        // On wide-gamut/XDR displays AppKit otherwise backs every layer with
+        // 16-bit float pixels (8 bytes each): a full-screen editor costs ~40 MB
+        // for the text area alone. Pulse only draws sRGB colors, so sRGB
+        // backing (4 bytes per pixel) looks the same at half the memory.
+        window.colorSpace = .sRGB
         window.isReleasedWhenClosed = false
         window.title = "Pulse"
         super.init(window: window)

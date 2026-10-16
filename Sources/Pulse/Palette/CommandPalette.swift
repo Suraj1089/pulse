@@ -44,6 +44,7 @@ final class CommandPalette: NSObject, NSTextFieldDelegate, NSTableViewDataSource
         panel.hidesOnDeactivate = true
         panel.backgroundColor = .clear
         panel.isOpaque = false
+        panel.colorSpace = .sRGB  // 4-byte pixels on wide-gamut displays (see MainWindowController)
         panel.hasShadow = true
         panel.onResignKey = { [weak self] in self?.close() }
 
