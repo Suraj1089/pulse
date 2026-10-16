@@ -80,11 +80,11 @@
   }
   </script>
 
-  <!-- Google Analytics (GA4): runs only on pulse0.app, and only once GA_ID
-       is set to the property's Measurement ID. -->
+  <!-- Google Analytics (GA4), the same as Google's gtag.js snippet but only
+       on pulse0.app, so local copies and preview deployments aren't counted. -->
   <script>
   (function () {
-    var GA_ID = "G-XXXXXXXXXX";
+    var GA_ID = "G-MCM9LLHVXG";
     if (!/^(www\.)?pulse0\.app$/.test(location.hostname) || !/^G-[A-Z0-9]+$/.test(GA_ID) || /^G-X+$/.test(GA_ID)) return;
     var s = document.createElement("script");
     s.async = true;
