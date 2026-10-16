@@ -120,6 +120,10 @@ enum MainMenu {
         menu.addItem(item("Split Terminal", #selector(MainWindowController.splitTerminal(_:)), "\\"))
         menu.addItem(item("Kill Terminal", #selector(MainWindowController.killTerminal(_:))))
         menu.addItem(.separator())
+        // VS Code's ⌥⌘K is Keyboard Shortcuts here.
+        menu.addItem(item("Send Selection to Claude Code", #selector(MainWindowController.sendSelectionToClaude(_:)), "k", [.command, .shift]))
+        menu.addItem(item("Share Selection with Claude Code", #selector(MainWindowController.toggleClaudeIntegration(_:))))
+        menu.addItem(.separator())
         menu.addItem(item("Word Wrap", #selector(MainWindowController.toggleWordWrap(_:)), "w", [.command, .option]))
         menu.addItem(item("Zoom In", #selector(MainWindowController.zoomIn(_:)), "="))
         menu.addItem(item("Zoom Out", #selector(MainWindowController.zoomOut(_:)), "-"))

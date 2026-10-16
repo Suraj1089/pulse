@@ -35,6 +35,7 @@ Pulse is a code editor written in Swift and AppKit, with no web view, no Electro
 - **Find and replace** in the file (the standard macOS find bar), and **project search** (uses `ripgrep` when installed, otherwise a built-in scan; a block of code finds the same code however it is wrapped or indented).
 - **Command palette**: `⌘P` go to file, `⇧⌘P` commands, `⌘L` go to line.
 - **Integrated terminal** (`` ⌃` ``), started only when you first open it.
+- **Claude Code knows what you're looking at**: run `claude` in Pulse's terminal and it sees the open file and your selection ("⧉ 5 lines selected"), as in VS Code. `⇧⌘K` puts `@file#L5-9` in Claude's prompt. From another terminal, run `/ide` and pick Pulse. It costs nothing until Claude connects; View › Share Selection with Claude Code turns it off.
 - **Autosave and session recovery**: files save themselves a second after you stop typing, and Pulse reopens your folder, tabs and any unsaved buffers after you quit.
 - **Honest resource meter**: the status bar shows Pulse's own memory and CPU, with the terminal's shell measured separately.
 
@@ -76,6 +77,7 @@ Pulse checks for a new release once a day and shows an **Update** button at the 
 | `` ⌃` `` | Show or hide the terminal |
 | `⌃⇧`` ` | New terminal (in the open folder) |
 | `⌘\` | Split terminal (side by side) |
+| `⇧⌘K` | Send the selection to Claude Code (`@file#L5-9` in its prompt) |
 | `⌘/` | Toggle line comment |
 | `⌘]` / `⌘[` | Indent / outdent |
 | `⇧⌘]` / `⇧⌘[` | Next / previous tab |

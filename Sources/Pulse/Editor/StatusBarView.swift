@@ -11,6 +11,7 @@ final class StatusBarView: NSView {
     private let indentation = StatusBarView.makeLabel()
     private let encoding = StatusBarView.makeLabel()
     private let message = StatusBarView.makeLabel()
+    private let claude = StatusBarView.makeLabel()
     private let resources = StatusBarView.makeLabel()
 
     override init(frame frameRect: NSRect) {
@@ -21,7 +22,10 @@ final class StatusBarView: NSView {
         message.isHidden = true
         message.textColor = .systemOrange
         message.lineBreakMode = .byTruncatingTail
-        let stack = NSStackView(views: [left, NSView(), message, resources])
+        claude.isHidden = true
+        claude.stringValue = "✻ Claude Code"
+        claude.toolTip = "Claude Code is connected: it sees this window's open file and selection."
+        let stack = NSStackView(views: [left, NSView(), message, claude, resources])
         stack.orientation = .horizontal
         stack.distribution = .fill
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -75,6 +79,11 @@ final class StatusBarView: NSView {
                 if self?.message.stringValue == text { self?.showMessage(nil) }
             }
         }
+    }
+
+    /// Shown while Claude Code is connected to this window.
+    func showClaude(connected: Bool) {
+        claude.isHidden = !connected
     }
 
     func showResources(_ snapshot: ResourceSnapshot) {
