@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Pulse stays small on purpose: 50–60 MB of memory and no CPU while idle. Some things are left out for that reason, such as extensions, AI features, language servers that start on their own, web previews and anything that runs in the background. The full list is in [Out of scope](https://github.com/Suraj1089/pulse/blob/main/CLAUDE.md#out-of-scope-reject).
+        Pulse stays small on purpose: about 60–70 MB of memory in everyday use and no CPU while idle. Some things are left out for that reason, such as extensions, AI features, language servers that start on their own, web previews and anything that runs in the background. The full list is in [Out of scope](https://github.com/Suraj1089/pulse/blob/main/CLAUDE.md#out-of-scope-reject).
   - type: textarea
     id: problem
     attributes:

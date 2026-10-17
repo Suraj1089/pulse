@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pulse — A Light, Native Code Editor for macOS</title>
-  <meta name="description" content="Pulse is a native macOS code editor written in Swift and AppKit. Tabs, split editors, syntax highlighting, project search, a command palette and a terminal in under 30 MB of memory, and Claude Code sees what you select. Free and open source.">
+  <meta name="description" content="Pulse is a native macOS code editor written in Swift and AppKit. Tabs, split editors, syntax highlighting, project search, a command palette and a terminal in about 60–70 MB of memory, and Claude Code sees what you select. Free and open source.">
   <meta name="keywords" content="lightweight code editor mac, native macOS code editor, low memory code editor, fast text editor mac, VS Code alternative mac, Sublime Text alternative, Swift AppKit editor, Pulse editor">
   <meta name="author" content="Suraj Pisal">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
@@ -15,7 +15,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://pulse0.app/">
   <meta property="og:title" content="Pulse — A light, native code editor for macOS">
-  <meta property="og:description" content="Files, tabs, split editors, search and a terminal in under 30 MB. Works with Claude Code. Native Swift and AppKit. Free and open source.">
+  <meta property="og:description" content="Files, tabs, split editors, search and a terminal in about 60–70 MB of memory. Works with Claude Code. Native Swift and AppKit. Free and open source.">
   <meta property="og:image" content="https://pulse0.app/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -23,7 +23,7 @@
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Pulse — A light, native code editor for macOS">
-  <meta name="twitter:description" content="Files, tabs, split editors, search and a terminal in under 30 MB. Works with Claude Code. Native Swift and AppKit.">
+  <meta name="twitter:description" content="Files, tabs, split editors, search and a terminal in about 60–70 MB of memory. Works with Claude Code. Native Swift and AppKit.">
   <meta name="twitter:image" content="https://pulse0.app/og-image.png">
 
   <link rel="alternate" type="text/plain" href="https://pulse0.app/llms.txt" title="LLM Documentation">
@@ -54,7 +54,7 @@
       {
         "@type": "Question",
         "name": "How much memory does Pulse use?",
-        "acceptedAnswer": { "@type": "Answer", "text": "In CI on GitHub's macOS 14 runner (medians of three runs), Pulse used 15.9 MB with an empty window, 27.1 MB with ten source files open, 29.1 MB with those files in two split editor panes, 28.2 MB with ten files and the terminal open, and 28.5 MB with Claude Code connected as well. The shell is counted separately (about 1.8 MB). Every build is checked and fails above 100 MB." }
+        "acceptedAnswer": { "@type": "Answer", "text": "In everyday use, with a project, several files and the terminal open, Pulse uses about 60–70 MB. CI also launches every build in fixed scenarios on GitHub's macOS 14 runner and reads it 8 seconds after launch (medians of three runs): 15.9 MB with an empty window, 27.1 MB with ten source files open, 29.1 MB with those files in two split editor panes, 28.2 MB with ten files and the terminal open, and 28.5 MB with Claude Code connected as well. The shell is counted separately (about 1.8 MB). Every build is checked and fails above 100 MB." }
       },
       {
         "@type": "Question",
@@ -593,7 +593,7 @@
       <li><a class="indent" href="#privacy" data-file="privacy"><span class="fi" style="color:var(--type)">M↓</span>PRIVACY.md</a></li>
     </ul>
     <div class="side-foot">
-      <div><b>27.1 MB</b> · ten files open</div>
+      <div><b>60–70 MB</b> · everyday use</div>
       <div>macOS 14+ · MIT</div>
     </div>
   </aside>
@@ -642,7 +642,7 @@
         <div class="src">
           <div class="md-h"><span class="c">// Memory check, run on every commit</span></div>
           <h2>Small enough to forget it’s open.</h2>
-          <p class="prose">Every commit is built and launched on a Mac in CI. If any scenario crosses 100&nbsp;MB, the build fails.</p>
+          <p class="prose">In everyday use, with a project, several files and the terminal open, Pulse uses about <b>60–70&nbsp;MB</b>. Every commit is also built and launched on a Mac in CI in the fixed scenarios below; if any crosses 100&nbsp;MB, the build fails.</p>
           <div class="term">
             <div class="term-head"><span>Terminal — zsh — macos-14 runner</span><span>exit 0</span></div>
             <div class="term-body">
@@ -683,7 +683,7 @@
               <div class="term-foot"><span class="ok">✓</span> 5 scenarios under budget · physical footprint via <span class="t">vmmap</span>, 8 s after launch</div>
             </div>
           </div>
-          <p class="prose">Medians of three runs on GitHub’s macOS 14 runner. That is what Activity Monitor calls “Memory”. Processes you start in the terminal are not counted as Pulse. Run the same check on your Mac with <a href="https://github.com/Suraj1089/pulse/blob/main/scripts/memory-check.sh"><code>scripts/memory-check.sh</code></a>; the status bar in Pulse shows the live number too.</p>
+          <p class="prose">Medians of three runs on GitHub’s macOS 14 runner, taken 8 seconds after a fresh launch, so they read lower than everyday use: a larger window, scrolling through big files, search results and terminal scrollback all add to it. That is what Activity Monitor calls “Memory”. Processes you start in the terminal are not counted as Pulse. Run the same check on your Mac with <a href="https://github.com/Suraj1089/pulse/blob/main/scripts/memory-check.sh"><code>scripts/memory-check.sh</code></a>; the status bar in Pulse shows the live number too.</p>
         </div>
       </section>
 
@@ -696,7 +696,7 @@
           <div class="symbols nogutter">
             <div class="sym">
               <div class="sig"><span class="k">func</span> <span class="t">foldersAndTabs</span>()</div>
-              <p>Open a project, browse it in the sidebar, keep many files open, with a path bar above each file. One window per folder (<kbd>⇧⌘N</kbd>). Folders load only when you expand them.</p>
+              <p>Open a project, browse it in the sidebar, keep many files open, with a path bar above each file. The file you’re editing stays highlighted in the tree. One window per folder (<kbd>⇧⌘N</kbd>). Folders load only when you expand them.</p>
             </div>
             <div class="sym">
               <div class="sig"><span class="k">func</span> <span class="t">splitEditor</span>(<span class="a">_</span> direction: <span class="t">Direction</span>)</div>
@@ -867,7 +867,7 @@
   <span class="hide-sm">Spaces: 4</span>
   <span class="hide-sm">UTF-8</span>
   <span class="grow"></span>
-  <span>Pulse <b>27.1 MB</b></span>
+  <span>Pulse <b>64 MB</b></span>
   <span>CPU <b>0%</b></span>
   <span class="hide-sm">Shell 1.8 MB</span>
 </div>

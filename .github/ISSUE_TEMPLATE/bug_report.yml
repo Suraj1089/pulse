@@ -27,7 +27,7 @@ body:
     attributes:
       label: Resource meter
       description: For memory or CPU problems, what the status bar showed.
-      placeholder: e.g. Pulse 48 MB · CPU 0%
+      placeholder: e.g. Pulse 64 MB · CPU 0%
   - type: input
     id: version
     attributes:
