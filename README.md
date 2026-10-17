@@ -24,11 +24,11 @@
 
 ---
 
-Pulse is a code editor written in Swift and AppKit, with no web view, no Electron and no extension host. Its goal is to stay small: **50–60 MB of memory in normal use, and never more than 100 MB**, with no CPU use while you are not typing.
+Pulse is a code editor written in Swift and AppKit, with no web view, no Electron and no extension host. It stays small: **about 60–70 MB of memory in everyday use, and never more than 100 MB**, with no CPU use while you are not typing.
 
 ## Features
 
-- **Folders and files**: open a folder, browse it in the sidebar, open many files in tabs.
+- **Folders and files**: open a folder, browse it in the sidebar, open many files in tabs. The file you're editing stays highlighted in the tree.
 - **Windows**: each folder opens in its own window (`pulse <folder>`, Finder, File › Open), like VS Code; opening a folder that is already open brings its window forward. ⇧⌘N opens an empty window. All windows come back after a restart.
 - **Editing**: syntax highlighting for Swift, JS/TS, Python, Go, Rust, C/C++/Obj-C, Java/Kotlin, Ruby, shell, HTML/XML, CSS, JSON, YAML, TOML, Markdown and SQL. Line numbers, current-line highlight, auto-indent, toggle comment, indent/outdent, word wrap.
 - **Breadcrumbs**: the open file's path, from the opened folder, shows under the tabs.
@@ -89,7 +89,11 @@ Pulse checks for a new release once a day and shows an **Update** button at the 
 
 ## Memory budget
 
-| Scenario | Measured in CI | Target | Hard limit |
+In everyday use, with a project, several files and the terminal open, Pulse uses **about 60–70 MB**. The status bar shows the live number.
+
+CI also launches every build in a fixed set of scenarios. These read lower than everyday use because they are taken 8 seconds after a fresh launch:
+
+| Scenario | Measured in CI (fresh launch) | Target | Hard limit |
 | :--- | :--- | :--- | :--- |
 | Empty window | **15.9 MB** | ≤ 40 MB | 100 MB |
 | Ten files open | **27.1 MB** | ≤ 60 MB | 100 MB |

@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-Pulse is a native macOS code editor written in Swift and AppKit. Its design constraint is memory: under 30 MB with ten files open in CI measurements, a 50–60 MB target in normal use, and a hard limit of 100 MB enforced on every build. It uses no CPU while idle.
+Pulse is a native macOS code editor written in Swift and AppKit. Its design constraint is memory: about 60–70 MB in everyday use, and a hard limit of 100 MB enforced on every build. It uses no CPU while idle.
 
 - Developer: Suraj Pisal
 - License: MIT
@@ -14,7 +14,7 @@ Pulse is a native macOS code editor written in Swift and AppKit. Its design cons
 
 ## 2. Features
 
-- **Folders and files**: open a folder (⌘O), browse it in a sidebar file tree, open files in tabs, with a path bar (breadcrumbs) above each file. Folders are read only when expanded. New file, new folder, reveal in Finder, copy path and move to Trash from the tree's context menu.
+- **Folders and files**: open a folder (⌘O), browse it in a sidebar file tree (the active file stays highlighted and its folders open to show it), open files in tabs, with a path bar (breadcrumbs) above each file. Folders are read only when expanded. New file, new folder, reveal in Finder, copy path and move to Trash from the tree's context menu.
 - **Windows**: one window per folder (⇧⌘N for a new one); opening a folder that is already open brings its window forward.
 - **Split editors**: Split Editor Right (⌥⌘\) or Split Editor Down, from the View menu, the command palette or a tab's right-click menu, which also has Close and Close Others. Splits nest into a grid. A file open in two panes is one document: one copy of its text, one undo history, and edits show in both. A pane closes with its last tab.
 - **Syntax highlighting**: Swift, JavaScript/TypeScript, Python, Go, Rust, C/C++/Objective-C, Java/Kotlin/Scala/Dart/C#, Ruby, shell, HTML/XML, CSS/SCSS, JSON, YAML, TOML, Markdown and SQL. Regex-based, not a full parser.
@@ -50,7 +50,9 @@ Not included by design: extensions, a full Git client (history, merges), debugge
 
 ## 4. Memory measurements
 
-CI (`scripts/memory-check.sh`, GitHub macOS 14 runner) launches the bundled app and reads physical footprint with `vmmap --summary` after 8 seconds. Medians of three runs:
+In everyday use, with a project, several files and the terminal open, Pulse uses about 60–70 MB of physical footprint (the number Activity Monitor shows).
+
+CI (`scripts/memory-check.sh`, GitHub macOS 14 runner) also launches the bundled app in fixed scenarios and reads physical footprint with `vmmap --summary` after 8 seconds. These fresh-launch numbers are lower than everyday use. Medians of three runs:
 
 | Scenario | Pulse | Child processes |
 |---|---|---|
