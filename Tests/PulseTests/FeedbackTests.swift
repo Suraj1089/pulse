@@ -1,8 +1,10 @@
+import AppKit
 import XCTest
 @testable import Pulse
 
-/// Help › Report a Bug… / Request a Feature… open GitHub issue forms.
-final class FeedbackTests: XCTestCase {
+/// Help › Report a Bug… / Request a Feature… (and the status bar's bug
+/// button) open GitHub issue forms.
+final class FeedbackTests: PulseTestCase {
     func testBugReportOpensTheFormFilledIn() throws {
         let url = try XCTUnwrap(URLComponents(url: Feedback.url(for: .bug), resolvingAgainstBaseURL: false))
         XCTAssertEqual(url.host, "github.com")
@@ -27,5 +29,15 @@ final class FeedbackTests: XCTestCase {
         let url = try XCTUnwrap(URLComponents(url: Feedback.url(for: .feature), resolvingAgainstBaseURL: false))
         XCTAssertEqual(url.path, "/Suraj1089/pulse/issues/new")
         XCTAssertEqual(url.queryItems, [URLQueryItem(name: "template", value: "feature_request.yml")])
+    }
+
+    func testTheStatusBarBugButtonReportsABug() throws {
+        let controller = makeController()
+        let button = try XCTUnwrap(views(NSButton.self, in: controller).first { $0.toolTip == "Report a Bug…" })
+        XCTAssertEqual(button.action, #selector(MainWindowController.reportBug(_:)), "the same command as the Help menu")
+        XCTAssertNil(button.target, "goes up the responder chain to its window")
+        XCTAssertTrue(controller.responds(to: #selector(MainWindowController.reportBug(_:))))
+        XCTAssertEqual(button.accessibilityLabel(), "Report a Bug")
+        XCTAssertNotNil(button.image)
     }
 }

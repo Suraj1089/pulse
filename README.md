@@ -124,7 +124,7 @@ open dist/Pulse.app
 
 ## Feedback
 
-In Pulse, Help › Report a Bug… and Help › Request a Feature… open a GitHub issue form in your browser. The bug form comes with your Pulse version, macOS version and Mac model filled in; nothing is posted until you submit it. You can also [open an issue](https://github.com/Suraj1089/pulse/issues/new/choose) directly. Feature requests are weighed against the [contribution rules](CLAUDE.md#contribution-rules): Pulse stays small on purpose.
+In Pulse, Help › Report a Bug… and Help › Request a Feature… open a GitHub issue form in your browser; the ladybug at the right end of the status bar is a shortcut to the bug form. The bug form comes with your Pulse version, macOS version and Mac model filled in; nothing is posted until you submit it. You can also [open an issue](https://github.com/Suraj1089/pulse/issues/new/choose) directly. Feature requests are weighed against the [contribution rules](CLAUDE.md#contribution-rules): Pulse stays small on purpose.
 
 ## License
 
