@@ -34,6 +34,9 @@ final class SearchFileResult: NSObject {
 /// output is checked against the same rules as the built-in scan.
 final class ProjectSearch {
     static let maxMatches = 2_000
+    /// ripgrep output read per search. 2,000 matches fit easily; a common word
+    /// in a big folder can print hundreds of MB, which is never read.
+    static let maxOutputBytes = 8 << 20
 
     private var process: Process?
     private var generation = 0
@@ -102,23 +105,18 @@ final class ProjectSearch {
         do { try task.run() } catch { completion([], false); return }
 
         DispatchQueue.global(qos: .userInitiated).async {
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            task.waitUntilExit()
-            let output = String(decoding: data, as: UTF8.self)
             var order: [String] = []
             var byPath: [String: SearchFileResult] = [:]
             var total = 0
-            var truncated = false
-            // "\r\n" is one Character in Swift, so a CRLF file's line would
-            // otherwise swallow the next result.
-            for record in output.split(omittingEmptySubsequences: true, whereSeparator: { $0 == "\n" || $0 == "\r\n" }) {
-                // Format: path NUL line:text
-                guard let nul = record.firstIndex(of: "\0") else { continue }
+            let truncated = ProjectSearch.readLines(of: task, from: pipe) { bytes in
+                // Format: path NUL line:text (a CRLF file's line keeps its "\r")
+                let record = String(decoding: bytes.last == UInt8(ascii: "\r") ? bytes.dropLast() : bytes, as: UTF8.self)
+                guard let nul = record.firstIndex(of: "\0") else { return true }
                 var path = String(record[..<nul])
                 if path.hasPrefix("./") { path.removeFirst(2) }
-                guard filter.matches(path) else { continue }
+                guard filter.matches(path) else { return true }
                 let rest = record[record.index(after: nul)...]
-                guard let colon = rest.firstIndex(of: ":"), let line = Int(rest[..<colon]) else { continue }
+                guard let colon = rest.firstIndex(of: ":"), let line = Int(rest[..<colon]) else { return true }
                 let text = String(rest[rest.index(after: colon)...])
                 let result: SearchFileResult
                 if let existing = byPath[path] {
@@ -130,10 +128,41 @@ final class ProjectSearch {
                 }
                 result.matches.append(ProjectSearch.match(line: line, text: text, query: query, caseSensitive: caseSensitive))
                 total += 1
-                if total >= ProjectSearch.maxMatches { truncated = true; break }
+                return total < ProjectSearch.maxMatches
             }
             completion(order.compactMap { byPath[$0] }, truncated)
         }
+    }
+
+    /// Hands ripgrep's output to `handle` a line at a time as it arrives, and
+    /// stops ripgrep once `handle` returns false or `maxOutputBytes` have been
+    /// read, so only what is kept is ever in memory. True if it stopped early.
+    static func readLines(of task: Process, from pipe: Pipe, _ handle: (Data) -> Bool) -> Bool {
+        let reader = pipe.fileHandleForReading
+        let newline = UInt8(ascii: "\n")
+        var pending = Data()
+        var read = 0
+        var stopped = false
+        reading: while true {
+            let chunk = reader.availableData
+            if chunk.isEmpty { break }
+            read += chunk.count
+            pending.append(chunk)
+            var start = pending.startIndex
+            while let end = pending[start...].firstIndex(of: newline) {
+                if !handle(pending[start..<end]) { stopped = true; break reading }
+                start = end + 1
+            }
+            pending.removeSubrange(pending.startIndex..<start)
+            if read > maxOutputBytes { stopped = true; break }
+        }
+        if stopped {
+            task.terminate()
+        } else if !pending.isEmpty {
+            _ = handle(pending)
+        }
+        task.waitUntilExit()
+        return stopped
     }
 
     // MARK: Multi-word queries (blocks of code)
@@ -177,22 +206,19 @@ final class ProjectSearch {
         do { try task.run() } catch { completion([], false); return }
 
         DispatchQueue.global(qos: .userInitiated).async {
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            task.waitUntilExit()
             var order: [String] = []
             var byPath: [String: SearchFileResult] = [:]
             var total = 0
-            var truncated = false
-            for line in data.split(separator: UInt8(ascii: "\n")) {
+            let truncated = ProjectSearch.readLines(of: task, from: pipe) { line in
                 guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
                       object["type"] as? String == "match",
                       let match = object["data"] as? [String: Any],
                       var path = (match["path"] as? [String: Any])?["text"] as? String,
                       let text = (match["lines"] as? [String: Any])?["text"] as? String,
                       let firstLine = match["line_number"] as? Int,
-                      let submatches = match["submatches"] as? [[String: Any]] else { continue }
+                      let submatches = match["submatches"] as? [[String: Any]] else { return true }
                 if path.hasPrefix("./") { path.removeFirst(2) }
-                guard filter.matches(path) else { continue }
+                guard filter.matches(path) else { return true }
                 let result: SearchFileResult
                 if let existing = byPath[path] {
                     result = existing
@@ -201,13 +227,13 @@ final class ProjectSearch {
                     byPath[path] = result
                     order.append(path)
                 }
-                for submatch in submatches {
+                for submatch in submatches where total < ProjectSearch.maxMatches {
                     guard let start = submatch["start"] as? Int, let end = submatch["end"] as? Int,
                           let found = ProjectSearch.blockMatch(firstLine: firstLine, text: text, startByte: start, endByte: end) else { continue }
                     result.matches.append(found)
                     total += 1
                 }
-                if total >= ProjectSearch.maxMatches { truncated = true; break }
+                return total < ProjectSearch.maxMatches
             }
             completion(order.compactMap { byPath[$0] }.filter { !$0.matches.isEmpty }, truncated)
         }

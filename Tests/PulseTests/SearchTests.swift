@@ -76,6 +76,28 @@ final class SearchTests: PulseTestCase {
         }
     }
 
+    func testCommonWordStopsAtTheMatchCap() throws {
+        let line = "let value = 1\n"
+        var files: [String: String] = [:]
+        for index in 0..<30 { files["file\(index).swift"] = String(repeating: line, count: 150) }
+        files["crlf.swift"] = "a\r\nlet value = 2\r\n"
+        let root = try makeFolder(files: files)
+        for ripgrep in modes {
+            for query in ["value", "let value"] {
+                var found: (results: [SearchFileResult], truncated: Bool)?
+                let search = ProjectSearch()
+                search.run(query: query, root: root, caseSensitive: false, index: FileIndex(root: root),
+                           useRipgrep: ripgrep) { found = ($0, $1) }
+                wait(timeout: 10, "search results") { found != nil }
+                let total = found?.results.reduce(0) { $0 + $1.matches.count } ?? 0
+                XCTAssertEqual(total, ProjectSearch.maxMatches, "\(query) ripgrep=\(ripgrep)")
+                XCTAssertEqual(found?.truncated, true, "\(query) ripgrep=\(ripgrep)")
+            }
+            let crlf = search("value = 2", in: root, ripgrep: ripgrep).first?.matches.first
+            XCTAssertEqual(crlf?.preview, "let value = 2", "no \\r in a CRLF line's preview (ripgrep=\(ripgrep))")
+        }
+    }
+
     func testPatternTreatsEveryCharacterLiterally() {
         let words = ProjectSearch.words(of: "a.b (c)  [d]+\n{e}|f")
         XCTAssertEqual(words, ["a.b", "(c)", "[d]+", "{e}|f"])
