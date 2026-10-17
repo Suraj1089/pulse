@@ -1,0 +1,27 @@
+name: Request a feature
+description: Suggest something that would make opening, reading, editing or searching code better.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Pulse stays small on purpose: about 60–70 MB of memory in everyday use and no CPU while idle. Some things are left out for that reason, such as extensions, AI features, language servers that start on their own, web previews and anything that runs in the background. The full list is in [Out of scope](https://github.com/Suraj1089/pulse/blob/main/CLAUDE.md#out-of-scope-reject).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task, and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+      description: How it could work in Pulse, or how another editor does it.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: I checked that this isn't on the out-of-scope list.
+          required: true

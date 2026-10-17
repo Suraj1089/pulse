@@ -101,7 +101,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             guard let self else { return }
             self.window?.title = document?.displayName ?? "Pulse"
             self.window?.representedURL = document?.url
-            if let url = document?.url { self.sidebar.fileTree.reveal(url) }
+            self.sidebar.fileTree.reveal(document?.url)
         }
         editor.onSessionChange = { [weak self] in self?.scheduleSessionSave() }
         editor.onDidSave = { [weak self] document in
@@ -519,6 +519,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     // MARK: Welcome and appearance
 
     @objc func showWelcome(_ sender: Any?) { editor.openSpecial(.welcome) }
+    @objc func reportBug(_ sender: Any?) { Feedback.open(.bug) }
+    @objc func requestFeature(_ sender: Any?) { Feedback.open(.feature) }
 
     /// At launch: the first time Pulse opens with nothing to show, and every
     /// launch when "Show on launch" is ticked, unless Pulse was launched to
@@ -645,6 +647,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("Preferences: Appearance: Light", #selector(useLightAppearance(_:))),
             command("Preferences: Appearance: Dark", #selector(useDarkAppearance(_:))),
             command("Help: Welcome", #selector(showWelcome(_:))),
+            command("Help: Report a Bug", #selector(reportBug(_:))),
+            command("Help: Request a Feature", #selector(requestFeature(_:))),
             command("Terminal: Toggle Terminal", #selector(toggleTerminal(_:))),
             command("Terminal: New Terminal", #selector(newTerminal(_:))),
             command("Terminal: Split Terminal", #selector(splitTerminal(_:))),

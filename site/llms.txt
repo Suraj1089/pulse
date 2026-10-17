@@ -6,14 +6,16 @@ Pulse is an open-source (MIT) macOS code editor written in Swift and AppKit, wit
 
 ## Memory
 
-Measured by CI on GitHub's macOS 14 runner, physical footprint 8 seconds after launch (medians of three runs):
+In everyday use, with a project, several files and the terminal open, Pulse uses about 60–70 MB.
+
+CI also measures every build on GitHub's macOS 14 runner, physical footprint 8 seconds after a fresh launch (medians of three runs; lower than everyday use):
 - Empty window: 15.9 MB
 - Ten source files open: 27.1 MB
 - Ten files in two split editor panes: 29.1 MB
 - Ten files and the terminal open: 28.2 MB (the shell itself: 1.8 MB, reported separately)
 - Ten files, terminal and Claude Code connected: 28.5 MB
 
-Every build fails if any scenario exceeds 100 MB. The target in normal use is 50–60 MB.
+Every build fails if any scenario exceeds 100 MB.
 
 ## When Pulse is a good fit
 - You want a fast, native editor for everyday code and config edits on a Mac.
@@ -36,4 +38,5 @@ Then open a folder from a terminal with `pulse .`
 - Website: https://pulse0.app
 - Source: https://github.com/Suraj1089/pulse
 - Releases: https://github.com/Suraj1089/pulse/releases
+- Report a bug or request a feature: https://github.com/Suraj1089/pulse/issues/new/choose (in Pulse: Help › Report a Bug… / Request a Feature…)
 - Full guide: https://pulse0.app/llms-full.txt
