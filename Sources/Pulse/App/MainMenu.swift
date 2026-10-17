@@ -171,6 +171,9 @@ enum MainMenu {
     private static func helpMenu() -> NSMenu {
         let menu = NSMenu(title: "Help")
         menu.addItem(item("Welcome to Pulse", #selector(MainWindowController.showWelcome(_:))))
+        menu.addItem(.separator())
+        menu.addItem(item("Report a Bug…", #selector(MainWindowController.reportBug(_:))))
+        menu.addItem(item("Request a Feature…", #selector(MainWindowController.requestFeature(_:))))
         return menu
     }
 

@@ -812,6 +812,7 @@
             <details><summary>Why install from Terminal instead of a download?</summary><p>Pulse isn’t notarized by Apple yet, so macOS blocks a copy downloaded in a browser (“Apple could not verify ‘Pulse’…”). The installer fetches the same release with <code>curl</code> and clears that download flag, so Pulse opens normally. Updates from inside Pulse work the same way.</p></details>
             <details><summary>Does it support language servers or autocomplete?</summary><p>Not yet. Language servers often use more memory than the whole editor, so if support arrives it will be optional and shown separately in the resource meter.</p></details>
             <details><summary>Why is the memory number different on my Mac?</summary><p>Screen size, font size, the files you open and macOS version all change it. The status bar shows Pulse’s live footprint, and <code>scripts/memory-check.sh</code> runs the same scenarios as CI.</p></details>
+            <details><summary>How do I report a bug or ask for a feature?</summary><p>In Pulse, choose Report a Bug… or Request a Feature… from the Help menu. Each opens a GitHub issue form in your browser (you need a GitHub account), and the bug form comes with your Pulse version, macOS version and Mac model filled in. You can also <a href="https://github.com/Suraj1089/pulse/issues/new/choose">open an issue</a> directly.</p></details>
             <details><summary>Does Pulse collect any data?</summary><p>No. There is no telemetry, no analytics and no account. Pulse goes online only to check GitHub for a new release (at launch and at most once a day) and to download one when you choose to update. The Claude Code connection stays on your Mac.</p></details>
           </div>
         </div>
@@ -826,6 +827,7 @@
           <div class="policy nogutter">
             <h3>The Pulse app</h3>
             <p>Pulse collects nothing: no telemetry, no analytics, no account. It goes online only to check GitHub for a new release and to download one you choose to install.</p>
+            <p>Help › Report a Bug… opens a GitHub issue form in your browser with your Pulse version, macOS version and Mac model filled in, where you can see and change them. Nothing is posted until you submit the issue.</p>
             <h3>This website</h3>
             <p>If you click <b>Accept</b> in the cookie banner, this site loads Google Analytics 4, a service of Google. It sets two cookies, <code>_ga</code> and <code>_ga_MCM9LLHVXG</code>, which last up to two years, and records:</p>
             <ul>
@@ -840,7 +842,7 @@
             <p>The site is served by Cloudflare, and its fonts come from Google Fonts. Both receive your IP address when your browser loads the page, as part of delivering it.</p>
             <h3>Contact</h3>
             <p>Pulse and this site are made by Suraj Pisal. For questions or requests about your data, <a href="https://github.com/Suraj1089/pulse/issues">open an issue on GitHub</a>.</p>
-            <p>Last updated 16 October 2026.</p>
+            <p>Last updated 17 October 2026.</p>
           </div>
         </div>
       </section>
@@ -851,6 +853,7 @@
       <nav aria-label="Footer">
         <a href="https://github.com/Suraj1089/pulse">GitHub</a>
         <a href="https://github.com/Suraj1089/pulse/releases">Releases</a>
+        <a href="https://github.com/Suraj1089/pulse/issues/new/choose">Feedback</a>
         <a href="#privacy">Privacy</a>
         <button type="button" class="linklike" data-consent>Cookie settings</button>
       </nav>
