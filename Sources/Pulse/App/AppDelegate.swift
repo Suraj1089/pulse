@@ -57,6 +57,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windows.newWindow()
     }
 
+    /// File › Open Recent: the folder's window if it has one, else this one or a new one.
+    @objc func openRecentFolder(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        windows.open([url])
+    }
+
+    @objc func clearRecentFolders(_ sender: Any?) {
+        RecentFolders.clear()
+        NSDocumentController.shared.clearRecentDocuments(nil)
+        windows.controllers.forEach { $0.editor.setRecents([]) }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
