@@ -65,4 +65,8 @@ enum RecentFolders {
         paths.insert(url.path, at: 0)
         UserDefaults.standard.set(Array(paths.prefix(8)), forKey: key)
     }
+
+    static func clear() {
+        UserDefaults.standard.removeObject(forKey: key)
+    }
 }

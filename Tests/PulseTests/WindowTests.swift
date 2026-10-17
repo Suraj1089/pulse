@@ -119,4 +119,21 @@ final class WindowTests: PulseTestCase {
         XCTAssertEqual(b.minX - a.minX, 26, accuracy: 1, "to the right")
         XCTAssertEqual(b.maxY - a.maxY, -26, accuracy: 1, "and down")
     }
+
+    func testOpenRecentMenuListsRecentFoldersAndClears() throws {
+        let a = try makeFolder("a", files: ["a.swift": "\n"])
+        let b = try makeFolder("b", files: ["b.swift": "\n"])
+        manager.open([a])
+        manager.open([b])
+        let menu = NSMenu()
+        RecentMenu.shared.menuNeedsUpdate(menu)
+        XCTAssertEqual(menu.items.prefix(2).map(\.title), ["b", "a"], "newest first")
+        XCTAssertEqual(menu.items.first?.representedObject as? URL, b)
+        XCTAssertEqual(menu.items.last?.action, #selector(AppDelegate.clearRecentFolders(_:)))
+
+        RecentFolders.clear()
+        RecentMenu.shared.menuNeedsUpdate(menu)
+        XCTAssertEqual(menu.items.map(\.title), ["Clear Recently Opened"])
+        XCTAssertNil(menu.items.first?.action, "disabled when empty")
+    }
 }
