@@ -93,13 +93,15 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
         if let selected { revealNow(selected) }
     }
 
-    /// Expands the folders above `url` and selects it.
-    func reveal(_ url: URL) {
+    /// Expands the folders above `url` and selects it; nil (a tab without a
+    /// file) clears the selection.
+    func reveal(_ url: URL?) {
         // Deferred one turn so a just-reloaded outline has created its rows.
         DispatchQueue.main.async { [weak self] in self?.revealNow(url) }
     }
 
-    private func revealNow(_ url: URL) {
+    private func revealNow(_ url: URL?) {
+        guard let url else { outline.deselectAll(nil); return }
         guard let root else { return }
         let rootPath = root.url.standardizedFileURL.path
         let path = url.standardizedFileURL.path
@@ -130,6 +132,14 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
 
     func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
         (item as? FileNode)?.isDirectory ?? false
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, rowViewForItem item: Any) -> NSTableRowView? {
+        let id = NSUserInterfaceItemIdentifier("FileRow")
+        if let row = outlineView.makeView(withIdentifier: id, owner: self) as? FileTreeRowView { return row }
+        let row = FileTreeRowView()
+        row.identifier = id
+        return row
     }
 
     func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
@@ -261,5 +271,16 @@ final class FileTreeController: NSViewController, NSOutlineViewDataSource, NSOut
         guard alert.runModal() == .alertFirstButtonReturn else { return nil }
         let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty || name.contains("/") ? nil : name
+    }
+}
+
+/// The open file's row stays clearly marked while the editor has focus: an
+/// accent tint instead of the faint gray AppKit draws for a table that isn't
+/// focused. With the tree focused, the standard selection is drawn.
+final class FileTreeRowView: NSTableRowView {
+    override func drawSelection(in dirtyRect: NSRect) {
+        guard !isEmphasized else { return super.drawSelection(in: dirtyRect) }
+        NSColor.controlAccentColor.withAlphaComponent(0.22).setFill()
+        bounds.fill()
     }
 }

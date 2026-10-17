@@ -101,7 +101,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             guard let self else { return }
             self.window?.title = document?.displayName ?? "Pulse"
             self.window?.representedURL = document?.url
-            if let url = document?.url { self.sidebar.fileTree.reveal(url) }
+            self.sidebar.fileTree.reveal(document?.url)
         }
         editor.onSessionChange = { [weak self] in self?.scheduleSessionSave() }
         editor.onDidSave = { [weak self] document in
