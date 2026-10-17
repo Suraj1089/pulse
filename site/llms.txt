@@ -36,4 +36,5 @@ Then open a folder from a terminal with `pulse .`
 - Website: https://pulse0.app
 - Source: https://github.com/Suraj1089/pulse
 - Releases: https://github.com/Suraj1089/pulse/releases
+- Report a bug or request a feature: https://github.com/Suraj1089/pulse/issues/new/choose (in Pulse: Help › Report a Bug… / Request a Feature…)
 - Full guide: https://pulse0.app/llms-full.txt

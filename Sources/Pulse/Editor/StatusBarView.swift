@@ -1,7 +1,7 @@
 import AppKit
 
-/// Bottom strip: git branch, caret position, language, indentation, and Pulse's own
-/// memory and CPU next to whatever the terminal is running.
+/// Bottom strip: git branch, caret position, language, indentation, Pulse's own
+/// memory and CPU next to whatever the terminal is running, and a bug button.
 final class StatusBarView: NSView {
     static let height: CGFloat = 24
 
@@ -13,6 +13,9 @@ final class StatusBarView: NSView {
     private let message = StatusBarView.makeLabel()
     private let claude = StatusBarView.makeLabel()
     private let resources = StatusBarView.makeLabel()
+    /// Help › Report a Bug…, sent up the responder chain to the window.
+    private let reportBug = NSButton(image: NSImage(systemSymbolName: "ladybug", accessibilityDescription: "Report a Bug") ?? NSImage(),
+                                     target: nil, action: #selector(MainWindowController.reportBug(_:)))
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -25,7 +28,12 @@ final class StatusBarView: NSView {
         claude.isHidden = true
         claude.stringValue = "✻ Claude Code"
         claude.toolTip = "Claude Code is connected: it sees this window's open file and selection."
-        let stack = NSStackView(views: [left, NSView(), message, claude, resources])
+        reportBug.isBordered = false
+        reportBug.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 11, weight: .regular)
+        reportBug.contentTintColor = .secondaryLabelColor
+        reportBug.toolTip = "Report a Bug…"
+        reportBug.setAccessibilityLabel("Report a Bug")
+        let stack = NSStackView(views: [left, NSView(), message, claude, resources, reportBug])
         stack.orientation = .horizontal
         stack.distribution = .fill
         stack.translatesAutoresizingMaskIntoConstraints = false

@@ -1,0 +1,49 @@
+name: Report a bug
+description: Something doesn't work, crashes, or uses more memory or CPU than it should.
+labels: [bug]
+body:
+  # Help › Report a Bug… fills in version, macos and mac by these ids
+  # (Sources/Pulse/App/Feedback.swift); keep them in step.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you were doing, what went wrong, and any error message.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a folder with …
+        2. …
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+  - type: input
+    id: meter
+    attributes:
+      label: Resource meter
+      description: For memory or CPU problems, what the status bar showed.
+      placeholder: e.g. Pulse 48 MB · CPU 0%
+  - type: input
+    id: version
+    attributes:
+      label: Pulse version
+      description: Pulse › About Pulse.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS
+      description: Apple menu › About This Mac.
+    validations:
+      required: true
+  - type: input
+    id: mac
+    attributes:
+      label: Mac
+      description: Chip and model, e.g. Apple M2, Mac14,2.

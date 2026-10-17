@@ -122,4 +122,6 @@ Open a folder from Terminal: `pulse .`
 
 Pulse has no telemetry or analytics and needs no account. Its only network traffic is the update check against GitHub Releases (release builds: at launch and at most once a day) and downloading an update you choose to install. The Claude Code connection is local to the Mac (127.0.0.1) and only exists while Claude Code is installed. Files never leave the Mac through Pulse.
 
+Help › Report a Bug… and Help › Request a Feature… (the bug form also from the ladybug button at the right end of the status bar) open a GitHub issue form (https://github.com/Suraj1089/pulse/issues/new/choose) in the default browser. The bug form comes with the Pulse version, macOS version and Mac model (chip and model identifier) filled in, visible and editable; nothing is posted until the user submits the issue. Pulse makes no request itself.
+
 The website (pulse0.app) uses Google Analytics 4 only for visitors who click Accept in its cookie banner; declining loads nothing and sets no cookies. Details are in the Privacy section of the site.
