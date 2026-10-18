@@ -141,6 +141,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             guard let self, let pane else { return }
             self.focusChanged(to: pane)
         }
+        pane.textView.onRefuse = { [weak self] message in self?.statusBar.showMessage(message, isWarning: false) }
         pane.scrollView.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(didScroll(_:)),
                                                name: NSView.boundsDidChangeNotification, object: pane.scrollView.contentView)
