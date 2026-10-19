@@ -136,7 +136,7 @@ final class ClaudeBridgeTests: PulseTestCase {
 
     /// Runs `command` in the window's first terminal and returns its output.
     private func shellOutput(_ command: String, in controller: MainWindowController) throws -> String {
-        let view = try XCTUnwrap(views(LocalProcessTerminalView.self, in: controller).last(where: { $0.window != nil }))
+        let view = try XCTUnwrap(views(TerminalView.self, in: controller).last(where: { $0.window != nil }))
         let file = temp.appendingPathComponent("out-\(UUID().uuidString)")
         view.send(txt: "\(command) > '\(file.path)'\r")
         wait(timeout: 10, "shell output") {

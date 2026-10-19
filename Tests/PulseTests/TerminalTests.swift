@@ -6,12 +6,12 @@ import XCTest
 /// Multiple terminals: tabs (+), side-by-side panes (split), kill, exit.
 /// These start real shells, in temp folders, and end them in tearDown.
 final class TerminalTests: PulseTestCase {
-    private func terminalViews(_ controller: MainWindowController) -> [LocalProcessTerminalView] {
-        views(LocalProcessTerminalView.self, in: controller).filter { $0.window != nil }
+    private func terminalViews(_ controller: MainWindowController) -> [TerminalView] {
+        views(TerminalView.self, in: controller).filter { $0.window != nil }
     }
 
     /// Runs `command` in the given pane and waits for its output file.
-    private func output(of command: String, in view: LocalProcessTerminalView) throws -> String {
+    private func output(of command: String, in view: TerminalView) throws -> String {
         let file = temp.appendingPathComponent("out-\(UUID().uuidString)")
         view.send(txt: "\(command) > '\(file.path)'\r")
         wait(timeout: 10, "shell output") {
@@ -84,6 +84,37 @@ final class TerminalTests: PulseTestCase {
         wait(timeout: 10, "the pane to close") { panel.terminalCount == 1 }
         XCTAssertTrue(controller.editor.isTerminalVisible)
         XCTAssertEqual(terminalViews(controller).count, 1)
+    }
+
+    /// The session reads the shell's output itself: a burst arrives in full and in order.
+    func testABurstOfOutputReachesTheScreenInFull() throws {
+        let controller = makeController()
+        controller.editor.showTerminal()
+        layout(controller)
+        let view = try XCTUnwrap(terminalViews(controller).first)
+        _ = try output(of: "echo ready", in: view)
+        view.send(txt: "seq 1 50000\r")
+        wait(timeout: 30, "the last line on screen") { self.screen(of: view).contains("50000") }
+        let lines = screen(of: view)
+        let last = try XCTUnwrap(lines.firstIndex(of: "50000"))
+        XCTAssertEqual(Array(lines[..<last].suffix(3)), ["49997", "49998", "49999"])
+    }
+
+    func testShellsKnowTheirTerminalSize() throws {
+        let controller = makeController()
+        controller.editor.showTerminal()
+        controller.splitTerminal(nil)   // the first pane shrinks after its shell started
+        layout(controller)
+        for view in terminalViews(controller) {
+            let terminal = view.getTerminal()
+            XCTAssertEqual(try output(of: "stty size", in: view), "\(terminal.rows) \(terminal.cols)")
+        }
+    }
+
+    /// The non-empty lines on a terminal's screen.
+    private func screen(of view: TerminalView) -> [String] {
+        let terminal = view.getTerminal()
+        return (0..<terminal.rows).compactMap { terminal.getLine(row: $0)?.translateToString(trimRight: true) }.filter { !$0.isEmpty }
     }
 
     func testFontSizeReachesEveryPane() {

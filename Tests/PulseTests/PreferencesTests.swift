@@ -186,7 +186,7 @@ final class PreferencesTests: PulseTestCase {
         let controller = makeController()
         controller.editor.showTerminal()
         layout(controller)
-        let terminal = try XCTUnwrap(views(LocalProcessTerminalView.self, in: controller).first)
+        let terminal = try XCTUnwrap(views(TerminalView.self, in: controller).first)
         func background() -> CGColor? { terminal.layer?.backgroundColor }
         AppAppearance.current = .dark
         layout(controller)
