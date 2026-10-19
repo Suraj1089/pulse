@@ -73,6 +73,15 @@ final class WindowManager {
         }
     }
 
+    /// Developer: Reload Window. A new window built from `controller`'s session
+    /// state (folder, tabs, unsaved text, terminal, frame) takes its place, as
+    /// after a relaunch; the old one closes with its views and shells.
+    func reload(_ controller: MainWindowController) {
+        if EditorViewController.autosaveEnabled { controller.editor.saveNamedDocuments() }
+        newWindow(restoring: controller.sessionState)
+        controller.close()   // windowWillClose drops it and saves the session
+    }
+
     // MARK: Closing
 
     /// A window that isn't the last one won't be restored, so its unsaved

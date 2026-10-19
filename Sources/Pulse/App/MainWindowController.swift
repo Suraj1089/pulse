@@ -449,6 +449,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         sidebarItem.animator().isCollapsed.toggle()
     }
 
+    @objc func reloadWindow(_ sender: Any?) { windows.reload(self) }
+
     @objc func showSourceControl(_ sender: Any?) {
         if sidebarItem.isCollapsed { sidebarItem.animator().isCollapsed = false }
         sidebar.showSourceControl()
@@ -666,6 +668,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("Help: Welcome", #selector(showWelcome(_:))),
             command("Help: Report a Bug", #selector(reportBug(_:))),
             command("Help: Request a Feature", #selector(requestFeature(_:))),
+            command("Developer: Reload Window", #selector(reloadWindow(_:))),
             command("Terminal: Toggle Terminal", #selector(toggleTerminal(_:))),
             command("Terminal: New Terminal", #selector(newTerminal(_:))),
             command("Terminal: Split Terminal", #selector(splitTerminal(_:))),

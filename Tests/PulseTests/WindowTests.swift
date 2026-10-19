@@ -100,6 +100,29 @@ final class WindowTests: PulseTestCase {
         XCTAssertTrue(manager.windowShouldClose(manager.controllers[0]))
     }
 
+    func testReloadWindowRebuildsItWithItsFolderTabsUnsavedTextAndFrame() throws {
+        let a = try makeFolder("a", files: ["a.swift": "let a = 1\n"])
+        let b = try makeFolder("b", files: ["b.swift": "\n"])
+        manager.open([a, a.appendingPathComponent("a.swift")])
+        manager.open([b])
+        let old = manager.controllers[0]
+        old.editor.newDocument()
+        old.editor.textView.insertText("draft", replacementRange: old.editor.textView.selectedRange())
+        let frame = NSRect(x: 120, y: 140, width: 900, height: 600)
+        old.window?.setFrame(frame, display: false)
+
+        manager.reload(old)
+
+        XCTAssertEqual(manager.controllers.count, 2, "the old window closed")
+        XCTAssertFalse(manager.controllers.contains { $0 === old })
+        let reloaded = try XCTUnwrap(manager.controllers.first { $0.root == a })
+        XCTAssertEqual(reloaded.editor.documents.map { $0.url?.lastPathComponent }, ["a.swift", nil])
+        XCTAssertEqual(reloaded.editor.documents.last?.storage.string, "draft", "unsaved text comes back")
+        XCTAssertTrue(reloaded.editor.activeDocument === reloaded.editor.documents.last, "the active tab too")
+        XCTAssertEqual(reloaded.window?.frame, frame)
+        XCTAssertEqual(SessionState.loadAll().map(\.root), [b.path, a.path], "saved once each")
+    }
+
     func testAnUpdateShowsInEveryWindowIncludingNewOnes() throws {
         manager.newWindow()
         let release = Updater.Release(version: "9.9.9", zip: URL(string: "https://example.invalid/Pulse.zip")!,

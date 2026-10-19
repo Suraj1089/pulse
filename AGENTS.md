@@ -103,6 +103,8 @@ A push to `main` is released by `release.yml` only when its commit message conta
 
 `Sources/Pulse/Resources/pulse` is a shell script copied into `Pulse.app/Contents/Resources/` by `bundle.sh` and `package.sh`; it finds the app from its own real path and runs `open -a`. `App/CommandLineTool.swift` links it as `pulse` into the first writable, non-system folder on the user's PATH (read once from the login shell): automatically on the first launch of a release build, or from Pulse › Install 'pulse' Command, which falls back to `/usr/local/bin` with the macOS administrator prompt. It never replaces a different program named `pulse`, re-points links left at a moved or deleted Pulse.app, and never edits shell profiles. The Homebrew cask declares it with `binary`.
 
+Besides paths, the script takes `-h`/`--help`, `-v`/`--version` (also `help` and `version` when no file has that name), and `--upgrade [version]` / `--downgrade [version]`. Those two find the latest release (the redirect of `releases/latest`) or the newest one older than the installed version (GitHub's releases API), then run the website's `install.sh` with that version and `PULSE_INSTALL_DIR` set to the folder the app is in. `install.sh` takes an optional version (`bash -s -- 2.1.3`) and ignores SIGHUP and failed writes to the terminal, so it finishes when it is run from Pulse's own terminal and quitting Pulse closes that terminal. Unknown options are refused rather than created as files.
+
 ## Copyright
 
 © 2026 pulse0.app · MIT licensed
