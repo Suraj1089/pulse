@@ -1,7 +1,7 @@
 import AppKit
 
 /// NSTextView tuned for code: spaces for tabs, auto-indent, line comments,
-/// block indent/outdent and a current-line highlight.
+/// block indent/outdent, a current-line highlight and folding (Folding.swift).
 final class CodeTextView: NSTextView {
     var indentWidth = 4
     var lineComment: String?
@@ -23,6 +23,11 @@ final class CodeTextView: NSTextView {
 
     override func drawBackground(in rect: NSRect) {
         super.drawBackground(in: rect)
+        drawCurrentLine(in: rect)
+        drawFoldPlaceholders(in: rect)
+    }
+
+    private func drawCurrentLine(in rect: NSRect) {
         guard selectedRange().length == 0, let layoutManager else { return }
         let location = min(selectedRange().location, nsText.length)
         var lineRect: NSRect
@@ -41,11 +46,33 @@ final class CodeTextView: NSTextView {
     }
 
     override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
+        let ranges = stillSelecting ? ranges : rangesAroundFolds(ranges)
         super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
         // Must allow layout: with non-contiguous layout, a redraw that skips
         // layout paints the background but no glyphs.
         setNeedsDisplay(visibleRect)
     }
+
+    /// Text typed after a fold would take `.folded` from the hidden
+    /// character before it and vanish.
+    override var typingAttributes: [NSAttributedString.Key: Any] {
+        get { super.typingAttributes }
+        set {
+            var attributes = newValue
+            attributes[.folded] = nil
+            super.typingAttributes = attributes
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if unfoldPlaceholder(at: convert(event.locationInWindow, from: nil)) { return }
+        super.mouseDown(with: event)
+    }
+
+    override func moveRight(_ sender: Any?) { if !stepOverFold(forward: true) { super.moveRight(sender) } }
+    override func moveForward(_ sender: Any?) { if !stepOverFold(forward: true) { super.moveForward(sender) } }
+    override func moveLeft(_ sender: Any?) { if !stepOverFold(forward: false) { super.moveLeft(sender) } }
+    override func moveBackward(_ sender: Any?) { if !stepOverFold(forward: false) { super.moveBackward(sender) } }
 
     /// AppKit's text checking (spelling, candidates, correction bubbles; all
     /// off here) asks for the selected text on every selection change, twice,
@@ -80,6 +107,7 @@ final class CodeTextView: NSTextView {
     /// so Undo holds at most one such copy of a file.
     override func shouldChangeText(inRanges affectedRanges: [NSValue], replacementStrings: [String]?) -> Bool {
         let ranges = affectedRanges.map(\.rangeValue)
+        unfoldPartlyChanged(ranges)
         guard let strings = replacementStrings, strings.count == ranges.count, let first = ranges.first, let last = ranges.last,
               let storage = textStorage else {
             return super.shouldChangeText(inRanges: affectedRanges, replacementStrings: replacementStrings)

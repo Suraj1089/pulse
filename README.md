@@ -30,7 +30,7 @@ Pulse is a code editor written in Swift and AppKit, with no web view, no Electro
 
 - **Folders and files**: open a folder, browse it in the sidebar, open many files in tabs. The file you're editing stays highlighted in the tree.
 - **Windows**: each folder opens in its own window (`pulse <folder>`, Finder, File › Open), like VS Code; opening a folder that is already open brings its window forward. ⇧⌘N opens an empty window. All windows come back after a restart.
-- **Editing**: syntax highlighting for Swift, JS/TS, Python, Go, Rust, C/C++/Obj-C, Java/Kotlin, Ruby, shell, HTML/XML, CSS, JSON, YAML, TOML, Markdown and SQL. Line numbers, current-line highlight, auto-indent, toggle comment, indent/outdent, word wrap.
+- **Editing**: syntax highlighting for Swift, JS/TS, Python, Go, Rust, C/C++/Obj-C, Java/Kotlin, Ruby, shell, HTML/XML, CSS, JSON, YAML, TOML, Markdown and SQL. Line numbers, current-line highlight, auto-indent, toggle comment, indent/outdent, word wrap. Code folding by indentation, as in VS Code: the chevrons in the gutter, `⌥⌘[` / `⌥⌘]`, or Fold All in View › Folding.
 - **Breadcrumbs**: the open file's path, from the opened folder, shows under the tabs.
 - **Split editor**: View › Split Editor Right (`⌥⌘\`) or Down, or right-click a tab. Each pane has its own tabs; a file open in two panes is one text, edited in both. Nothing is created until you split, and a pane closes with its last tab.
 - **Find and replace** in the file (the standard macOS find bar), and **project search** (uses `ripgrep` when installed, otherwise a built-in scan; a block of code finds the same code however it is wrapped or indented). Under `…`, **files to include** and **files to exclude** take comma-separated globs as in VS Code: `*.ts`, `src` (that folder at any depth), `./src` (only the top-level one), `src/**/*.test.ts`, `*.{ts,tsx}`.
@@ -73,6 +73,7 @@ Pulse checks for a new release once a day and shows an **Update** button at the 
 | `⇧⌘P` | Command palette |
 | `⌘L` | Go to line |
 | `⌘F` / `⌥⌘F` | Find / find and replace in file |
+| `⌥⌘[` / `⌥⌘]` | Fold / unfold the block at the caret |
 | `⇧⌘F` | Search the project |
 | `` ⌃` `` | Show or hide the terminal |
 | `` ⌃⇧` `` | New terminal (in the open folder) |

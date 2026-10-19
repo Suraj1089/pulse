@@ -478,6 +478,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     @objc func toggleComment(_ sender: Any?) { editor.textView.toggleLineComment() }
     @objc func indentLines(_ sender: Any?) { editor.textView.shiftLines(right: true) }
     @objc func outdentLines(_ sender: Any?) { editor.textView.shiftLines(right: false) }
+    @objc func foldBlock(_ sender: Any?) { editor.textView.foldAtCaret() }
+    @objc func unfoldBlock(_ sender: Any?) { editor.textView.unfoldAtCaret() }
+    @objc func foldAll(_ sender: Any?) { editor.textView.foldAll() }
+    @objc func unfoldAll(_ sender: Any?) { editor.textView.unfoldAll() }
     // ⌘+ / ⌘− / ⌘0 resize the area being worked in; View › Font Size names one.
     @objc func zoomIn(_ sender: Any?) { changeFontSize(of: focusedFontArea, by: 1) }
     @objc func zoomOut(_ sender: Any?) { changeFontSize(of: focusedFontArea, by: -1) }
@@ -587,7 +591,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             return true
         case #selector(saveDocument(_:)), #selector(saveDocumentAs(_:)), #selector(toggleComment(_:)),
              #selector(indentLines(_:)), #selector(outdentLines(_:)), #selector(showGoToLine(_:)),
-             #selector(copyFilePath(_:)):
+             #selector(copyFilePath(_:)), #selector(foldBlock(_:)), #selector(unfoldBlock(_:)),
+             #selector(foldAll(_:)), #selector(unfoldAll(_:)):
             return hasDocument
         case #selector(nextTab(_:)), #selector(previousTab(_:)):
             return editor.documents.count > 1
@@ -631,6 +636,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("View: Split Editor Right", #selector(splitEditorRight(_:))),
             command("View: Split Editor Down", #selector(splitEditorDown(_:))),
             command("View: Toggle Word Wrap", #selector(toggleWordWrap(_:))),
+            command("View: Fold", #selector(foldBlock(_:))),
+            command("View: Unfold", #selector(unfoldBlock(_:))),
+            command("View: Fold All", #selector(foldAll(_:))),
+            command("View: Unfold All", #selector(unfoldAll(_:))),
             command("View: Zoom In", #selector(zoomIn(_:))),
             command("View: Zoom Out", #selector(zoomOut(_:))),
             command("View: Reset Zoom", #selector(resetZoom(_:))),

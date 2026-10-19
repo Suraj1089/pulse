@@ -19,6 +19,7 @@ Pulse is a native macOS code editor written in Swift and AppKit. Its design cons
 - **Split editors**: Split Editor Right (⌥⌘\) or Split Editor Down, from the View menu, the command palette or a tab's right-click menu, which also has Close and Close Others. Splits nest into a grid. A file open in two panes is one document: one copy of its text, one undo history, and edits show in both. A pane closes with its last tab.
 - **Syntax highlighting**: Swift, JavaScript/TypeScript, Python, Go, Rust, C/C++/Objective-C, Java/Kotlin/Scala/Dart/C#, Ruby, shell, HTML/XML, CSS/SCSS, JSON, YAML, TOML, Markdown and SQL. Regex-based, not a full parser.
 - **Editing**: line numbers, current-line highlight, auto-indent (including after `{`, `[`, `(` and Python `:`), spaces for tabs, toggle line comment (⌘/), indent and outdent (⌘] and ⌘[), word wrap (⌥⌘W), font size (⌘+, ⌘−, ⌘0).
+- **Code folding**: by indentation, as in VS Code, so it works in every language. A chevron in the gutter (shown on hover; always on a folded line) or ⌥⌘[ / ⌥⌘] folds and unfolds the block at the caret; View › Folding and the command palette also have Fold All and Unfold All. A folded line ends in "⋯", which unfolds it on click. The closing brace stays visible, the text is unchanged, and folds are not saved between launches.
 - **Find and replace**: the standard macOS find bar (⌘F, ⌥⌘F, ⌘G, ⌘E).
 - **Project search** (⇧⌘F): runs ripgrep (`rg`) as a short-lived child process when installed, otherwise a built-in scan. Results grouped by file; click to jump to the match. The `…` button shows "files to include" and "files to exclude": comma-separated globs as in VS Code (`*.ts`, `src`, `./src`, `src/**/*.test.ts`, `*.{ts,tsx}`), case-insensitive; a folder pattern covers everything inside it, and an exclude beats an include.
 - **Command palette**: ⌘P go to file (fuzzy), ⇧⌘P commands, ⌘L go to line.
@@ -102,6 +103,7 @@ Open a folder from Terminal: `pulse .`
 | ⇧⌘P | Command palette |
 | ⌘L | Go to line |
 | ⌘F / ⌥⌘F | Find / Find and replace |
+| ⌥⌘[ / ⌥⌘] | Fold / unfold |
 | ⇧⌘F | Search the project |
 | ⇧⌘E | Show files |
 | ⌃⇧G | Show source control |
@@ -126,4 +128,4 @@ Pulse has no telemetry or analytics and needs no account. Its only network traff
 
 Help › Report a Bug… and Help › Request a Feature… (the bug form also from the ladybug button at the right end of the status bar) open a GitHub issue form (https://github.com/Suraj1089/pulse/issues/new/choose) in the default browser. The bug form comes with the Pulse version, macOS version and Mac model (chip and model identifier) filled in, visible and editable; nothing is posted until the user submits the issue. Pulse makes no request itself.
 
-The website (pulse0.app) uses Google Analytics 4 only for visitors who click Accept in its cookie banner; declining loads nothing and sets no cookies. Details are in the Privacy section of the site.
+The website (pulse0.app) uses Google Analytics 4 only for visitors who click Accept in its cookie banner; declining loads nothing and sets no cookies.

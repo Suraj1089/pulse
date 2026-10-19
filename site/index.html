@@ -446,15 +446,6 @@
   .faq summary:hover { color: var(--accent); }
   .faq details p { margin: -4px 0 18px 32px; color: var(--muted); max-width: 64ch; }
 
-  /* PRIVACY.md */
-  .policy { max-width: 760px; margin-inline: auto; color: var(--muted); font-size: 15px; }
-  .policy h3 { font: 500 14px/1.4 var(--font-code); color: var(--fg); margin: 24px 0 6px; }
-  .policy h3:first-child { margin-top: 0; }
-  .policy p, .policy ul { margin: 0 0 10px; }
-  .policy ul { padding-left: 20px; }
-  .policy li { margin: 3px 0; }
-  .policy b { color: var(--fg); font-weight: 500; }
-  .policy code { font-size: .88em; color: var(--fg); background: var(--chrome); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
   .linklike { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }
   .linklike:hover { text-decoration: underline; text-underline-offset: 3px; }
   .foot .linklike { color: var(--muted); } .foot .linklike:hover { color: var(--fg); }
@@ -590,7 +581,6 @@
       <li><a class="indent" href="#shortcuts" data-file="shortcuts"><span class="fi" style="color:var(--num)">{}</span>keybindings.json</a></li>
       <li><a class="indent" href="#install" data-file="install"><span class="fi" style="color:var(--ok)">$</span>install.sh</a></li>
       <li><a class="indent" href="#faq" data-file="faq"><span class="fi" style="color:var(--type)">M↓</span>FAQ.md</a></li>
-      <li><a class="indent" href="#privacy" data-file="privacy"><span class="fi" style="color:var(--type)">M↓</span>PRIVACY.md</a></li>
     </ul>
     <div class="side-foot">
       <div><b>60–70 MB</b> · everyday use</div>
@@ -608,7 +598,6 @@
       <a class="tab" href="#shortcuts" data-file="shortcuts">keybindings.json</a>
       <a class="tab" href="#install" data-file="install">install.sh</a>
       <a class="tab" href="#faq" data-file="faq">FAQ.md</a>
-      <a class="tab" href="#privacy" data-file="privacy">PRIVACY.md</a>
     </nav>
 
     <main>
@@ -683,7 +672,7 @@
               <div class="term-foot"><span class="ok">✓</span> 5 scenarios under budget · physical footprint via <span class="t">vmmap</span>, 8 s after launch</div>
             </div>
           </div>
-          <p class="prose">Medians of three runs on GitHub’s macOS 14 runner, taken 8 seconds after a fresh launch, so they read lower than everyday use: a larger window, scrolling through big files, search results and terminal scrollback all add to it. That is what Activity Monitor calls “Memory”. Processes you start in the terminal are not counted as Pulse. Run the same check on your Mac with <a href="https://github.com/Suraj1089/pulse/blob/main/scripts/memory-check.sh"><code>scripts/memory-check.sh</code></a>; the status bar in Pulse shows the live number too.</p>
+          <p class="prose">Medians of three runs on GitHub’s macOS 14 runner, 8 seconds after launch, so lower than everyday use. Run the same check with <a href="https://github.com/Suraj1089/pulse/blob/main/scripts/memory-check.sh"><code>scripts/memory-check.sh</code></a>.</p>
         </div>
       </section>
 
@@ -704,7 +693,7 @@
             </div>
             <div class="sym">
               <div class="sig"><span class="k">func</span> <span class="t">highlight</span>(<span class="a">_</span> language: <span class="t">Language</span>)</div>
-              <p>Swift, TypeScript, Python, Go, Rust, C, Java, Kotlin, Ruby, shell, HTML, CSS, JSON, YAML, TOML, Markdown, SQL.</p>
+              <p>Swift, TypeScript, Python, Go, Rust, C, Java, Kotlin, Ruby, shell, HTML, CSS, JSON, YAML, TOML, Markdown, SQL. Fold any block from the gutter or with <kbd>⌥⌘[</kbd>, as in VS Code.</p>
             </div>
             <div class="sym">
               <div class="sig"><span class="k">func</span> <span class="t">searchProject</span>(<span class="a">_</span> query: <span class="t">String</span>)</div>
@@ -809,43 +798,14 @@
           <div class="faq nogutter">
             <details><summary>Is Pulse a replacement for VS Code?</summary><p>For a lot of everyday editing, yes. For extension-heavy workflows, no. Pulse has tabs, split editors, highlighting, find and replace, project search, a command palette, a terminal with tabs and splits, and a source control panel with diffs. It has no extensions, debugger, full Git client or built-in AI, and isn’t trying to.</p></details>
             <details><summary>Does it work with Claude Code?</summary><p>Yes. Run <code>claude</code> in Pulse’s terminal and it sees the file and lines you select, the way it does in VS Code. <kbd>⇧⌘K</kbd> sends the selection as an @-mention, and <code>/ide</code> connects a <code>claude</code> running in another terminal. The connection stays on your Mac, starts only if Claude Code is installed, and can be turned off with View › Share Selection with Claude Code.</p></details>
-            <details><summary>Why install from Terminal instead of a download?</summary><p>Pulse isn’t notarized by Apple yet, so macOS blocks a copy downloaded in a browser (“Apple could not verify ‘Pulse’…”). The installer fetches the same release with <code>curl</code> and clears that download flag, so Pulse opens normally. Updates from inside Pulse work the same way.</p></details>
             <details><summary>Does it support language servers or autocomplete?</summary><p>Not yet. Language servers often use more memory than the whole editor, so if support arrives it will be optional and shown separately in the resource meter.</p></details>
             <details><summary>Why is the memory number different on my Mac?</summary><p>Screen size, font size, the files you open and macOS version all change it. The status bar shows Pulse’s live footprint, and <code>scripts/memory-check.sh</code> runs the same scenarios as CI.</p></details>
-            <details><summary>How do I report a bug or ask for a feature?</summary><p>In Pulse, click the ladybug at the right end of the status bar, or choose Report a Bug… or Request a Feature… from the Help menu. Each opens a GitHub issue form in your browser (you need a GitHub account), and the bug form comes with your Pulse version, macOS version and Mac model filled in. You can also <a href="https://github.com/Suraj1089/pulse/issues/new/choose">open an issue</a> directly.</p></details>
-            <details><summary>Does Pulse collect any data?</summary><p>No. There is no telemetry, no analytics and no account. Pulse goes online only to check GitHub for a new release (at launch and at most once a day) and to download one when you choose to update. The Claude Code connection stays on your Mac.</p></details>
+            <details><summary>How do I report a bug or ask for a feature?</summary><p>Click the ladybug in Pulse’s status bar, or use Help › Report a Bug… or Request a Feature…. Both open a <a href="https://github.com/Suraj1089/pulse/issues/new/choose">GitHub issue form</a>, with your Pulse and macOS versions filled in.</p></details>
+            <details><summary>Does Pulse collect any data?</summary><p>No. There is no telemetry, no analytics and no account. Pulse goes online only to check GitHub for a new release (at launch and at most once a day) and to download one when you choose to update. The Claude Code connection stays on your Mac. This website loads Google Analytics only if you accept its cookies; Cookie settings in the footer changes that.</p></details>
           </div>
         </div>
       </section>
 
-      <!-- PRIVACY.md -->
-      <section class="file" id="privacy" data-file="privacy" data-lang="Markdown">
-        <div class="crumbs">pulse0.app <span>›</span> <b>PRIVACY.md</b></div>
-        <div class="src">
-          <div class="md-h"><span class="k">#</span> Privacy</div>
-          <h2>Privacy</h2>
-          <div class="policy nogutter">
-            <h3>The Pulse app</h3>
-            <p>Pulse collects nothing: no telemetry, no analytics, no account. It goes online only to check GitHub for a new release and to download one you choose to install.</p>
-            <p>Help › Report a Bug… opens a GitHub issue form in your browser with your Pulse version, macOS version and Mac model filled in, where you can see and change them. Nothing is posted until you submit the issue.</p>
-            <h3>This website</h3>
-            <p>If you click <b>Accept</b> in the cookie banner, this site loads Google Analytics 4, a service of Google. It sets two cookies, <code>_ga</code> and <code>_ga_MCM9LLHVXG</code>, which last up to two years, and records:</p>
-            <ul>
-              <li>the pages and sections you view, how you arrived (the referring site) and when</li>
-              <li>your approximate location (country and city), browser, operating system, device type and screen size</li>
-              <li>when you click <b>Copy</b> on the install command</li>
-            </ul>
-            <p>Google Analytics doesn’t store IP addresses. Google signals and ad personalization are turned off, and the data isn’t used for advertising. Google keeps it for two months.</p>
-            <p>If you click <b>Decline</b>, or don’t answer, Google Analytics doesn’t load and no cookies are set. Your answer is remembered in this browser’s local storage, on this device only.</p>
-            <p><button type="button" class="linklike" data-consent>Change your cookie choice</button> at any time. Declining also deletes the Google Analytics cookies. Google also offers an <a href="https://tools.google.com/dlpage/gaoptout">opt-out browser add-on</a>.</p>
-            <h3>Hosting and fonts</h3>
-            <p>The site is served by Cloudflare, and its fonts come from Google Fonts. Both receive your IP address when your browser loads the page, as part of delivering it.</p>
-            <h3>Contact</h3>
-            <p>Pulse and this site are made by Suraj Pisal. For questions or requests about your data, <a href="https://github.com/Suraj1089/pulse/issues">open an issue on GitHub</a>.</p>
-            <p>Last updated 17 October 2026.</p>
-          </div>
-        </div>
-      </section>
     </main>
 
     <footer class="foot">
@@ -854,7 +814,6 @@
         <a href="https://github.com/Suraj1089/pulse">GitHub</a>
         <a href="https://github.com/Suraj1089/pulse/releases">Releases</a>
         <a href="https://github.com/Suraj1089/pulse/issues/new/choose">Feedback</a>
-        <a href="#privacy">Privacy</a>
         <button type="button" class="linklike" data-consent>Cookie settings</button>
       </nav>
     </footer>
@@ -873,7 +832,7 @@
 </div>
 
 <div class="consent" id="consent" role="region" aria-label="Cookie consent" hidden>
-  <p>May this site use <b>Google Analytics</b> cookies to count visits and install-command copies? The Pulse app itself collects nothing. <a href="#privacy">Privacy</a></p>
+  <p>May this site use <b>Google Analytics</b> cookies to count visits and install-command copies? The Pulse app itself collects nothing.</p>
   <div class="consent-actions">
     <button type="button" id="consent-decline">Decline</button>
     <button type="button" id="consent-accept">Accept</button>
@@ -892,7 +851,7 @@
   // keybindings.json rendered with syntax colors
   var keys = [
     ["Open a folder or files", "⌘O"], ["New window", "⇧⌘N"], ["Go to file", "⌘P"], ["Command palette", "⇧⌘P"],
-    ["Go to line", "⌘L"], ["Find / replace", "⌘F · ⌥⌘F"], ["Search the project", "⇧⌘F"],
+    ["Go to line", "⌘L"], ["Find / replace", "⌘F · ⌥⌘F"], ["Search the project", "⇧⌘F"], ["Fold / unfold", "⌥⌘[ · ⌥⌘]"],
     ["Split editor right", "⌥⌘\\"], ["Show or hide terminal", "⌃`"], ["New / split terminal", "⌃⇧` · ⌘\\"],
     ["Source control", "⌃⇧G"], ["Send selection to Claude Code", "⇧⌘K"],
     ["Toggle comment", "⌘/"], ["Indent / outdent", "⌘] · ⌘["], ["Next / previous tab", "⇧⌘] · ⇧⌘["],
