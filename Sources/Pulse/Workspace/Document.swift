@@ -58,6 +58,11 @@ final class Document {
         didSet { if oldValue != isDirty { onDirtyChange?() } }
     }
 
+    /// Shown without taking typing (the status bar's lock). Files opened
+    /// from disk start this way when the default file mode is Read Only;
+    /// new files and unsaved text start editable.
+    var isReadOnly = false
+
     var displayName: String {
         if special == .diff, let diffTarget {
             return "\(diffTarget.fileName) (\(diffTarget.staged ? "Staged" : "Changes"))"

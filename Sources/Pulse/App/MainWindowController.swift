@@ -220,6 +220,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                     document?.isDirty = true
                 } else {
                     document = try? Document.open(url)
+                    document?.isReadOnly = EditorViewController.opensFilesReadOnly
                 }
             } else if let text = entry.unsavedText {
                 document = Document(url: nil, text: text)
@@ -544,6 +545,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     @objc func useDarkAppearance(_ sender: Any?) { AppAppearance.current = .dark }
     @objc func toggleWordWrap(_ sender: Any?) { editor.toggleWrap() }
 
+    @objc func toggleReadOnly(_ sender: Any?) { editor.toggleReadOnly() }
+
     @objc func toggleAutosave(_ sender: Any?) {
         EditorViewController.autosaveEnabled.toggle()
         if EditorViewController.autosaveEnabled { editor.saveNamedDocuments() }
@@ -570,6 +573,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case #selector(toggleWordWrap(_:)):
             menuItem.state = EditorViewController.wrapLines ? .on : .off
             return true
+        case #selector(toggleReadOnly(_:)):
+            menuItem.state = hasDocument && editor.activeDocument?.isReadOnly == true ? .on : .off
+            return hasDocument
+        case #selector(toggleComment(_:)), #selector(indentLines(_:)), #selector(outdentLines(_:)):
+            return hasDocument && editor.activeDocument?.isReadOnly == false
         case #selector(toggleTerminal(_:)):
             menuItem.title = editor.isTerminalVisible ? "Hide Terminal" : "Show Terminal"
             return true
@@ -589,8 +597,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case #selector(useDarkAppearance(_:)):
             menuItem.state = AppAppearance.current == .dark ? .on : .off
             return true
-        case #selector(saveDocument(_:)), #selector(saveDocumentAs(_:)), #selector(toggleComment(_:)),
-             #selector(indentLines(_:)), #selector(outdentLines(_:)), #selector(showGoToLine(_:)),
+        case #selector(saveDocument(_:)), #selector(saveDocumentAs(_:)), #selector(showGoToLine(_:)),
              #selector(copyFilePath(_:)), #selector(foldBlock(_:)), #selector(unfoldBlock(_:)),
              #selector(foldAll(_:)), #selector(unfoldAll(_:)):
             return hasDocument
@@ -620,6 +627,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("File: Save All", #selector(saveAllDocuments(_:))),
             command("File: Close Tab", #selector(closeTab(_:))),
             command("File: Toggle Autosave", #selector(toggleAutosave(_:))),
+            command("File: Toggle Read Only", #selector(toggleReadOnly(_:))),
             command("File: Reveal in Finder", #selector(revealInFinder(_:))),
             command("File: Copy Path", #selector(copyFilePath(_:))),
             command("Go: Go to File", #selector(showGoToFile(_:))),

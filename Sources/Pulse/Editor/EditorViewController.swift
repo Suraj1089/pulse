@@ -75,6 +75,15 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         set { UserDefaults.standard.set(newValue, forKey: "wrapLines") }
     }
 
+    /// Default file mode (Welcome tab): files opened from disk start read-only.
+    static var opensFilesReadOnly: Bool {
+        get { UserDefaults.standard.object(forKey: "openFilesReadOnly") as? Bool ?? true }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "openFilesReadOnly")
+            NotificationCenter.default.post(name: .settingsDidChange, object: nil)
+        }
+    }
+
     // MARK: View setup
 
     override func loadView() {
@@ -187,7 +196,9 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             add(document, to: pane, activate: true)
         } else {
             do {
-                add(try Document.open(url), to: pane, activate: true)
+                let document = try Document.open(url)
+                document.isReadOnly = EditorViewController.opensFilesReadOnly
+                add(document, to: pane, activate: true)
             } catch {
                 _ = presentError(error)
                 return
@@ -240,6 +251,17 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     func newDocument() {
         add(Document(url: nil, text: ""))
         view.window?.makeFirstResponder(textView)
+    }
+
+    /// Locks or unlocks the active file, in every pane that shows it.
+    func toggleReadOnly() {
+        guard let document = activeDocument, document.special == nil else { return }
+        document.isReadOnly.toggle()
+        for pane in panes where pane.activeDocument === document {
+            pane.textView.isEditable = !document.isReadOnly
+        }
+        updateStatus()
+        if !document.isReadOnly { view.window?.makeFirstResponder(textView) }
     }
 
     /// Adds a tab to the active pane.
@@ -824,14 +846,14 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     private func updateStatus() {
         guard let pane = activePane, let document = pane.activeDocument, document.special == nil else {
-            statusBar.showDocument(languageName: nil, visible: false)
+            statusBar.showDocument(languageName: nil, readOnly: false, visible: false)
             return
         }
         let selection = pane.textView.selectedRange()
         let line = document.line(at: selection.location)
         let column = selection.location - document.start(ofLine: line) + 1
         statusBar.showPosition(line: line + 1, column: column, selected: selection.length)
-        statusBar.showDocument(languageName: document.language?.name, visible: true)
+        statusBar.showDocument(languageName: document.language?.name, readOnly: document.isReadOnly, visible: true)
     }
 
     // MARK: Highlighting

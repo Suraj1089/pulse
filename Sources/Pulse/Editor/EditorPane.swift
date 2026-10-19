@@ -135,6 +135,7 @@ final class EditorPane: NSView {
     /// position for it (the document's own for a file new to this pane).
     func show(_ document: Document?) {
         attach(document?.storage ?? emptyStorage)
+        textView.isEditable = !(document?.isReadOnly ?? false)
         ruler.document = document
         ruler.updateThickness()
         guard let document else { return }

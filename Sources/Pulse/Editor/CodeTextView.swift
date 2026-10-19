@@ -16,6 +16,23 @@ final class CodeTextView: NSTextView {
         return became
     }
 
+    // MARK: Read only (Document.isReadOnly sets isEditable)
+
+    /// Undo and Redo would change a read-only file, so it has none while locked.
+    override var undoManager: UndoManager? { isEditable ? super.undoManager : nil }
+
+    /// Typing into a read-only file says why nothing happens. Keys that only
+    /// move the caret, Escape and shortcuts work as usual.
+    override func keyDown(with event: NSEvent) {
+        if !isEditable, event.modifierFlags.isDisjoint(with: [.command, .control]),
+           let key = event.charactersIgnoringModifiers?.unicodeScalars.first?.value,
+           key != 0x1B, key == 0xF728 || !(0xF700...0xF8FF).contains(key) {
+            refuse("This file is read-only. Click Read Only in the status bar to edit it.")
+            return
+        }
+        super.keyDown(with: event)
+    }
+
     private var indentUnit: String { String(repeating: " ", count: indentWidth) }
     private var nsText: NSString { string as NSString }
 
@@ -175,6 +192,8 @@ final class CodeTextView: NSTextView {
     /// (Delete All, pasting over everything), the older history goes first,
     /// so Undo holds at most one such copy of a file.
     override func shouldChangeText(inRanges affectedRanges: [NSValue], replacementStrings: [String]?) -> Bool {
+        // Pulse's own commands (comment, indent, a large paste) come here too.
+        guard isEditable else { return false }
         let ranges = affectedRanges.map(\.rangeValue)
         unfoldPartlyChanged(ranges)
         guard let strings = replacementStrings, strings.count == ranges.count, let first = ranges.first, let last = ranges.last,
