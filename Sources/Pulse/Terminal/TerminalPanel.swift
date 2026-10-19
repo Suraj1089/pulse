@@ -118,7 +118,7 @@ final class TerminalPanel: NSView {
 
     /// The focused shell's process id, to find the Claude Code running in it.
     var focusedShellPID: pid_t? {
-        guard let pid = focusedSession?.view.process?.shellPid, pid > 0 else { return nil }
+        guard let pid = focusedSession?.shellPID, pid > 0 else { return nil }
         return pid
     }
 
@@ -250,51 +250,153 @@ private final class TerminalTab {
     }
 }
 
-/// One shell and its SwiftTerm view.
-private final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate {
-    let view: LocalProcessTerminalView
+/// One shell and its SwiftTerm view. The session reads the shell's output
+/// itself, on the main queue into one buffer shared by every terminal, and
+/// feeds it to the view as it arrives. SwiftTerm's LocalProcess reads through
+/// DispatchIO, which allocates a new buffer of up to 128 KB for every read (a
+/// PTY read returns at most 1 KB) and then queues a copy of each read (up to
+/// 4 MB); a burst of output churned enough heap to add 15–70 MB until it settled.
+/// Here the PTY's own buffer is the only queue: while Pulse is busy, the shell
+/// waits, as in any terminal.
+private final class TerminalSession: TerminalViewDelegate {
+    let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
     let directory: URL
     var onTitleChange: ((String) -> Void)?
     var onExit: ((TerminalSession) -> Void)?
+    private(set) var shellPID: pid_t = 0
+    private var pty: Int32 = -1
+    private var outputSource: DispatchSourceRead?
+    private var exitSource: DispatchSourceProcess?
     private var running = false
+
+    /// Every terminal reads into this one: reads and feeds happen on the main queue.
+    private static var buffer = [UInt8](repeating: 0, count: 16 * 1024)
 
     init(directory: URL?) {
         self.directory = directory ?? FileManager.default.homeDirectoryForCurrentUser
-        view = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
-        super.init()
-        view.processDelegate = self
+        view.terminalDelegate = self
     }
 
-    /// `extra` goes on top of SwiftTerm's usual environment (what nil gives).
+    deinit {
+        outputSource?.cancel()
+        exitSource?.cancel()
+    }
+
+    /// `extra` goes on top of SwiftTerm's usual environment.
     func start(adding extra: [String]) {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let environment: [String]? = extra.isEmpty ? nil : Terminal.getEnvironmentVariables(termName: "xterm-256color") + extra
-        view.startProcess(executable: shell, args: [], environment: environment,
-                          execName: "-" + (shell as NSString).lastPathComponent, currentDirectory: directory.path)
+        let environment = Terminal.getEnvironmentVariables(termName: "xterm-256color") + extra
+        var size = windowSize()
+        guard let (pid, pty) = PseudoTerminalHelpers.fork(andExec: shell, args: ["-" + (shell as NSString).lastPathComponent],
+                                                          env: environment, currentDirectory: directory.path,
+                                                          desiredWindowSize: &size) else { return }
+        shellPID = pid
+        self.pty = pty
         running = true
+        _ = fcntl(pty, F_SETFL, fcntl(pty, F_GETFL) | O_NONBLOCK)
+
+        let outputSource = DispatchSource.makeReadSource(fileDescriptor: pty, queue: .main)
+        outputSource.setEventHandler { [weak self] in self?.readOutput() }
+        outputSource.setCancelHandler { close(pty) }
+        outputSource.resume()
+        self.outputSource = outputSource
+
+        let exitSource = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .main)
+        exitSource.setEventHandler { [weak self] in
+            var status: Int32 = 0
+            waitpid(pid, &status, WNOHANG)
+            self?.exited()
+        }
+        exitSource.resume()
+        self.exitSource = exitSource
     }
 
     func terminate() {
+        closeOutput()
         guard running else { return }
         running = false
-        view.terminate()
+        kill(shellPID, SIGTERM)
     }
 
-    func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
+    /// Feeds what the shell wrote, up to a buffer at a time, for at most 8 ms;
+    /// the source fires again while more is waiting, so typing and drawing
+    /// carry on during a flood.
+    private func readOutput() {
+        let deadline = DispatchTime.now().uptimeNanoseconds + 8_000_000
+        var count = 0
+        while true {
+            let n = Self.buffer.withUnsafeMutableBytes { read(pty, $0.baseAddress! + count, $0.count - count) }
+            let error = n < 0 ? errno : 0
+            if n > 0 {
+                count += n
+                if count < Self.buffer.count { continue }
+            } else if error == EINTR {
+                continue
+            }
+            // The buffer is full, the shell has nothing more for now, or its output ended.
+            if count > 0 {
+                view.feed(byteArray: Self.buffer[..<count])
+                count = 0
+            }
+            if n == 0 || (n < 0 && error != EAGAIN) { closeOutput(); return }
+            if n < 0 || DispatchTime.now().uptimeNanoseconds >= deadline { return }
+        }
+    }
 
-    func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
+    private func closeOutput() {
+        outputSource?.cancel()   // its cancel handler closes the PTY
+        outputSource = nil
+        pty = -1
+    }
+
+    private func exited() {
+        exitSource?.cancel()
+        guard running else { return }
+        running = false
+        onExit?(self)
+    }
+
+    /// What the shell sees as its window: cells, and pixels for programs that draw images.
+    private func windowSize() -> winsize {
+        let terminal = view.getTerminal()
+        let cell = view.cellSizeInPixels(source: terminal) ?? (width: 0, height: 0)
+        return winsize(ws_row: UInt16(clamping: terminal.rows), ws_col: UInt16(clamping: terminal.cols),
+                       ws_xpixel: UInt16(clamping: cell.width * terminal.cols), ws_ypixel: UInt16(clamping: cell.height * terminal.rows))
+    }
+
+    // MARK: TerminalViewDelegate
+
+    func send(source: TerminalView, data: ArraySlice<UInt8>) {
+        guard pty >= 0 else { return }
+        data.withUnsafeBytes { bytes in
+            DispatchIO.write(toFileDescriptor: pty, data: DispatchData(bytes: bytes), runningHandlerOn: .main) { _, _ in }
+        }
+    }
+
+    func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
+        guard pty >= 0 else { return }
+        var size = windowSize()
+        _ = PseudoTerminalHelpers.setWinSize(masterPtyDescriptor: pty, windowSize: &size)
+    }
+
+    func setTerminalTitle(source: TerminalView, title: String) {
         onTitleChange?(title)
     }
 
-    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
-
-    func processTerminated(source: TerminalView, exitCode: Int32?) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.running else { return }
-            self.running = false
-            self.onExit?(self)
-        }
+    /// OSC 52 copy and paste, as SwiftTerm's LocalProcessTerminalView does them.
+    func clipboardCopy(source: TerminalView, content: Data) {
+        guard let text = String(data: content, encoding: .utf8) else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
+
+    func clipboardRead(source: TerminalView) -> Data? {
+        NSPasteboard.general.string(forType: .string)?.data(using: .utf8)
+    }
+
+    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
+    func scrolled(source: TerminalView, position: Double) {}
+    func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
 }
 
 /// A tab in the terminal header: "2: zsh (2)".
