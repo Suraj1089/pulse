@@ -95,6 +95,9 @@ extension NSTextStorage {
         index >= 0 && index < length && attribute(.folded, at: index, effectiveRange: nil) != nil
     }
 
+    /// Folds or unfolds `ranges`, and has every layout manager on this text
+    /// generate their glyphs again (an attribute change alone only lays
+    /// them out again).
     func setFolded(_ folded: Bool, in ranges: [NSRange]) {
         guard !ranges.isEmpty else { return }
         beginEditing()
@@ -102,6 +105,12 @@ extension NSTextStorage {
             if folded { addAttribute(.folded, value: true, range: range) } else { removeAttribute(.folded, range: range) }
         }
         endEditing()
+        for layoutManager in layoutManagers {
+            for range in ranges {
+                layoutManager.invalidateGlyphs(forCharacterRange: range, changeInLength: 0, actualCharacterRange: nil)
+                layoutManager.invalidateLayout(forCharacterRange: range, actualCharacterRange: nil)
+            }
+        }
     }
 }
 

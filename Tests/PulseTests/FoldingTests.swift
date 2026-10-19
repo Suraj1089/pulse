@@ -54,8 +54,15 @@ final class FoldingTests: PulseTestCase {
     func testFoldingHidesTheLinesAndUnfoldingBringsThemBack() throws {
         let (controller, textView, storage) = try open()
         let layoutManager = try XCTUnwrap(textView.layoutManager)
+        let container = try XCTUnwrap(textView.textContainer)
+        // Laid out first: with non-contiguous layout an unlaid line's position is an estimate.
         func top(_ line: Int) -> CGFloat {
-            layoutManager.lineFragmentRect(forGlyphAt: layoutManager.glyphIndexForCharacter(at: start(line)), effectiveRange: nil).minY
+            layoutManager.ensureLayout(for: container)
+            return layoutManager.lineFragmentRect(forGlyphAt: layoutManager.glyphIndexForCharacter(at: start(line)), effectiveRange: nil).minY
+        }
+        func property(at character: Int) -> NSLayoutManager.GlyphProperty {
+            layoutManager.ensureGlyphs(forCharacterRange: NSRange(location: 0, length: storage.length))
+            return layoutManager.propertyForGlyph(at: layoutManager.glyphIndexForCharacter(at: character))
         }
         let lineHeight = top(2) - top(1)
         XCTAssertGreaterThan(lineHeight, 0)
@@ -65,12 +72,15 @@ final class FoldingTests: PulseTestCase {
         XCTAssertEqual(storage.fold(at: end(1)), bodyOfB, "the block around the caret")
         XCTAssertEqual(textView.selectedRange(), NSRange(location: end(1), length: 0), "the caret leaves the hidden lines")
         XCTAssertEqual(top(5), top(1) + lineHeight, "the closing brace follows the folded line")
+        XCTAssertEqual(property(at: start(2) + 8), .null, "hidden text draws nothing")
+        XCTAssertEqual(property(at: end(1)), .controlCharacter, "the hidden line break doesn't break the line")
         XCTAssertEqual(storage.string, source, "the text is unchanged")
         XCTAssertEqual(controller.editor.activeDocument?.isDirty, false)
 
         textView.unfoldAtCaret()
         XCTAssertFalse(hasFolds(storage))
         XCTAssertEqual(top(5), top(1) + 4 * lineHeight)
+        XCTAssertNotEqual(property(at: start(2) + 8), .null)
     }
 
     func testTheCaretStepsOverAFold() throws {
