@@ -19,6 +19,49 @@ final class CodeTextView: NSTextView {
     private var indentUnit: String { String(repeating: " ", count: indentWidth) }
     private var nsText: NSString { string as NSString }
 
+    // MARK: Drawing in strips (TextStrips.swift)
+
+    private lazy var strips = TextStrips(view: self)
+    /// For tests: the strips' frames, top to bottom.
+    var stripFrames: [CGRect] { strips.frames }
+
+    /// AppKit then gives the view no backing of its own; the strips draw it.
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        strips.update()
+    }
+
+    override func setNeedsDisplay(_ invalidRect: NSRect) {
+        strips.invalidate(invalidRect)
+        super.setNeedsDisplay(invalidRect)
+    }
+
+    override var needsDisplay: Bool {
+        didSet { if needsDisplay { strips.invalidateAll() } }
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        strips.update()
+    }
+
+    /// A scroll or a resize of the clip view changes what is visible without
+    /// asking this view to redraw.
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: NSView.frameDidChangeNotification, object: nil)
+        guard let clip = superview as? NSClipView else { return }
+        clip.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(visibleRectChanged), name: NSView.boundsDidChangeNotification, object: clip)
+        NotificationCenter.default.addObserver(self, selector: #selector(visibleRectChanged), name: NSView.frameDidChangeNotification, object: clip)
+    }
+
+    @objc private func visibleRectChanged() {
+        strips.update()
+    }
+
     // MARK: Current line
 
     override func drawBackground(in rect: NSRect) {
