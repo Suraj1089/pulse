@@ -24,6 +24,8 @@ final class CodeTextView: NSTextView {
     private lazy var strips = TextStrips(view: self)
     /// For tests: the strips' frames, top to bottom.
     var stripFrames: [CGRect] { strips.frames }
+    /// For tests: how many times a strip has drawn.
+    var stripDraws: Int { strips.draws }
 
     /// AppKit then gives the view no backing of its own; the strips draw it.
     override var wantsUpdateLayer: Bool { true }
@@ -41,9 +43,33 @@ final class CodeTextView: NSTextView {
         didSet { if needsDisplay { strips.invalidateAll() } }
     }
 
+    /// Laying out more of the text changes the view's height as the user
+    /// scrolls, and with AppKit's default policy each change redrew the whole
+    /// view: every strip, many times a second. A frame change moves no text;
+    /// whatever does change asks for display itself.
+    override var layerContentsRedrawPolicy: NSView.LayerContentsRedrawPolicy {
+        get { .onSetNeedsDisplay }
+        set {}
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        strips.update()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        strips.update()
+    }
+
     override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
         strips.update()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        strips.invalidateAll()
     }
 
     /// A scroll or a resize of the clip view changes what is visible without

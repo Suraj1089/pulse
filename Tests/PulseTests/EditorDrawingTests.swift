@@ -16,7 +16,7 @@ final class EditorDrawingTests: PulseTestCase {
     }
 
     private func open(blocks: Int = 600) throws -> MainWindowController {
-        let root = try makeFolder(files: ["main.swift": source(blocks: blocks)])
+        let root = try makeFolder(files: ["main.swift": source(blocks: blocks), "other.swift": source(blocks: 40)])
         return makeController(opening: [root.appendingPathComponent("main.swift")])
     }
 
@@ -54,6 +54,19 @@ final class EditorDrawingTests: PulseTestCase {
         textView.scroll(NSPoint(x: 300, y: 0))
         try assertLayersMatch(controller, "sideways")
 
+        controller.editor.toggleWrap()
+        try assertLayersMatch(controller, "wrapped")
+        controller.window?.setContentSize(NSSize(width: 900, height: 560))
+        try assertLayersMatch(controller, "resized")
+        controller.editor.toggleWrap()
+        try assertLayersMatch(controller, "unwrapped")
+
+        let main = try XCTUnwrap(controller.editor.activeDocument?.url)
+        controller.editor.open(main.deletingLastPathComponent().appendingPathComponent("other.swift"))
+        try assertLayersMatch(controller, "other tab")
+        controller.editor.open(main)
+        try assertLayersMatch(controller, "back")
+
         defer { AppAppearance.current = .auto }
         AppAppearance.current = .dark
         try assertLayersMatch(controller, "dark")
@@ -88,7 +101,41 @@ final class EditorDrawingTests: PulseTestCase {
         }
     }
 
+    /// A step of a trackpad scroll brings in at most one strip (two when it
+    /// crosses a boundary); nothing else redraws.
+    func testScrollingDrawsOnlyTheStripsComingIntoView() throws {
+        let controller = try open()
+        let textView = try XCTUnwrap(controller.editor.textView)
+        try display(controller)
+        for step in 1...20 {
+            let before = textView.stripDraws
+            try scrollWheel(-60, in: controller)
+            try display(controller)
+            XCTAssertLessThanOrEqual(textView.stripDraws - before, 2, "step \(step)")
+        }
+        XCTAssertGreaterThan(textView.visibleRect.minY, 600, "the steps scrolled")
+    }
+
+    func testAFrameChangeAloneRedrawsNoStrip() throws {
+        let controller = try open()
+        let textView = try XCTUnwrap(controller.editor.textView)
+        textView.scroll(NSPoint(x: 0, y: 1_000))
+        try display(controller)
+        let before = textView.stripDraws
+        // What laying out more of the text does to the view's height.
+        textView.setFrameSize(NSSize(width: textView.frame.width, height: textView.frame.height + 100))
+        try display(controller)
+        XCTAssertEqual(textView.stripDraws, before)
+    }
+
     // MARK: Helpers
+
+    /// A scroll-wheel event of `delta` pixels, continuous like a trackpad's.
+    private func scrollWheel(_ delta: Int32, in controller: MainWindowController) throws {
+        let event = try XCTUnwrap(CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: delta, wheel2: 0, wheel3: 0))
+        event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        try XCTUnwrap(controller.editor.activePane).scrollView.scrollWheel(with: try XCTUnwrap(NSEvent(cgEvent: event)))
+    }
 
     /// Compares what Core Animation shows for the editor (its layer tree,
     /// strips included) with what AppKit draws for it with `cacheDisplay`.
