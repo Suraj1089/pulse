@@ -62,6 +62,9 @@ enum MainMenu {
         menu.addItem(item("New File", #selector(MainWindowController.newFile(_:)), "n"))
         menu.addItem(item("New Window", #selector(AppDelegate.newWindow(_:)), "n", [.command, .shift]))
         menu.addItem(item("Open…", #selector(MainWindowController.openDocument(_:)), "o"))
+        let recent = NSMenu(title: "Open Recent")
+        recent.delegate = RecentMenu.shared
+        menu.addItem(submenu(recent))
         menu.addItem(.separator())
         menu.addItem(item("Save", #selector(MainWindowController.saveDocument(_:)), "s"))
         menu.addItem(item("Save As…", #selector(MainWindowController.saveDocumentAs(_:)), "s", [.command, .shift]))
@@ -194,5 +197,26 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(item("Bring All to Front", #selector(NSApplication.arrangeInFront(_:))))
         return menu
+    }
+}
+
+/// Fills File › Open Recent from `RecentFolders` each time it opens; the
+/// submenu is empty until then, so nothing is kept between uses.
+final class RecentMenu: NSObject, NSMenuDelegate {
+    static let shared = RecentMenu()
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        let folders = RecentFolders.all
+        for url in folders {
+            let item = NSMenuItem(title: url.lastPathComponent, action: #selector(AppDelegate.openRecentFolder(_:)), keyEquivalent: "")
+            item.representedObject = url
+            item.toolTip = (url.path as NSString).abbreviatingWithTildeInPath
+            item.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
+            menu.addItem(item)
+        }
+        if !folders.isEmpty { menu.addItem(.separator()) }
+        let clear = NSMenuItem(title: "Clear Recently Opened", action: folders.isEmpty ? nil : #selector(AppDelegate.clearRecentFolders(_:)), keyEquivalent: "")
+        menu.addItem(clear)
     }
 }
