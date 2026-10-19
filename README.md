@@ -38,6 +38,7 @@ Pulse is a code editor written in Swift and AppKit, with no web view, no Electro
 - **Integrated terminal** (`` ⌃` ``) with tabs and side-by-side splits, started only when you first open it.
 - **Source Control** (`⌃⇧G`): staged and unstaged changes, with buttons to stage or unstage a file or a whole section. Click a changed file to see its diff (added and removed lines with old and new line numbers, like GitHub); double-click opens the file.
 - **Claude Code knows what you're looking at**: run `claude` in Pulse's terminal and it sees the open file and your selection ("⧉ 5 lines selected"), as in VS Code. `⇧⌘K` puts `@file#L5-9` in Claude's prompt. From another terminal, run `/ide` and pick Pulse. It costs nothing until Claude connects; View › Share Selection with Claude Code turns it off.
+- **Read-only files**: files open read-only by default, so a stray key can't change code an AI tool is editing. Click **Read Only** in the status bar (or File › Read Only) to edit one; the Welcome tab's **Default file mode** opens files ready to edit instead. New files are always editable.
 - **Autosave and session recovery**: files save themselves a second after you stop typing, and Pulse reopens your folder, tabs and any unsaved buffers after you quit.
 - **Honest resource meter**: the status bar shows Pulse's own memory and CPU, with the terminal's shell measured separately.
 

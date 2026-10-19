@@ -70,6 +70,7 @@ enum MainMenu {
         menu.addItem(item("Save As…", #selector(MainWindowController.saveDocumentAs(_:)), "s", [.command, .shift]))
         menu.addItem(item("Save All", #selector(MainWindowController.saveAllDocuments(_:)), "s", [.command, .option]))
         menu.addItem(item("Autosave", #selector(MainWindowController.toggleAutosave(_:))))
+        menu.addItem(item("Read Only", #selector(MainWindowController.toggleReadOnly(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Reveal in Finder", #selector(MainWindowController.revealInFinder(_:)), "r", [.command, .option]))
         menu.addItem(item("Copy Path", #selector(MainWindowController.copyFilePath(_:)), "c", [.command, .option, .shift]))

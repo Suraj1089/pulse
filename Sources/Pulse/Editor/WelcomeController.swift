@@ -15,6 +15,7 @@ final class WelcomeController: NSViewController {
 
     private let appearance = NSSegmentedControl()
     private let autosave = NSSwitch()
+    private let fileMode = NSSegmentedControl(labels: ["Read only", "Edit"], trackingMode: .selectOne, target: nil, action: nil)
     private let install = NSButton(title: "Install", target: nil, action: nil)
     private let showOnLaunch = NSButton(checkboxWithTitle: "Show on launch", target: nil, action: nil)
     private var actionRows: [WelcomeRow] = []
@@ -61,6 +62,11 @@ final class WelcomeController: NSViewController {
         autosave.target = self
         autosave.action = #selector(autosaveChanged)
 
+        fileMode.controlSize = .small
+        fileMode.target = self
+        fileMode.action = #selector(fileModeChanged)
+        fileMode.toolTip = "How files open. Files already open keep their mode; the status bar switches one."
+
         install.bezelStyle = .rounded
         install.controlSize = .small
         install.target = self
@@ -76,6 +82,7 @@ final class WelcomeController: NSViewController {
             setting(label("Appearance"), appearance),
             setting(commandLabel, install),
             setting(label("Autosave"), autosave),
+            setting(label("Default file mode"), fileMode),
         ])
 
         let separator = NSBox()
@@ -122,6 +129,7 @@ final class WelcomeController: NSViewController {
     @objc private func refresh() {
         appearance.selectedSegment = AppAppearance.allCases.firstIndex(of: AppAppearance.current) ?? 0
         autosave.state = EditorViewController.autosaveEnabled ? .on : .off
+        fileMode.selectedSegment = EditorViewController.opensFilesReadOnly ? 0 : 1
         showOnLaunch.state = WelcomeController.showsOnLaunch ? .on : .off
         let installed = CommandLineTool.isInstalled
         install.title = installed ? "Installed" : "Install"
@@ -168,6 +176,10 @@ final class WelcomeController: NSViewController {
         if (autosave.state == .on) != EditorViewController.autosaveEnabled {
             NSApp.sendAction(#selector(MainWindowController.toggleAutosave(_:)), to: nil, from: self)
         }
+    }
+
+    @objc private func fileModeChanged() {
+        EditorViewController.opensFilesReadOnly = fileMode.selectedSegment == 0
     }
 
     @objc private func installCommand() {

@@ -1,7 +1,8 @@
 import AppKit
 
-/// Bottom strip: git branch, caret position, language, indentation, Pulse's own
-/// memory and CPU next to whatever the terminal is running, and a bug button.
+/// Bottom strip: git branch, the file's mode, caret position, language,
+/// indentation, Pulse's own memory and CPU next to whatever the terminal is
+/// running, and a bug button.
 final class StatusBarView: NSView {
     static let height: CGFloat = 24
 
@@ -13,6 +14,10 @@ final class StatusBarView: NSView {
     private let message = StatusBarView.makeLabel()
     private let claude = StatusBarView.makeLabel()
     private let resources = StatusBarView.makeLabel()
+    /// Read Only (lock) or Editing (pencil); a click switches, through the
+    /// responder chain like File › Read Only.
+    private let mode = NSButton(title: "", target: nil, action: #selector(MainWindowController.toggleReadOnly(_:)))
+    private var showsReadOnly: Bool?
     /// Help › Report a Bug…, sent up the responder chain to the window.
     private let reportBug = NSButton(image: NSImage(systemSymbolName: "ladybug", accessibilityDescription: "Report a Bug") ?? NSImage(),
                                      target: nil, action: #selector(MainWindowController.reportBug(_:)))
@@ -20,7 +25,12 @@ final class StatusBarView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         branch.isHidden = true
-        let left = NSStackView(views: [branch, position, language, indentation, encoding])
+        mode.isBordered = false
+        mode.imagePosition = .imageLeading
+        mode.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 10, weight: .regular)
+        mode.contentTintColor = .secondaryLabelColor
+        mode.isHidden = true
+        let left = NSStackView(views: [branch, mode, position, language, indentation, encoding])
         left.spacing = 16
         message.isHidden = true
         message.textColor = .systemOrange
@@ -65,9 +75,18 @@ final class StatusBarView: NSView {
             : "Ln \(line), Col \(column)"
     }
 
-    func showDocument(languageName: String?, visible: Bool) {
+    func showDocument(languageName: String?, readOnly: Bool, visible: Bool) {
         language.stringValue = languageName ?? "Plain Text"
-        for label in [position, language, indentation, encoding] { label.isHidden = !visible }
+        for view in [position, language, indentation, encoding, mode] as [NSView] { view.isHidden = !visible }
+        guard visible, readOnly != showsReadOnly else { return }
+        showsReadOnly = readOnly
+        let title = readOnly ? "Read Only" : "Editing"
+        mode.attributedTitle = NSAttributedString(string: title, attributes: [
+            .font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor,
+        ])
+        mode.image = NSImage(systemSymbolName: readOnly ? "lock" : "pencil", accessibilityDescription: nil)
+        mode.toolTip = readOnly ? "This file is read-only. Click to edit it." : "Click to make this file read-only."
+        mode.setAccessibilityLabel(readOnly ? "Read only. Click to edit." : "Editing. Click to make read-only.")
     }
 
     func showBranch(_ name: String?) {

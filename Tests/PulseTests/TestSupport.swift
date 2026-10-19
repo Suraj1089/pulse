@@ -17,7 +17,7 @@ class PulseTestCase: XCTestCase {
 
     private static let preferenceKeys = ["autosave", "wrapLines", "editorFontSize", "sidebarFontSize", "terminalFontSize",
                                          "recentFolders", "appearance", "welcomeShown", "showWelcomeOnLaunch",
-                                         "cliInstallFolder", "claudeIntegration"]
+                                         "cliInstallFolder", "claudeIntegration", "openFilesReadOnly"]
 
     override func setUpWithError() throws {
         try super.setUpWithError()
@@ -44,6 +44,8 @@ class PulseTestCase: XCTestCase {
             savedDefaults[key] = UserDefaults.standard.object(forKey: key)
             UserDefaults.standard.removeObject(forKey: key)
         }
+        // Most tests type into the files they open; ReadOnlyTests check the default.
+        EditorViewController.opensFilesReadOnly = false
     }
 
     override func tearDownWithError() throws {
