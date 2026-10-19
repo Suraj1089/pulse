@@ -133,6 +133,7 @@ enum MainMenu {
         menu.addItem(item("Share Selection with Claude Code", #selector(MainWindowController.toggleClaudeIntegration(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Word Wrap", #selector(MainWindowController.toggleWordWrap(_:)), "w", [.command, .option]))
+        menu.addItem(submenu(foldingMenu()))
         menu.addItem(item("Zoom In", #selector(MainWindowController.zoomIn(_:)), "="))
         menu.addItem(item("Zoom Out", #selector(MainWindowController.zoomOut(_:)), "-"))
         menu.addItem(item("Actual Size", #selector(MainWindowController.resetZoom(_:)), "0"))
@@ -140,6 +141,16 @@ enum MainMenu {
         menu.addItem(submenu(appearanceMenu()))
         menu.addItem(.separator())
         menu.addItem(item("Enter Full Screen", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]))
+        return menu
+    }
+
+    /// VS Code's folding commands and keys.
+    private static func foldingMenu() -> NSMenu {
+        let menu = NSMenu(title: "Folding")
+        menu.addItem(item("Fold", #selector(MainWindowController.foldBlock(_:)), "[", [.command, .option]))
+        menu.addItem(item("Unfold", #selector(MainWindowController.unfoldBlock(_:)), "]", [.command, .option]))
+        menu.addItem(item("Fold All", #selector(MainWindowController.foldAll(_:))))
+        menu.addItem(item("Unfold All", #selector(MainWindowController.unfoldAll(_:))))
         return menu
     }
 

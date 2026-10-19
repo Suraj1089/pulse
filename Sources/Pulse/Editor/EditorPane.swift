@@ -44,6 +44,7 @@ final class EditorPane: NSView {
         // Container in a layout manager on a storage first, then the view.
         let layoutManager = NSLayoutManager()
         layoutManager.allowsNonContiguousLayout = true
+        layoutManager.delegate = FoldingLayoutDelegate.shared
         let container = NSTextContainer(size: NSSize(width: EditorPane.unbounded, height: EditorPane.unbounded))
         layoutManager.addTextContainer(container)
         let emptyStorage = NSTextStorage()
