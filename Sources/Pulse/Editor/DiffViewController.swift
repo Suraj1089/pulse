@@ -250,6 +250,10 @@ final class DiffViewController: NSViewController {
     private func scroll(toLine line: Int) {
         guard let diff, diff.lineStarts.indices.contains(line),
               let layoutManager = textView.layoutManager, let container = textView.textContainer else { return }
+        // Right after new text, non-contiguous layout may not have grown the
+        // text view down to the line yet, and the clip view would stop short;
+        // scrollRangeToVisible lays out and sizes it first.
+        textView.scrollRangeToVisible(NSRange(location: diff.lineStarts[line], length: 0))
         let glyphs = layoutManager.glyphRange(forCharacterRange: NSRange(location: diff.lineStarts[line], length: 0), actualCharacterRange: nil)
         let rect = layoutManager.boundingRect(forGlyphRange: NSRange(location: glyphs.location, length: 1), in: container)
         scrollView.contentView.scroll(to: NSPoint(x: 0, y: max(0, rect.minY + textView.textContainerOrigin.y - changeOffset)))
