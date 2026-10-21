@@ -1,11 +1,14 @@
 import AppKit
 
-/// The diff tab: one changed file, as git sees it, like GitHub's unified view.
-/// git computes the diff in a short-lived process (GitDiffLoader); this view
-/// keeps one read-only text view of the result. Line backgrounds, markers and
-/// old/new line numbers are drawn for the visible lines only, and colors are
-/// layout-manager temporary attributes, so a large diff costs its text and a
-/// few bytes a line. Built when the tab is shown, dropped when it closes.
+/// The diff tab: one changed file, as git sees it, like VS Code's inline diff:
+/// the whole file, removed and added lines tinted where they are, and the
+/// edited part of a changed line tinted more strongly. A file too long to show
+/// whole shows only its changes. git computes the diff in a short-lived
+/// process (GitDiffLoader); this view keeps one read-only text view of the
+/// result. Line backgrounds, markers and old/new line numbers are drawn for the
+/// visible lines only, and colors are layout-manager temporary attributes, so
+/// a large diff costs its text and a few bytes a line. Built when the tab is
+/// shown, dropped when it closes.
 final class DiffViewController: NSViewController {
     var onOpenFile: ((URL, Int?) -> Void)?
 
@@ -161,12 +164,14 @@ final class DiffViewController: NSViewController {
                 if keepPosition {
                     scrollView.contentView.scroll(to: previousTop)
                     scrollView.reflectScrolledClipView(scrollView.contentView)
+                } else if diff.isWholeFile, let first = diff.changeLines.first {
+                    scroll(toLine: first)
                 } else {
                     scrollView.contentView.scroll(to: .zero)
                 }
             }
         }
-        previousButton.isEnabled = !(diff?.hunkLines.isEmpty ?? true)
+        previousButton.isEnabled = !(diff?.changeLines.isEmpty ?? true)
         nextButton.isEnabled = previousButton.isEnabled
     }
 
@@ -180,9 +185,10 @@ final class DiffViewController: NSViewController {
         let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
         let text = NSMutableAttributedString(string: "+\(diff.added)", attributes: [.font: font, .foregroundColor: Theme.gitAdded])
         text.append(NSAttributedString(string: "  −\(diff.removed)", attributes: [.font: font, .foregroundColor: Theme.gitDeleted]))
-        if diff.isTruncated {
-            text.append(NSAttributedString(string: "  (first \(diff.lineCount.formatted()) lines; open the file for the rest)",
-                                           attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor]))
+        let note: String? = diff.isTruncated ? "  (first \(diff.lineCount.formatted()) lines; open the file for the rest)"
+            : diff.isWholeFile ? nil : "  (changes only: the file is too long to show whole)"
+        if let note {
+            text.append(NSAttributedString(string: note, attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor]))
         }
         return text
     }
@@ -202,9 +208,7 @@ final class DiffViewController: NSViewController {
         let last = diff.line(containing: max(range.location, NSMaxRange(range) - 1))
         guard first <= last else { return }
         for line in first...last where diff.kinds[line] == .hunk || diff.kinds[line] == .note {
-            let end = line + 1 < diff.lineStarts.count ? diff.lineStarts[line + 1] - 1 : (textView.textStorage?.length ?? 0)
-            let lineRange = NSRange(location: diff.lineStarts[line], length: max(0, end - diff.lineStarts[line]))
-            layoutManager.addTemporaryAttribute(.foregroundColor, value: Theme.comment, forCharacterRange: lineRange)
+            layoutManager.addTemporaryAttribute(.foregroundColor, value: Theme.comment, forCharacterRange: diff.range(ofLine: line))
         }
     }
 
@@ -215,25 +219,32 @@ final class DiffViewController: NSViewController {
 
     // MARK: Navigation
 
-    /// Index of the diff line at the top of the visible area.
-    private var topLine: Int {
+    /// A change is scrolled to with three lines of the file above it.
+    private var changeOffset: CGFloat {
+        3 * (textView.layoutManager?.defaultLineHeight(for: Theme.editorFont) ?? 16)
+    }
+
+    /// Index of the diff line `offset` points below the top of the visible area.
+    private func line(atVisibleOffset offset: CGFloat) -> Int {
         guard let diff, let layoutManager = textView.layoutManager, let container = textView.textContainer else { return 0 }
-        var point = scrollView.contentView.bounds.origin
-        point.y -= textView.textContainerOrigin.y
-        let glyph = layoutManager.glyphIndex(for: NSPoint(x: 0, y: max(0, point.y + 1)), in: container)
+        let top = scrollView.contentView.bounds.minY - textView.textContainerOrigin.y
+        let glyph = layoutManager.glyphIndex(for: NSPoint(x: 0, y: max(0, top + offset + 1)), in: container)
         return diff.line(containing: layoutManager.characterIndexForGlyph(at: glyph))
     }
 
+    /// Where a change scrolled to sits: next and previous are counted from here.
+    private var currentLine: Int { line(atVisibleOffset: changeOffset) }
+
     @objc private func nextChange() {
         guard let diff else { return }
-        let top = topLine
-        if let line = diff.hunkLines.first(where: { $0 > top }) { scroll(toLine: line) }
+        let current = currentLine
+        if let line = diff.changeLines.first(where: { $0 > current }) { scroll(toLine: line) }
     }
 
     @objc private func previousChange() {
         guard let diff else { return }
-        let top = topLine
-        if let line = diff.hunkLines.last(where: { $0 < top }) { scroll(toLine: line) }
+        let current = currentLine
+        if let line = diff.changeLines.last(where: { $0 < current }) { scroll(toLine: line) }
     }
 
     private func scroll(toLine line: Int) {
@@ -241,7 +252,7 @@ final class DiffViewController: NSViewController {
               let layoutManager = textView.layoutManager, let container = textView.textContainer else { return }
         let glyphs = layoutManager.glyphRange(forCharacterRange: NSRange(location: diff.lineStarts[line], length: 0), actualCharacterRange: nil)
         let rect = layoutManager.boundingRect(forGlyphRange: NSRange(location: glyphs.location, length: 1), in: container)
-        scrollView.contentView.scroll(to: NSPoint(x: 0, y: max(0, rect.minY + textView.textContainerOrigin.y - 4)))
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: max(0, rect.minY + textView.textContainerOrigin.y - changeOffset)))
         scrollView.reflectScrolledClipView(scrollView.contentView)
         textView.needsDisplay = true
         highlightVisible()
@@ -252,7 +263,7 @@ final class DiffViewController: NSViewController {
         guard let target, target.kind != .deleted else { return }
         var line: Int?
         if let diff, !diff.isEmpty {
-            line = (topLine..<diff.lineCount).lazy.map { Int(diff.newNumbers[$0]) }.first { $0 > 0 }
+            line = (self.line(atVisibleOffset: 0)..<diff.lineCount).lazy.map { Int(diff.newNumbers[$0]) }.first { $0 > 0 }
         }
         onOpenFile?(target.fileURL, line)
     }
@@ -373,6 +384,7 @@ final class DiffTextView: NSTextView {
         let columnWidth = (gutterWidth - 16) / 2
         let containerRect = rect.offsetBy(dx: -origin.x, dy: -origin.y)
         let glyphs = layoutManager.glyphRange(forBoundingRect: containerRect, in: textContainer)
+        var edited: (line: Int, range: NSRange?) = (-1, nil)   // once per line, not per wrapped fragment
         layoutManager.enumerateLineFragments(forGlyphRange: glyphs) { fragment, _, _, glyphRange, _ in
             let character = layoutManager.characterIndexForGlyph(at: glyphRange.location)
             let line = diff.line(containing: character)
@@ -382,6 +394,19 @@ final class DiffTextView: NSTextView {
             if let color = DiffTextView.background(for: kind) {
                 color.setFill()
                 row.fill()
+            }
+            if kind == .added || kind == .removed {
+                if edited.line != line { edited = (line, self.editedRange(of: line, in: diff)) }
+                if let range = edited.range {
+                    let characters = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+                    let part = NSIntersectionRange(range, characters)
+                    if part.length > 0 {
+                        let partGlyphs = layoutManager.glyphRange(forCharacterRange: part, actualCharacterRange: nil)
+                        let box = layoutManager.boundingRect(forGlyphRange: partGlyphs, in: textContainer)
+                        (kind == .added ? Theme.diffAddedEdit : Theme.diffRemovedEdit).setFill()
+                        NSRect(x: box.minX + origin.x, y: row.minY, width: box.width, height: row.height).fill()
+                    }
+                }
             }
             // Numbers and the marker go on a line's first fragment only.
             guard character == diff.lineStarts[line] else { return }
@@ -400,6 +425,13 @@ final class DiffTextView: NSTextView {
                 (marker.0 as NSString).draw(at: NSPoint(x: columnWidth * 2 + 2, y: textY), withAttributes: attributes)
             }
         }
+    }
+
+    /// The part of a changed line that differs from the line it replaced (or
+    /// that replaced it), in the text's offsets; nil when it has no such line.
+    private func editedRange(of line: Int, in diff: GitDiff) -> NSRange? {
+        guard let partner = diff.partner(of: line), let text = textStorage?.string else { return nil }
+        return GitDiff.editedRanges(in: text as NSString, diff.range(ofLine: line), diff.range(ofLine: partner))?.0
     }
 
     private static func background(for kind: GitDiff.LineKind) -> NSColor? {
