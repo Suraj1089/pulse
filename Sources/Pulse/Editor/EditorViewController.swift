@@ -615,11 +615,17 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             guard panel.runModal() == .OK, let url = panel.url else { return false }
             target = url
         }
+        let renamed = target?.standardizedFileURL != document.url?.standardizedFileURL
         do {
             try document.save(to: target)
         } catch {
             _ = presentError(error)
             return false
+        }
+        // Blame described the file under its old name.
+        if renamed, document.blame != nil {
+            document.blame = nil
+            blameDidChange(document)
         }
         // A new name can mean a new language.
         for pane in panesShowing(document) {
@@ -664,6 +670,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
                 pane.ruler.needsDisplay = true
                 highlightNow(pane)
             }
+            loadBlame(document)
             if document === activeDocument { updateStatus() }
         }
     }
@@ -853,7 +860,66 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let line = document.line(at: selection.location)
         let column = selection.location - document.start(ofLine: line) + 1
         statusBar.showPosition(line: line + 1, column: column, selected: selection.length)
-        statusBar.showDocument(languageName: document.language?.name, readOnly: document.isReadOnly, visible: true)
+        statusBar.showDocument(languageName: document.language?.name, readOnly: document.isReadOnly,
+                               blame: document.repository == nil ? nil : document.blame != nil, visible: true)
+    }
+
+    // MARK: Blame
+
+    /// Shows or hides who last changed each line of the active file (View ›
+    /// Blame, the status bar), in every pane that shows it. Off for every
+    /// file until asked, and not saved. git blames the file as saved, so
+    /// unsaved changes are saved first (or, with autosave off, asked for).
+    func toggleBlame() {
+        guard let document = activeDocument, document.special == nil else { return }
+        if document.blame != nil {
+            document.blame = nil
+            blameDidChange(document)
+            return
+        }
+        guard document.repository != nil else {
+            statusBar.showMessage("Blame needs a file in a git repository.", isWarning: false)
+            return
+        }
+        if document.isDirty {
+            guard EditorViewController.autosaveEnabled else {
+                statusBar.showMessage("Save “\(document.displayName)” to see who changed its lines.", isWarning: false)
+                return
+            }
+            guard save(document) else { return }
+        }
+        let blame = FileBlame()
+        blame.onChange = { [weak self, weak document] in
+            guard let self, let document else { return }
+            self.blameDidChange(document)
+        }
+        blame.onFailure = { [weak self, weak document] message in
+            guard let self, let document else { return }
+            document.blame = nil
+            self.blameDidChange(document)
+            self.statusBar.showMessage(message, isWarning: false)
+        }
+        document.blame = blame
+        loadBlame(document)
+        blameDidChange(document)
+    }
+
+    private func loadBlame(_ document: Document) {
+        guard let blame = document.blame, let url = document.url else { return }
+        blame.load(url, lineCount: document.lineCount)
+    }
+
+    /// Reads blame again for the saved files showing it (on returning to
+    /// Pulse: commits may have been made meanwhile). Nothing runs otherwise.
+    func refreshBlame() {
+        for document in documents where document.blame?.isLoading == false && !document.isDirty {
+            loadBlame(document)
+        }
+    }
+
+    private func blameDidChange(_ document: Document) {
+        for pane in panesShowing(document) { pane.textView.needsDisplay = true }
+        if document === activeDocument { updateStatus() }
     }
 
     // MARK: Highlighting
@@ -928,6 +994,16 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     func undoManager(for view: NSTextView) -> UndoManager? {
         owner(of: view)?.activeDocument?.undoManager
+    }
+
+    /// Before every edit (typing, Pulse's own commands, Undo): blame moves
+    /// with the lines. Nothing to do while blame is off.
+    func textView(_ textView: NSTextView, shouldChangeTextInRanges affectedRanges: [NSValue],
+                  replacementStrings: [String]?) -> Bool {
+        if let replacementStrings, let document = owner(of: textView)?.activeDocument, document.blame != nil {
+            document.blameWillChange(affectedRanges.map(\.rangeValue), replacementStrings)
+        }
+        return true
     }
 
     func textDidChange(_ notification: Notification) {

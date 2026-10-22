@@ -134,6 +134,7 @@ enum MainMenu {
         menu.addItem(item("Share Selection with Claude Code", #selector(MainWindowController.toggleClaudeIntegration(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Word Wrap", #selector(MainWindowController.toggleWordWrap(_:)), "w", [.command, .option]))
+        menu.addItem(item("Blame", #selector(MainWindowController.toggleBlame(_:))))
         menu.addItem(submenu(foldingMenu()))
         menu.addItem(item("Zoom In", #selector(MainWindowController.zoomIn(_:)), "="))
         menu.addItem(item("Zoom Out", #selector(MainWindowController.zoomOut(_:)), "-"))

@@ -52,6 +52,12 @@ enum Theme {
         NSFont.monospacedDigitSystemFont(ofSize: max(fontSize - 2, 9), weight: .regular)
     }
 
+    /// Blame after a line (View › Blame): the gutter's size, in italics.
+    static var blameFont: NSFont {
+        let font = NSFont.systemFont(ofSize: max(fontSize - 2, 9))
+        return NSFont(descriptor: font.fontDescriptor.withSymbolicTraits(.italic), size: font.pointSize) ?? font
+    }
+
     static func dynamic(light: UInt32, dark: UInt32) -> NSColor {
         NSColor(name: nil) { appearance in
             appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? hex(dark) : hex(light)
@@ -82,6 +88,8 @@ enum Theme {
     static let gitModified = dynamic(light: 0x895503, dark: 0xE2C08D)
     static let gitAdded = dynamic(light: 0x587C0C, dark: 0x81B88B)
     static let gitDeleted = dynamic(light: 0xAD0707, dark: 0xC74E39)
+    /// Blame text: quieter than code, still readable (4.5:1 on the current line).
+    static let blame = dynamic(light: 0x656C76, dark: 0x8B929B)
 
     // Diff rows: tints of the git colors, light enough to keep syntax colors readable.
     static let diffAdded = NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua

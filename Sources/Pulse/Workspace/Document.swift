@@ -63,6 +63,11 @@ final class Document {
     /// new files and unsaved text start editable.
     var isReadOnly = false
 
+    /// Who last changed each line (View › Blame), while the file shows it.
+    /// Nil, the default, until asked; not saved, so a reopened file starts
+    /// without it.
+    var blame: FileBlame?
+
     var displayName: String {
         if special == .diff, let diffTarget {
             return "\(diffTarget.fileName) (\(diffTarget.staged ? "Staged" : "Changes"))"
@@ -116,6 +121,7 @@ final class Document {
         if url != destination {
             url = destination
             language = Language.detect(url: destination)
+            repositoryLookup = nil
         }
         refreshModificationDate()
         isDirty = false
@@ -186,6 +192,44 @@ final class Document {
         storage.beginEditing()
         storage.addAttribute(.font, value: Theme.editorFont, range: NSRange(location: 0, length: storage.length))
         storage.endEditing()
+    }
+
+    // MARK: Blame
+
+    /// The git repository holding the file (nil: none, or untitled), looked
+    /// up once: the status bar asks on every keystroke.
+    var repository: URL? {
+        if let repositoryLookup { return repositoryLookup }
+        let found = url.flatMap(GitStatus.repositoryRoot)
+        repositoryLookup = .some(found)
+        return found
+    }
+    private var repositoryLookup: URL??
+
+    /// Before an edit, given each range and its replacement in the text as
+    /// it is now: the lines it changes lose their blame and the lines after
+    /// move with them. Whole lines added or removed leave their neighbours'.
+    func blameWillChange(_ ranges: [NSRange], _ replacements: [String]) {
+        guard let blame else { return }
+        let text = storage.string as NSString
+        for (range, replacement) in zip(ranges, replacements).reversed() where range.length > 0 || !replacement.isEmpty {
+            let first = line(at: range.location)
+            let removed = line(at: NSMaxRange(range)) - first
+            let units = replacement.utf16
+            let added = units.reduce(0) { $1 == 10 ? $0 + 1 : $0 }
+            let atLineStart = range.location == start(ofLine: first)
+            let atLineEnd = range.location == text.length || text.character(at: range.location) == 10
+                || text.character(at: range.location) == 13
+            if replacement.isEmpty, atLineStart, removed > 0, NSMaxRange(range) == start(ofLine: first + removed) {
+                blame.change(first..<first + removed, to: 0)
+            } else if range.length == 0, added > 0, atLineStart, units.last == 10 {
+                blame.change(first..<first, to: added)
+            } else if range.length == 0, added > 0, atLineEnd, units.first == 10 {
+                blame.change(first + 1..<first + 1, to: added)
+            } else {
+                blame.change(first..<first + removed + 1, to: added + 1)
+            }
+        }
     }
 
     // MARK: Line index (for the gutter and go-to-line)
