@@ -237,6 +237,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         } else if !editor.documents.isEmpty {
             editor.activate(0)
         }
+        editor.clearHistory()
         if state.terminalOpen { editor.showTerminal() }
     }
 
@@ -424,6 +425,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     @objc func closeTab(_ sender: Any?) { editor.closeActive() }
     @objc func nextTab(_ sender: Any?) { editor.selectTab(offset: 1) }
     @objc func previousTab(_ sender: Any?) { editor.selectTab(offset: -1) }
+    @objc func goBack(_ sender: Any?) { editor.goBack() }
+    @objc func goForward(_ sender: Any?) { editor.goForward() }
 
     @objc func showCommandPalette(_ sender: Any?) { showPalette(">") }
     @objc func showGoToFile(_ sender: Any?) { showPalette("") }
@@ -611,6 +614,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             return hasDocument
         case #selector(nextTab(_:)), #selector(previousTab(_:)):
             return editor.documents.count > 1
+        case #selector(goBack(_:)):
+            return editor.canGoBack
+        case #selector(goForward(_:)):
+            return editor.canGoForward
         case #selector(findInProject(_:)), #selector(showGoToFile(_:)), #selector(showSourceControl(_:)):
             return root != nil
         default:
@@ -638,6 +645,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("File: Toggle Read Only", #selector(toggleReadOnly(_:))),
             command("File: Reveal in Finder", #selector(revealInFinder(_:))),
             command("File: Copy Path", #selector(copyFilePath(_:))),
+            command("Go: Back", #selector(goBack(_:))),
+            command("Go: Forward", #selector(goForward(_:))),
             command("Go: Go to File", #selector(showGoToFile(_:))),
             command("Go: Go to Line", #selector(showGoToLine(_:))),
             command("Go: Next Tab", #selector(nextTab(_:))),

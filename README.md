@@ -35,6 +35,7 @@ Pulse is a code editor written in Swift and AppKit, with no web view, no Electro
 - **Split editor**: View › Split Editor Right (`⌥⌘\`) or Down, or right-click a tab. Each pane has its own tabs; a file open in two panes is one text, edited in both. Nothing is created until you split, and a pane closes with its last tab.
 - **Find and replace** in the file (the standard macOS find bar), and **project search** (uses `ripgrep` when installed, otherwise a built-in scan; a block of code finds the same code however it is wrapped or indented). Under `…`, **files to include** and **files to exclude** take comma-separated globs as in VS Code: `*.ts`, `src` (that folder at any depth), `./src` (only the top-level one), `src/**/*.test.ts`, `*.{ts,tsx}`.
 - **Command palette**: `⌘P` go to file, `⇧⌘P` commands, `⌘L` go to line. Developer: Reload Window rebuilds the window with its folder, tabs and unsaved text.
+- **Back and forward**: `⌃-` returns to where you jumped from (another file, a Find match, a search result, Go to Line) and `⌃⇧-` goes forward again, as in VS Code. Rebind them in Keyboard Shortcuts.
 - **Integrated terminal** (`` ⌃` ``) with tabs and side-by-side splits, started only when you first open it.
 - **Source Control** (`⌃⇧G`): staged and unstaged changes, with buttons to stage or unstage a file or a whole section. Click a changed file to see its diff: the whole file with removed and added lines highlighted in place and the edited part of a changed line marked, like VS Code, with old and new line numbers. Double-click opens the file.
 - **Blame**: click **Blame** in the status bar (or View › Blame) to see who last changed the open file's lines, when and why, after the first line of each change and the line you're on. Off until you ask, for that file only; turning it off frees it.
@@ -80,6 +81,7 @@ Pulse checks for a new release once a day and shows an **Update** button at the 
 | `⌘P` | Go to file |
 | `⇧⌘P` | Command palette |
 | `⌘L` | Go to line |
+| `⌃-` / `⌃⇧-` | Go back / forward (where you jumped from) |
 | `⌘F` / `⌥⌘F` | Find / find and replace in file |
 | `⌥⌘[` / `⌥⌘]` | Fold / unfold the block at the caret |
 | `⇧⌘F` | Search the project |
