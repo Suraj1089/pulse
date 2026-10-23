@@ -195,6 +195,11 @@ enum MainMenu {
 
     private static func goMenu() -> NSMenu {
         let menu = NSMenu(title: "Go")
+        // VS Code's keys. ⌃⇧- is matched by the character it types ("_"),
+        // like New Terminal's ⌃~; the menu shows it as ⌃_.
+        menu.addItem(item("Back", #selector(MainWindowController.goBack(_:)), "-", [.control]))
+        menu.addItem(item("Forward", #selector(MainWindowController.goForward(_:)), "_", [.control]))
+        menu.addItem(.separator())
         menu.addItem(item("Go to File…", #selector(MainWindowController.showGoToFile(_:)), "p"))
         menu.addItem(item("Go to Line…", #selector(MainWindowController.showGoToLine(_:)), "l"))
         menu.addItem(.separator())
