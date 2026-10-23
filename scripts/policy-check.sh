@@ -98,6 +98,7 @@ PROCESS_ALLOWED=(
     "$APP_SOURCES/Workspace/ProjectSearch.swift"   # ripgrep, one search
     "$APP_SOURCES/Workspace/GitStatus.swift"       # git status, on activation
     "$APP_SOURCES/Workspace/GitDiff.swift"         # git diff, one file
+    "$APP_SOURCES/Workspace/GitBlame.swift"        # git blame, one file, when asked
     "$APP_SOURCES/App/Updater.swift"               # curl / ditto, on update
     "$APP_SOURCES/App/CommandLineTool.swift"       # login shell PATH lookup, once
 )

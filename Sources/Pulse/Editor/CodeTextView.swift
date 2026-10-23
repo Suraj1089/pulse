@@ -111,6 +111,7 @@ final class CodeTextView: NSTextView {
         super.drawBackground(in: rect)
         drawCurrentLine(in: rect)
         drawFoldPlaceholders(in: rect)
+        drawBlame(in: rect)
     }
 
     private func drawCurrentLine(in rect: NSRect) {
@@ -129,6 +130,92 @@ final class CodeTextView: NSTextView {
         lineRect.origin.y += textContainerOrigin.y
         Theme.currentLine.setFill()
         lineRect.intersection(rect).fill()
+    }
+
+    // MARK: Blame (View › Blame)
+
+    /// The file shown, whose blame (if on) is drawn after its lines.
+    weak var document: Document?
+
+    /// Who changed a line, when and why, after the first line with text of
+    /// each run of lines from one commit, and after the caret's line. Only
+    /// for the lines in `rect`: nothing is laid out or kept ahead.
+    func blameAnnotations(in rect: NSRect) -> [(line: Int, label: String, point: NSPoint, uncommitted: Bool)] {
+        guard let document, let blame = document.blame?.result, let layoutManager, let textContainer,
+              let storage = textStorage, storage.length > 0 else { return [] }
+        let text = nsText
+        let origin = textContainerOrigin
+        let glyphs = layoutManager.glyphRange(forBoundingRect: rect.offsetBy(dx: -origin.x, dy: -origin.y), in: textContainer)
+        let characters = layoutManager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+        let caret = selectedRange()
+        let caretLine = caret.length == 0 ? document.line(at: caret.location) : -1
+        let lineHeight = layoutManager.defaultLineHeight(for: Theme.blameFont)
+        let now = Date().timeIntervalSince1970
+        var annotations: [(line: Int, label: String, point: NSPoint, uncommitted: Bool)] = []
+        var line = document.line(at: characters.location)
+        let last = document.line(at: NSMaxRange(characters))
+        while line <= last {
+            let start = document.start(ofLine: line)
+            // A folded block's lines take no space: carry on after it.
+            if storage.isFolded(at: start - 1), let fold = storage.fold(at: start - 1) {
+                line = document.line(at: NSMaxRange(fold)) + 1
+                continue
+            }
+            if line == caretLine || startsBlameRun(line, in: blame, document: document),
+               let label = blame.label(at: line, now: now) {
+                let end = Folding.contentEnd(ofLineAt: start, in: text)
+                var fragment = layoutManager.extraLineFragmentRect
+                var x = fragment.minX
+                if end > start {
+                    let glyph = layoutManager.glyphIndexForCharacter(at: end - 1)
+                    fragment = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+                    x = layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil).maxX
+                } else if start < text.length {
+                    fragment = layoutManager.lineFragmentRect(forGlyphAt: layoutManager.glyphIndexForCharacter(at: start), effectiveRange: nil)
+                    x = fragment.minX
+                }
+                // Past a folded block's "⋯".
+                if storage.isFolded(at: end) { x += 32 }
+                let point = NSPoint(x: origin.x + x + 24, y: origin.y + fragment.minY + (fragment.height - lineHeight) / 2)
+                annotations.append((line, label, point, blame.commit(at: line) == GitBlame.uncommitted))
+            }
+            line += 1
+        }
+        return annotations
+    }
+
+    private func drawBlame(in rect: NSRect) {
+        guard document?.blame?.result != nil else { return }
+        let font = Theme.blameFont
+        for annotation in blameAnnotations(in: rect) where annotation.point.x < rect.maxX {
+            let color = annotation.uncommitted ? Theme.gitModified : Theme.blame
+            (annotation.label as NSString).draw(at: annotation.point, withAttributes: [.font: font, .foregroundColor: color])
+        }
+    }
+
+    /// Whether `line` is the first line with text in its run of lines from one commit.
+    private func startsBlameRun(_ line: Int, in blame: GitBlame, document: Document) -> Bool {
+        let commit = blame.commit(at: line)
+        guard commit != GitBlame.unknown, !isBlankLine(line, in: document) else { return false }
+        var previous = line - 1
+        while previous >= 0, line - previous <= 200, blame.commit(at: previous) == commit {
+            if !isBlankLine(previous, in: document) { return false }
+            previous -= 1
+        }
+        return true
+    }
+
+    private func isBlankLine(_ line: Int, in document: Document) -> Bool {
+        let text = nsText
+        var index = document.start(ofLine: line)
+        while index < text.length {
+            switch text.character(at: index) {
+            case 10, 13: return true
+            case 32, 9: index += 1
+            default: return false
+            }
+        }
+        return true
     }
 
     override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {

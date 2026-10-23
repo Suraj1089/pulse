@@ -384,6 +384,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         fileIndex?.invalidate()
         editor.reloadChangedDocuments()
         editor.reloadVisibleDiff()
+        editor.refreshBlame()
         showBranch()
         sidebar.sourceControl.refresh()
     }
@@ -549,6 +550,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     @objc func toggleReadOnly(_ sender: Any?) { editor.toggleReadOnly() }
 
+    @objc func toggleBlame(_ sender: Any?) { editor.toggleBlame() }
+
     @objc func toggleAutosave(_ sender: Any?) {
         EditorViewController.autosaveEnabled.toggle()
         if EditorViewController.autosaveEnabled { editor.saveNamedDocuments() }
@@ -578,6 +581,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case #selector(toggleReadOnly(_:)):
             menuItem.state = hasDocument && editor.activeDocument?.isReadOnly == true ? .on : .off
             return hasDocument
+        case #selector(toggleBlame(_:)):
+            menuItem.state = hasDocument && editor.activeDocument?.blame != nil ? .on : .off
+            return hasDocument && editor.activeDocument?.repository != nil
         case #selector(toggleComment(_:)), #selector(indentLines(_:)), #selector(outdentLines(_:)):
             return hasDocument && editor.activeDocument?.isReadOnly == false
         case #selector(toggleTerminal(_:)):
@@ -646,6 +652,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("View: Split Editor Right", #selector(splitEditorRight(_:))),
             command("View: Split Editor Down", #selector(splitEditorDown(_:))),
             command("View: Toggle Word Wrap", #selector(toggleWordWrap(_:))),
+            command("View: Toggle Blame", #selector(toggleBlame(_:))),
             command("View: Fold", #selector(foldBlock(_:))),
             command("View: Unfold", #selector(unfoldBlock(_:))),
             command("View: Fold All", #selector(foldAll(_:))),
