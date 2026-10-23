@@ -98,6 +98,11 @@ enum Theme {
         ? hex(0xF85149).withAlphaComponent(0.16) : hex(0xCF222E).withAlphaComponent(0.11) }
     static let diffHunk = NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         ? hex(0x388BFD).withAlphaComponent(0.12) : hex(0x0969DA).withAlphaComponent(0.08) }
+    // The edited part of a changed line, over its row's tint.
+    static let diffAddedEdit = NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        ? hex(0x81B88B).withAlphaComponent(0.28) : hex(0x2DA44E).withAlphaComponent(0.26) }
+    static let diffRemovedEdit = NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        ? hex(0xF85149).withAlphaComponent(0.30) : hex(0xCF222E).withAlphaComponent(0.20) }
 
     static func color(for kind: TokenKind) -> NSColor {
         switch kind {

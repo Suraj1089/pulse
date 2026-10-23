@@ -34,9 +34,9 @@ Pulse is a code editor written in Swift and AppKit, with no web view, no Electro
 - **Breadcrumbs**: the open file's path, from the opened folder, shows under the tabs.
 - **Split editor**: View › Split Editor Right (`⌥⌘\`) or Down, or right-click a tab. Each pane has its own tabs; a file open in two panes is one text, edited in both. Nothing is created until you split, and a pane closes with its last tab.
 - **Find and replace** in the file (the standard macOS find bar), and **project search** (uses `ripgrep` when installed, otherwise a built-in scan; a block of code finds the same code however it is wrapped or indented). Under `…`, **files to include** and **files to exclude** take comma-separated globs as in VS Code: `*.ts`, `src` (that folder at any depth), `./src` (only the top-level one), `src/**/*.test.ts`, `*.{ts,tsx}`.
-- **Command palette**: `⌘P` go to file, `⇧⌘P` commands, `⌘L` go to line.
+- **Command palette**: `⌘P` go to file, `⇧⌘P` commands, `⌘L` go to line. Developer: Reload Window rebuilds the window with its folder, tabs and unsaved text.
 - **Integrated terminal** (`` ⌃` ``) with tabs and side-by-side splits, started only when you first open it.
-- **Source Control** (`⌃⇧G`): staged and unstaged changes, with buttons to stage or unstage a file or a whole section. Click a changed file to see its diff (added and removed lines with old and new line numbers, like GitHub); double-click opens the file.
+- **Source Control** (`⌃⇧G`): staged and unstaged changes, with buttons to stage or unstage a file or a whole section. Click a changed file to see its diff: the whole file with removed and added lines highlighted in place and the edited part of a changed line marked, like VS Code, with old and new line numbers. Double-click opens the file.
 - **Blame**: click **Blame** in the status bar (or View › Blame) to see who last changed the open file's lines, when and why, after the first line of each change and the line you're on. Off until you ask, for that file only; turning it off frees it.
 - **Claude Code knows what you're looking at**: run `claude` in Pulse's terminal and it sees the open file and your selection ("⧉ 5 lines selected"), as in VS Code. `⇧⌘K` puts `@file#L5-9` in Claude's prompt. From another terminal, run `/ide` and pick Pulse. It costs nothing until Claude connects; View › Share Selection with Claude Code turns it off.
 - **Read-only files**: files open read-only by default, so a stray key can't change code an AI tool is editing. Click **Read Only** in the status bar (or File › Read Only) to edit one; the Welcome tab's **Default file mode** opens files ready to edit instead. New files are always editable.
@@ -54,6 +54,12 @@ curl -fsSL https://pulse0.app/install.sh | bash
 It downloads the latest release into Applications and opens it. Pulse isn't notarized by Apple yet, so a copy downloaded in a browser is blocked by macOS ("Apple could not verify 'Pulse'…"); the installer fetches the same release with `curl` and clears that download flag. You can [read the script](install.sh) first.
 
 Open a folder from the terminal with `pulse .` (or `pulse file.swift src/`), like VS Code's `code .`. Pulse links the `pulse` command into a folder on your PATH the first time it runs; if that needs a password, use Pulse › Install 'pulse' Command. Homebrew installs it with the cask.
+
+`pulse --upgrade` updates Pulse to the latest release, and `pulse --downgrade` goes back to the release before the one you have, if a new one gives you trouble. Either takes a version (`pulse --downgrade 2.1.3`). `pulse --version` prints the installed version and `pulse --help` lists the rest. To install a specific release without the command, pass its version to the installer:
+
+```sh
+curl -fsSL https://pulse0.app/install.sh | bash -s -- 2.1.3
+```
 
 If installing from Pulse doesn't work, link it yourself (asks for your password once):
 

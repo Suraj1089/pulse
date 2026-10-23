@@ -785,7 +785,8 @@
             </article>
           </div>
           <p class="note">Pulse isn’t notarized by Apple yet, so macOS blocks a copy downloaded in a browser (“Apple could not verify ‘Pulse’…”). The installer fetches the same release with <code>curl</code> and clears that download flag, so Pulse opens normally. You can <a href="/install.sh">read the script</a> first.</p>
-          <p class="note">Open a folder from Terminal with <code>pulse .</code> Pulse adds the command on first launch, or from Pulse › Install ‘pulse’ Command.</p>
+          <p class="note">Open a folder from Terminal with <code>pulse .</code> Pulse adds the command on first launch, or from Pulse › Install ‘pulse’ Command. <code>pulse --upgrade</code> updates to the latest release and <code>pulse --downgrade</code> goes back to the previous one; <code>pulse --help</code> lists the rest.</p>
+          <p class="note">A specific release, newer or older: <code>curl -fsSL https://pulse0.app/install.sh | bash -s -- 2.1.3</code></p>
         </div>
       </section>
 

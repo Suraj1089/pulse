@@ -14,6 +14,7 @@ struct GitDiffTarget: Equatable {
 
 /// A unified diff, flattened for display: the text of every shown line
 /// (without the +/- marker), and per line its kind and old/new line numbers.
+/// Usually the whole file (see `isWholeFile`), like VS Code's inline diff.
 /// Compact on purpose: a 50,000-line diff costs its text plus 9 bytes a line.
 struct GitDiff {
     enum LineKind: UInt8 {
@@ -24,6 +25,12 @@ struct GitDiff {
     /// any reviewable change, small enough to stay inside the memory budget.
     static let maxBytes = 3 * 1024 * 1024
     static let maxLines = 50_000
+    /// Lines of context that make git print the whole file: a hunk that stops
+    /// short of either end has this many on one side, so it passes `maxLines`.
+    static let wholeFileContext = maxLines
+    /// Longer lines (minified code) are left as whole-line changes rather
+    /// than compared again on every draw.
+    static let maxEditedLineLength = 10_000
 
     var text = ""
     var kinds: [LineKind] = []
@@ -31,13 +38,18 @@ struct GitDiff {
     var newNumbers: [Int32] = []
     /// UTF-16 offset of each line in `text`, for mapping layout back to lines.
     var lineStarts: [Int] = []
-    var hunkLines: [Int] = []
+    /// The first line of each change: a run of removed and/or added lines.
+    var changeLines: [Int] = []
     var added = 0
     var removed = 0
     var isBinary = false
     var isTruncated = false
+    /// Every line of the file, not just the changes with a little context.
+    var isWholeFile = false
     /// Running UTF-16 length of `text` (counting it again per line would be quadratic).
     private var utf16Length = 0
+    /// The last line's kind, notes aside, to tell where a change starts.
+    private var previousKind: LineKind?
 
     var lineCount: Int { kinds.count }
 
@@ -51,16 +63,59 @@ struct GitDiff {
 
     /// The line containing UTF-16 offset `location` (binary search).
     func line(containing location: Int) -> Int {
-        var low = 0, high = lineStarts.count - 1
-        guard high >= 0 else { return 0 }
+        GitDiff.lastIndex(in: lineStarts, notAbove: location) ?? 0
+    }
+
+    /// Line `line` in `text`, without its newline (UTF-16).
+    func range(ofLine line: Int) -> NSRange {
+        let end = (line + 1 < lineStarts.count ? lineStarts[line + 1] : utf16Length) - 1
+        return NSRange(location: lineStarts[line], length: max(0, end - lineStarts[line]))
+    }
+
+    /// The line on the other side of a changed line: within a change, the
+    /// k-th removed line was replaced by the k-th added line.
+    func partner(of line: Int) -> Int? {
+        guard kinds.indices.contains(line), kinds[line] == .added || kinds[line] == .removed,
+              let change = GitDiff.lastIndex(in: changeLines, notAbove: line) else { return nil }
+        let start = changeLines[change]
+        var firstAdded = start
+        while firstAdded < kinds.count, kinds[firstAdded] == .removed || kinds[firstAdded] == .note { firstAdded += 1 }
+        let isRemoved = kinds[line] == .removed
+        let other = isRemoved ? firstAdded + (line - start) : start + (line - firstAdded)
+        return kinds.indices.contains(other) && kinds[other] == (isRemoved ? LineKind.added : .removed) ? other : nil
+    }
+
+    /// What was edited between two versions of a line (`a` and `b`, ranges in
+    /// `text`): each side without the prefix and suffix they share. Nil when
+    /// they share less than half the shorter one, which reads as a rewrite.
+    static func editedRanges(in text: NSString, _ a: NSRange, _ b: NSRange) -> (NSRange, NSRange)? {
+        let shorter = min(a.length, b.length)
+        guard shorter > 0, max(a.length, b.length) <= maxEditedLineLength else { return nil }
+        var prefix = 0
+        while prefix < shorter, text.character(at: a.location + prefix) == text.character(at: b.location + prefix) { prefix += 1 }
+        var suffix = 0
+        while suffix < shorter - prefix,
+              text.character(at: NSMaxRange(a) - 1 - suffix) == text.character(at: NSMaxRange(b) - 1 - suffix) { suffix += 1 }
+        guard (prefix + suffix) * 2 >= shorter, prefix + suffix < max(a.length, b.length) else { return nil }
+        return (NSRange(location: a.location + prefix, length: a.length - prefix - suffix),
+                NSRange(location: b.location + prefix, length: b.length - prefix - suffix))
+    }
+
+    /// Index of the last value in ascending `values` that is <= `value` (binary search).
+    private static func lastIndex(in values: [Int], notAbove value: Int) -> Int? {
+        guard let first = values.first, first <= value else { return nil }
+        var low = 0, high = values.count - 1
         while low < high {
             let mid = (low + high + 1) / 2
-            if lineStarts[mid] <= location { low = mid } else { high = mid - 1 }
+            if values[mid] <= value { low = mid } else { high = mid - 1 }
         }
         return low
     }
 
     private mutating func append(_ line: Substring, kind: LineKind, old: Int, new: Int) {
+        let isChange = kind == .added || kind == .removed
+        if isChange && previousKind != .added && previousKind != .removed { changeLines.append(kinds.count) }
+        if kind != .note { previousKind = kind }
         lineStarts.append(utf16Length)
         utf16Length += line.utf16.count + 1
         text += line
@@ -72,10 +127,11 @@ struct GitDiff {
 
     /// Parses `git diff` output: unified (`diff --git`) or combined (`diff
     /// --cc`, for conflicts). File headers are dropped; hunk headers stay as
-    /// separator lines.
-    static func parse(_ data: Data, truncated: Bool = false) -> GitDiff {
+    /// separator lines, except in a `wholeFile` diff (one hunk: the file).
+    static func parse(_ data: Data, truncated: Bool = false, wholeFile: Bool = false) -> GitDiff {
         var diff = GitDiff()
         diff.isTruncated = truncated
+        diff.isWholeFile = wholeFile && !truncated
         let output = String(decoding: data, as: UTF8.self)
         var inHunk = false
         var markerWidth = 1      // 2 in a combined diff
@@ -83,6 +139,7 @@ struct GitDiff {
         for rawLine in output.split(separator: "\n", omittingEmptySubsequences: false) {
             if diff.kinds.count >= maxLines {
                 diff.isTruncated = true
+                diff.isWholeFile = false
                 break
             }
             let line = rawLine.hasSuffix("\r") ? rawLine.dropLast() : rawLine
@@ -94,8 +151,7 @@ struct GitDiff {
             if line.hasPrefix("@@") {
                 inHunk = true
                 (oldLine, newLine) = hunkStarts(line)
-                diff.hunkLines.append(diff.kinds.count)
-                diff.append(line, kind: .hunk, old: 0, new: 0)
+                if !wholeFile { diff.append(line, kind: .hunk, old: 0, new: 0) }
                 continue
             }
             guard inHunk else {
@@ -147,7 +203,8 @@ struct GitDiff {
 
 /// Runs `git diff` for one file as a short-lived child process, so the diff
 /// algorithm's memory is git's, and reads at most `GitDiff.maxBytes` of its
-/// output. One load at a time; starting another cancels the previous one.
+/// output: the whole file, or just the changes when the whole file doesn't
+/// fit. One load at a time; starting another cancels the previous one.
 final class GitDiffLoader {
     enum Result {
         case diff(GitDiff)
@@ -165,8 +222,8 @@ final class GitDiffLoader {
         process = nil
     }
 
-    static func arguments(for target: GitDiffTarget) -> [String] {
-        let common = ["diff", "--no-color", "--no-ext-diff"]
+    static func arguments(for target: GitDiffTarget, wholeFile: Bool) -> [String] {
+        let common = ["diff", "--no-color", "--no-ext-diff"] + (wholeFile ? ["--unified=\(GitDiff.wholeFileContext)"] : [])
         if target.kind == .untracked {
             // Exits 1 when the files differ, which they always do here.
             return common + ["--no-index", "--", "/dev/null", target.path]
@@ -178,12 +235,23 @@ final class GitDiffLoader {
     }
 
     func load(_ target: GitDiffTarget, completion: @escaping (Result) -> Void) {
+        run(target, wholeFile: true) { [weak self] result in
+            // Too long to show whole: the changes, with three lines of context.
+            if case .diff(let diff) = result, diff.isTruncated {
+                self?.run(target, wholeFile: false, completion: completion)
+            } else {
+                completion(result)
+            }
+        }
+    }
+
+    private func run(_ target: GitDiffTarget, wholeFile: Bool, completion: @escaping (Result) -> Void) {
         cancel()
         guard let git = GitStatus.git else { completion(.failed("git is not installed")); return }
         let current = generation
         let process = Process()
         process.executableURL = URL(fileURLWithPath: git)
-        process.arguments = ["-C", target.repository.path] + GitDiffLoader.arguments(for: target)
+        process.arguments = ["-C", target.repository.path] + GitDiffLoader.arguments(for: target, wholeFile: wholeFile)
         let output = Pipe(), errors = Pipe()
         process.standardOutput = output
         process.standardError = errors
@@ -216,7 +284,7 @@ final class GitDiffLoader {
                     if truncated, let lastNewline = data.lastIndex(of: 10) {
                         data = data.prefix(upTo: lastNewline)
                     }
-                    result = .diff(GitDiff.parse(data, truncated: truncated))
+                    result = .diff(GitDiff.parse(data, truncated: truncated, wholeFile: wholeFile))
                 }
             } catch {
                 result = .failed(error.localizedDescription)
