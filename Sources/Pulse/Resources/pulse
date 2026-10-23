@@ -1,21 +1,110 @@
 #!/bin/sh
 # pulse: open files and folders in Pulse from a terminal, like VS Code's `code`.
-#   pulse               open Pulse
-#   pulse .             open the current folder
-#   pulse a.swift src/  open files and folders (a missing file is created)
+#   pulse                        open Pulse
+#   pulse .                      open the current folder
+#   pulse a.swift src/           open files and folders (a missing file is created)
+#   pulse -v, --version          print the installed version
+#   pulse --upgrade [version]    update to the latest release (or to <version>)
+#   pulse --downgrade [version]  go back to the previous release (or to <version>)
+#   pulse -h, --help             show this help
+# `pulse help` and `pulse version` work too, unless a file has that name.
 # Installed as a link to this file inside Pulse.app; the app is found from it,
 # so the command keeps working when the app is moved or updated.
 set -e
 
 self=$(realpath "$0")
 app=${self%/Contents/Resources/pulse}
+repo=Suraj1089/pulse
+installer=https://pulse0.app/install.sh
+
+usage() { sed -n '2,10s/^# \{0,1\}//p' "$self"; }
+installed() { /usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist"; }
+
+# True when version $1 comes before $2 ("2.0.9" before "2.0.10").
+older() {
+    awk -v a="$1" -v b="$2" 'BEGIN {
+        n = split(a, x, "."); m = split(b, y, ".")
+        for (i = 1; i <= n || i <= m; i++) if (x[i] + 0 != y[i] + 0) exit !(x[i] + 0 < y[i] + 0)
+        exit 1
+    }'
+}
+
+# The newest release: where GitHub's "latest" page redirects.
+latest() {
+    curl -fsS -o /dev/null -w '%{redirect_url}' "https://github.com/$repo/releases/latest" | sed -n 's#.*/tag/v##p'
+}
+
+# The newest release older than $1.
+previous() {
+    curl -fsS "https://api.github.com/repos/$repo/releases?per_page=100" |
+        grep -o '"tag_name": *"v[0-9.]*"' | sed 's/.*"v//; s/"$//' |
+        while read -r v; do if older "$v" "$1"; then echo "$v"; fi; done |
+        sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1
+}
+
+# --upgrade / --downgrade [version]: runs the website's installer (the one
+# `curl … | bash` runs) for that release, into the folder this Pulse.app is in.
+change() {
+    current=$(installed)
+    target=${2#v}
+    if [ -z "$target" ]; then
+        if [ "$1" = --upgrade ]; then target=$(latest); else target=$(previous "$current"); fi
+        if [ -z "$target" ]; then
+            if [ "$1" = --upgrade ]; then what="the latest release"; else what="a release older than $current"; fi
+            echo "pulse: couldn't find $what on GitHub (https://github.com/$repo/releases)" >&2
+            exit 1
+        fi
+        if [ "$1" = --upgrade ] && ! older "$current" "$target"; then
+            echo "Pulse $current is up to date."
+            exit 0
+        fi
+    fi
+    case "$target" in
+        *[!0-9.]*|.*|*.) echo "pulse: '$target' is not a version, like 2.1.3" >&2; exit 2 ;;
+    esac
+    if [ "$target" = "$current" ]; then
+        echo "Pulse $current is installed already."
+        exit 0
+    elif [ "$1" = --upgrade ] && older "$target" "$current"; then
+        echo "pulse: $target is older than the installed $current. To go back to it: pulse --downgrade $target" >&2
+        exit 2
+    elif [ "$1" = --downgrade ] && older "$current" "$target"; then
+        echo "pulse: $target is newer than the installed $current. To update to it: pulse --upgrade $target" >&2
+        exit 2
+    fi
+
+    if [ "$1" = --upgrade ]; then
+        echo "Upgrading Pulse from $current to $target"
+    else
+        echo "Downgrading Pulse from $current to $target"
+        echo "To return to the latest release later, run: curl -fsSL $installer | bash"
+    fi
+    script=$(curl -fsSL "$installer") || { echo "pulse: couldn't download $installer" >&2; exit 1; }
+    # Run from Pulse's own terminal, the shell hangs up when the installer
+    # quits Pulse; the installer (which inherits this) carries on.
+    trap '' HUP
+    PULSE_INSTALL_DIR=$(dirname "$app") bash -c "$script" install.sh "$target"
+}
 
 case "${1:-}" in
-    -h|--help) sed -n '2,5s/^# \{0,1\}//p' "$self"; exit 0 ;;
-    -v|--version) /usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist"; exit 0 ;;
+    -h|--help) usage; exit 0 ;;
+    -v|--version) installed; exit 0 ;;
+    --upgrade|--downgrade)
+        [ $# -le 2 ] || { echo "pulse: $1 takes at most one version" >&2; exit 2; }
+        change "$1" "${2:-}"
+        exit 0 ;;
 esac
+if [ $# -eq 1 ] && [ ! -e "$1" ]; then
+    case "$1" in
+        help) usage; exit 0 ;;
+        version) installed; exit 0 ;;
+    esac
+fi
 
 for path in "$@"; do
+    case "$path" in
+        -?*) echo "pulse: unknown option $path (see pulse --help; to open a file named $path, use ./$path)" >&2; exit 2 ;;
+    esac
     if [ ! -e "$path" ]; then
         dir=$(dirname "$path")
         if [ ! -d "$dir" ]; then

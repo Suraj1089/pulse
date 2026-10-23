@@ -32,7 +32,9 @@ Every build fails if any scenario exceeds 100 MB.
 
 This is the only supported way to install. Pulse is not notarized by Apple yet, so a Pulse.app downloaded in a browser is blocked by macOS Gatekeeper; the installer downloads the same release with curl and clears the quarantine flag.
 
-Then open a folder from a terminal with `pulse .`
+A specific release (newer or older): `curl -fsSL https://pulse0.app/install.sh | bash -s -- 2.1.3`
+
+Then open a folder from a terminal with `pulse .` Later, `pulse --upgrade` updates to the latest release and `pulse --downgrade` goes back to the previous one.
 
 ## Links
 - Website: https://pulse0.app
