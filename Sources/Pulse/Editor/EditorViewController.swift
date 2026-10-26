@@ -59,6 +59,13 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private var specialControllers: [Document.Special: NSViewController] = [:]
     private let highlighter = SyntaxHighlighter()
     private var autosaveWork: DispatchWorkItem?
+    /// Go › Back / Forward (see NavigationHistory).
+    private var history = NavigationHistory()
+    /// Set by an edit, a jump or a step through the history until the event
+    /// that made it is handled. Caret moves meanwhile are not jumps: typing
+    /// and pasting never count, and opening a search result in another file
+    /// is one jump with the reveal that follows.
+    private var settling = false
 
     var isTerminalVisible: Bool { terminal.superview != nil }
 
@@ -294,9 +301,15 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     private func activate(_ index: Int, in pane: EditorPane) {
         guard pane.documents.indices.contains(index) else { return }
+        let document = pane.documents[index]
+        // Another file: a jump from where the caret was. Showing it moves
+        // the caret, which is not one.
+        if document !== pane.activeDocument {
+            if let origin = place(in: pane) { recordJump(from: origin) }
+            settle()
+        }
         pane.rememberViewState()
         pane.activeIndex = index
-        let document = pane.documents[index]
         makeActive(pane)
         pane.show(document)
         highlightNow(pane)
@@ -664,6 +677,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     func reloadChangedDocuments() {
+        // New text from disk moves the caret; that isn't a jump.
+        settle()
         for document in documents where document.reloadIfChangedOnDisk() {
             for pane in panesShowing(document) {
                 pane.ruler.updateThickness()
@@ -698,6 +713,98 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         guard let document = activeDocument else { return }
         textView.goToLine(number, in: document)
         view.window?.makeFirstResponder(textView)
+    }
+
+    // MARK: Back and Forward
+
+    var canGoBack: Bool { !history.back.isEmpty }
+    var canGoForward: Bool { !history.forward.isEmpty }
+
+    func goBack() {
+        if let place = history.goBack(from: currentPlace, where: { self.canReach($0) }) { go(to: place) }
+    }
+
+    func goForward() {
+        if let place = history.goForward(from: currentPlace, where: { self.canReach($0) }) { go(to: place) }
+    }
+
+    /// After a session is restored: its tab switches weren't the user's.
+    func clearHistory() {
+        history = NavigationHistory()
+    }
+
+    private var currentPlace: NavigationHistory.Place? {
+        guard let pane = activePane else { return nil }
+        return place(in: pane)
+    }
+
+    /// The caret in `pane`'s file (nil for a special tab or none).
+    private func place(in pane: EditorPane) -> NavigationHistory.Place? {
+        guard let document = pane.activeDocument, document.special == nil else { return nil }
+        return NavigationHistory.Place(document: document, url: document.url, location: pane.textView.selectedRange().location)
+    }
+
+    /// Open in a pane, or a file that can be opened again.
+    private func canReach(_ place: NavigationHistory.Place) -> Bool {
+        if let document = place.document, panes.contains(where: { $0.documents.contains { $0 === document } }) { return true }
+        return place.url.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
+    }
+
+    /// Shows `place`'s file where it is open (the active pane first), or
+    /// opens it again, with the caret there; scrolls only if that is out of view.
+    private func go(to place: NavigationHistory.Place) {
+        settle()
+        let pane: EditorPane
+        if let document = place.document, let (owner, index) = location(where: { $0 === document }) {
+            if owner.activeIndex == index { focusChanged(to: owner) } else { activate(index, in: owner) }
+            pane = owner
+        } else if let url = place.url {
+            open(url)
+            pane = activePane
+        } else {
+            return
+        }
+        guard let document = pane.activeDocument, document.special == nil,
+              document === place.document || document.url?.standardizedFileURL == place.url?.standardizedFileURL else { return }
+        let caret = NSRange(location: min(place.location, document.length), length: 0)
+        let origin = pane.scrollView.contentView.bounds.origin
+        pane.textView.setSelectedRange(caret)
+        pane.textView.scrollRangeToVisible(caret)
+        if pane.scrollView.contentView.bounds.origin != origin { pane.textView.centerSelectionInVisibleArea(nil) }
+        view.window?.makeFirstResponder(pane.textView)
+    }
+
+    /// A caret move of more than `jumpLines` lines in the active pane that
+    /// typing, folding and the arrow and page keys didn't make is a jump.
+    private func noteJump(in pane: EditorPane, _ notification: Notification) {
+        guard !settling, let document = pane.activeDocument, document.special == nil,
+              let old = (notification.userInfo?["NSOldSelectedCharacterRange"] as? NSValue)?.rangeValue,
+              !EditorViewController.isStepKey(NSApp.currentEvent) else { return }
+        let from = min(old.location, document.length)
+        let lines = abs(document.line(at: pane.textView.selectedRange().location) - document.line(at: from))
+        // Folding moves a caret out of the text it hides; Back can't show that.
+        guard lines > NavigationHistory.jumpLines, document.storage.fold(at: from) == nil else { return }
+        recordJump(from: NavigationHistory.Place(document: document, url: document.url, location: from))
+    }
+
+    /// Arrow, page, Home and End keys without ⌘ move the caret a step at a time.
+    private static func isStepKey(_ event: NSEvent?) -> Bool {
+        guard let event, event.type == .keyDown, !event.modifierFlags.contains(.command),
+              let key = event.charactersIgnoringModifiers?.unicodeScalars.first?.value else { return false }
+        return (0xF700...0xF703).contains(key) || (0xF729...0xF72D).contains(key)
+    }
+
+    /// One jump per event: the caret moves that follow it are part of it.
+    private func recordJump(from place: NavigationHistory.Place) {
+        guard !settling else { return }
+        history.record(place)
+        settle()
+    }
+
+    private func settle() {
+        guard !settling else { return }
+        settling = true
+        DispatchQueue.main.async { [weak self] in self?.settling = false }
     }
 
     /// Re-applies the editor size from Theme to every open document.
@@ -996,10 +1103,12 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         owner(of: view)?.activeDocument?.undoManager
     }
 
-    /// Before every edit (typing, Pulse's own commands, Undo): blame moves
-    /// with the lines. Nothing to do while blame is off.
+    /// Before every edit (typing, Pulse's own commands, Undo): the caret move
+    /// that follows isn't a jump, and blame moves with the lines (nothing to
+    /// do while blame is off).
     func textView(_ textView: NSTextView, shouldChangeTextInRanges affectedRanges: [NSValue],
                   replacementStrings: [String]?) -> Bool {
+        if replacementStrings != nil { settle() }
         if let replacementStrings, let document = owner(of: textView)?.activeDocument, document.blame != nil {
             document.blameWillChange(affectedRanges.map(\.rangeValue), replacementStrings)
         }
@@ -1026,6 +1135,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         guard let textView = notification.object as? NSTextView, let pane = owner(of: textView) else { return }
         pane.ruler.needsDisplay = true
         guard pane === activePane else { return }
+        noteJump(in: pane, notification)
         updateStatus()
         claude.selectionDidChange()
     }
