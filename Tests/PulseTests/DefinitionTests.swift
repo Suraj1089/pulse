@@ -100,8 +100,8 @@ final class DefinitionTests: PulseTestCase {
         wait("the menu") { shown != nil }
         XCTAssertEqual(shown?.items.filter { !$0.isSeparatorItem }.map(\.title), [
             "2 definitions of “save”",
-            "Same Folder", "def save(self):  orders/models.py:2",
-            "Other Files", "def save(self):  payments/models.py:2",
+            "Same Folder", "def save(self):   orders/models.py:2",
+            "Other Files", "def save(self):   payments/models.py:2",
             "Find “save” in Project",
         ], "Markdown files are not searched")
 

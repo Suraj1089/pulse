@@ -922,7 +922,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
                 }
                 let location = "\(definition.path):\(definition.line)"
                 let preview = definition.preview.count > 80 ? String(definition.preview.prefix(79)) + "…" : definition.preview
-                let item = NSMenuItem(title: "\(preview)  \(location)", action: #selector(openDefinition(_:)), keyEquivalent: "")
+                let item = NSMenuItem(title: "\(preview)   \(location)", action: #selector(openDefinition(_:)), keyEquivalent: "")
                 let label = NSMutableAttributedString(string: preview, attributes: [.font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)])
                 label.append(NSAttributedString(string: "   " + location, attributes: [.font: NSFont.menuFont(ofSize: 11),
                                                                                          .foregroundColor: NSColor.secondaryLabelColor]))
