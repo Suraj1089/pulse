@@ -104,6 +104,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             self.sidebar.fileTree.reveal(document?.url)
         }
         editor.onSessionChange = { [weak self] in self?.scheduleSessionSave() }
+        editor.onFindInProject = { [weak self] name in self?.findInProject(seed: name) }
         editor.onDidSave = { [weak self] document in
             guard let self else { return }
             self.sidebar.sourceControl.refresh()
@@ -176,6 +177,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         guard url?.standardizedFileURL != root?.standardizedFileURL else { return }
         root = url
         fileIndex = url.map { FileIndex(root: $0) }
+        editor.fileIndex = fileIndex
         sidebar.fileTree.setRoot(url)
         sidebar.searchPanel.root = url
         sidebar.searchPanel.index = fileIndex
@@ -427,6 +429,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     @objc func previousTab(_ sender: Any?) { editor.selectTab(offset: -1) }
     @objc func goBack(_ sender: Any?) { editor.goBack() }
     @objc func goForward(_ sender: Any?) { editor.goForward() }
+    @objc func goToDefinition(_ sender: Any?) { editor.goToDefinition() }
 
     @objc func showCommandPalette(_ sender: Any?) { showPalette(">") }
     @objc func showGoToFile(_ sender: Any?) { showPalette("") }
@@ -438,8 +441,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     }
 
     @objc func findInProject(_ sender: Any?) {
+        findInProject(seed: editor.selectedText)
+    }
+
+    private func findInProject(seed: String?) {
         if sidebarItem.isCollapsed { sidebarItem.animator().isCollapsed = false }
-        sidebar.showSearch(seed: editor.selectedText)
+        sidebar.showSearch(seed: seed)
     }
 
     @objc func showFiles(_ sender: Any?) {
@@ -618,6 +625,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             return editor.canGoBack
         case #selector(goForward(_:)):
             return editor.canGoForward
+        case #selector(goToDefinition(_:)):
+            return editor.canGoToDefinition
         case #selector(findInProject(_:)), #selector(showGoToFile(_:)), #selector(showSourceControl(_:)):
             return root != nil
         default:
@@ -649,6 +658,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             command("Go: Forward", #selector(goForward(_:))),
             command("Go: Go to File", #selector(showGoToFile(_:))),
             command("Go: Go to Line", #selector(showGoToLine(_:))),
+            command("Go: Go to Definition", #selector(goToDefinition(_:))),
             command("Go: Next Tab", #selector(nextTab(_:))),
             command("Go: Previous Tab", #selector(previousTab(_:))),
             command("Search: Find in Project", #selector(findInProject(_:))),

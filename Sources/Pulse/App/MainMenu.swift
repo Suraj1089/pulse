@@ -202,6 +202,8 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(item("Go to File…", #selector(MainWindowController.showGoToFile(_:)), "p"))
         menu.addItem(item("Go to Line…", #selector(MainWindowController.showGoToLine(_:)), "l"))
+        menu.addItem(item("Go to Definition", #selector(MainWindowController.goToDefinition(_:)),
+                          String(UnicodeScalar(UInt32(NSF12FunctionKey))!), []))
         menu.addItem(.separator())
         menu.addItem(item("Next Tab", #selector(MainWindowController.nextTab(_:)), "]", [.command, .shift]))
         menu.addItem(item("Previous Tab", #selector(MainWindowController.previousTab(_:)), "[", [.command, .shift]))

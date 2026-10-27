@@ -2,7 +2,7 @@
 
 > A light, native code editor for macOS, built to stay under 100 MB of memory.
 
-Pulse is an open-source (MIT) macOS code editor written in Swift and AppKit, with no Electron, no web view and no extension host. It covers everyday editing: folders, tabs and windows, split editors, read-only files by default, syntax highlighting, code folding, find and replace, project search, back and forward navigation, a command palette, an integrated terminal with tabs and splits, and a source control panel with diffs and line blame. Claude Code running in its terminal sees the file and lines you select, as it does in VS Code. It deliberately has no extensions, debugger, full Git client, built-in AI features or telemetry.
+Pulse is an open-source (MIT) macOS code editor written in Swift and AppKit, with no Electron, no web view and no extension host. It covers everyday editing: folders, tabs and windows, split editors, read-only files by default, syntax highlighting, code folding, find and replace, project search, back and forward navigation, go to definition, a command palette, an integrated terminal with tabs and splits, and a source control panel with diffs and line blame. Claude Code running in its terminal sees the file and lines you select, as it does in VS Code. It deliberately has no extensions, debugger, full Git client, built-in AI features or telemetry.
 
 ## Memory
 
