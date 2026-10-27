@@ -1,0 +1,806 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Pulse walkthrough</title>
+<!--
+  One frame of the website's hero video per call to seek(t). A re-creation of
+  the Pulse window in HTML, drawn from real data that record.mjs passes in as
+  window.PULSE_DATA (the file shown, the tree, git blame, a project search,
+  a real commit's diff). Colors and sizes follow Theme.swift and the views.
+-->
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1024px; height: 640px; overflow: hidden; }
+  body {
+    font-family: Inter, sans-serif; font-size: 12px; color: var(--text); background: var(--chrome);
+    -webkit-font-smoothing: antialiased; font-feature-settings: "tnum" 0;
+  }
+  body.dark {
+    --bg: #1e1e20; --chrome: #252528; --text: #e6e6e8; --sec: #98989d; --ter: #6b6b70; --sep: rgba(255,255,255,.08); --hard: #0b0b0c;
+    --field: #323235; --segBg: #3a3a3d; --seg: #636367; --sel: #1d3857; --cur: #26292e; --accent: #0a84ff;
+    --kw: #ee72b3; --str: #f0907f; --com: #8e98a2; --type: #74cdee; --num: #d9c674; --attr: #efa25e;
+    --mod: #e2c08d; --add: #81b88b; --del: #c74e39; --blame: #8b929b; --textsel: #3d5c82; --textselOff: #3a3a3e;
+    --panel: #2b2b2e; --panelBorder: rgba(255,255,255,.11); --shadow: 0 18px 50px rgba(0,0,0,.6);
+    --diffAdd: rgba(129,184,139,.16); --diffDel: rgba(248,81,73,.16); --diffAddE: rgba(129,184,139,.30); --diffDelE: rgba(248,81,73,.32);
+    --gutter: #6d6d72; --gutterCur: #d8d8dc; --gutterBg: #222224; --match: rgba(255,214,10,.30); --button: #3c3c3f;
+    --capBg: rgba(40,40,43,.98); --capText: #f2f2f4; --capBorder: rgba(255,255,255,.12); --kbd: rgba(255,255,255,.14);
+    --termGreen: #7fd88f; --indicator: #ffd60a;
+  }
+  body.light {
+    --bg: #ffffff; --chrome: #f5f5f7; --text: #1d1d1f; --sec: #6e6e73; --ter: #a9a9ae; --sep: rgba(0,0,0,.09); --hard: #dedede;
+    --field: #e7e7ea; --segBg: #e3e3e6; --seg: #ffffff; --sel: #bfdaf9; --cur: #f1f4fa; --accent: #007aff;
+    --kw: #9c2f96; --str: #b3261e; --com: #5d6977; --type: #1b5c8a; --num: #3b2cc0; --attr: #7a4a1e;
+    --mod: #895503; --add: #587c0c; --del: #ad0707; --blame: #656c76; --textsel: #b4d5fe; --textselOff: #dcdcde;
+    --panel: #ffffff; --panelBorder: rgba(0,0,0,.12); --shadow: 0 18px 50px rgba(0,0,0,.22);
+    --diffAdd: rgba(45,164,78,.14); --diffDel: rgba(207,34,46,.11); --diffAddE: rgba(45,164,78,.28); --diffDelE: rgba(207,34,46,.22);
+    --gutter: #a1a1a6; --gutterCur: #1d1d1f; --gutterBg: #f7f7f8; --match: rgba(255,196,0,.40); --button: #ffffff;
+    --capBg: rgba(255,255,255,.97); --capText: #1d1d1f; --capBorder: rgba(0,0,0,.10); --kbd: rgba(0,0,0,.07);
+    --termGreen: #1e8a39; --indicator: #ffe14d;
+  }
+  .abs { position: absolute; }
+  .clip { overflow: hidden; }
+  .sec { color: var(--sec); }
+  .mono { font-family: "JetBrains Mono", monospace; }
+  svg { display: block; }
+
+  .title { left: 0; top: 0; width: 1024px; height: 28px; background: var(--chrome); border-bottom: 1px solid var(--sep); }
+  .lights { left: 12px; top: 8px; display: flex; gap: 8px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.18); }
+  .tsearch { left: 362px; top: 4px; width: 300px; height: 20px; border-radius: 5px; background: var(--field);
+    display: flex; align-items: center; justify-content: center; gap: 5px; color: var(--sec); font-size: 11.5px; }
+
+  .side { left: 0; top: 28px; width: 214px; height: 612px; background: var(--chrome); border-right: 1px solid var(--hard); }
+  .shead { left: 0; top: 0; width: 213px; height: 34px; }
+  .shead b { position: absolute; left: 14px; top: 11px; font-size: 10px; font-weight: 600; letter-spacing: .02em; color: var(--sec); }
+  .seg { position: absolute; right: 10px; top: 8px; display: flex; background: var(--segBg); border-radius: 5px; padding: 1px; }
+  .seg span { width: 24px; height: 17px; display: flex; align-items: center; justify-content: center; color: var(--sec); border-radius: 4px; }
+  .seg span.on { background: var(--seg); color: var(--text); box-shadow: 0 .5px 1px rgba(0,0,0,.2); }
+  .sbody { left: 0; top: 34px; width: 213px; height: 578px; }
+  .root { position: absolute; left: 14px; top: 6px; font-size: 10px; font-weight: 600; color: var(--sec); letter-spacing: .02em; }
+  .row { position: absolute; left: 0; width: 213px; height: 19px; display: flex; align-items: center; font-size: 11.5px; white-space: nowrap; }
+  .row.on { background: var(--sel); }
+  .row .chev { width: 13px; color: var(--sec); display: flex; justify-content: center; }
+  .row .ico { width: 18px; display: flex; justify-content: center; }
+  .fold { color: var(--accent); }
+  .doc { color: var(--sec); }
+
+  .field { position: absolute; left: 8px; width: 197px; height: 24px; border-radius: 6px; background: var(--field);
+    display: flex; align-items: center; gap: 6px; padding: 0 7px; font-size: 11.5px; }
+  .field .q { flex: 1; white-space: pre; overflow: hidden; }
+  .caret { display: inline-block; width: 1.5px; height: 13px; background: var(--accent); vertical-align: -2px; margin-left: 1px; }
+  .opt { font-size: 10px; font-weight: 600; color: var(--sec); }
+  .summary { position: absolute; left: 12px; font-size: 10.5px; color: var(--sec); }
+  .hit { position: absolute; left: 0; width: 213px; height: 19px; display: flex; align-items: center; white-space: pre; font-size: 10.5px; overflow: hidden; }
+  .hit.on { background: var(--sel); }
+  .hit .num { width: 44px; text-align: right; padding-right: 8px; color: var(--sec); font-family: "JetBrains Mono", monospace; font-size: 10px; flex: none; }
+  .hit mark { background: var(--match); color: inherit; border-radius: 2px; }
+
+  .main { left: 215px; top: 28px; width: 809px; height: 612px; background: var(--bg); }
+  .tabs { left: 0; top: 0; height: 34px; background: var(--chrome); border-bottom: 1px solid var(--sep); }
+  .tab { position: absolute; top: 0; height: 34px; display: flex; align-items: center; padding: 0 28px 0 14px; font-size: 11.5px;
+    color: var(--sec); border-right: 1px solid var(--sep); white-space: nowrap; overflow: hidden; }
+  .tab span.name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .tab.on { background: var(--bg); color: var(--text); height: 35px; }
+  .tab.on.dim { color: var(--sec); }
+  .tab .x { position: absolute; right: 9px; top: 11px; color: var(--sec); }
+  .crumbs { left: 0; top: 34px; height: 22px; display: flex; align-items: center; padding-left: 14px; font-size: 11px; color: var(--sec); gap: 5px; white-space: nowrap; }
+  .crumbs b { color: var(--text); font-weight: 500; }
+  .code { font-family: "JetBrains Mono", monospace; font-size: 11.5px; }
+  .ln { position: absolute; left: 0; width: 38px; text-align: right; color: var(--gutter); font-family: Inter, sans-serif; font-size: 10px;
+    font-feature-settings: "tnum" 1; line-height: 15px; }
+  .ln.cur { color: var(--gutterCur); }
+  .tx { position: absolute; white-space: pre; line-height: 15px; }
+  .k { color: var(--kw); } .s { color: var(--str); } .c { color: var(--com); } .t { color: var(--type); } .n { color: var(--num); } .a { color: var(--attr); }
+  .blame { position: absolute; white-space: pre; font-family: Inter, sans-serif; font-size: 10px; font-style: italic; color: var(--blame); line-height: 15px; }
+  .ins { position: absolute; width: 1.5px; height: 15px; background: var(--accent); }
+  .indicator { position: absolute; background: var(--indicator); color: #1d1d1f; border-radius: 3px; white-space: pre;
+    box-shadow: 0 1px 4px rgba(0,0,0,.35); line-height: 15px; padding: 0 2px; margin-left: -2px; }
+
+  .findbar { left: 0; height: 30px; background: var(--chrome); border-bottom: 1px solid var(--sep); }
+  .findbar .ff { position: absolute; left: 10px; top: 5px; height: 20px; border-radius: 5px; background: var(--field);
+    display: flex; align-items: center; gap: 6px; padding: 0 8px; font-size: 11.5px; }
+  .findbar .count { color: var(--sec); font-size: 10.5px; }
+  .btn { position: absolute; top: 5px; height: 20px; border-radius: 5px; background: var(--button); display: flex; align-items: center;
+    justify-content: center; font-size: 11px; box-shadow: 0 0 0 .5px var(--panelBorder), 0 .5px 1px rgba(0,0,0,.15); color: var(--text); }
+
+  .status { left: 0; height: 22px; width: 809px; background: var(--chrome); border-top: 1px solid var(--sep); display: flex; align-items: center;
+    font-size: 10.5px; color: var(--sec); white-space: nowrap; }
+  .status .it { display: flex; align-items: center; gap: 4px; margin-left: 13px; }
+  .status .it.blue { color: var(--accent); }
+  .status .right { margin-left: auto; display: flex; align-items: center; padding-right: 10px; }
+  .status .ring { border-radius: 6px; box-shadow: 0 0 0 1.5px var(--accent); padding: 1px 6px; margin-right: -6px; }
+
+  .term { left: 0; width: 809px; background: var(--bg); border-top: 1px solid var(--sep); }
+  .term .th { position: absolute; left: 12px; top: 7px; font-size: 10px; font-weight: 600; letter-spacing: .02em; color: var(--sec); }
+  .term .ti { position: absolute; right: 10px; top: 6px; display: flex; gap: 10px; color: var(--sec); }
+  .term .tl { position: absolute; left: 12px; white-space: pre; font-family: "JetBrains Mono", monospace; font-size: 11px; line-height: 15px; }
+  .block { display: inline-block; width: 7px; height: 13px; background: var(--sec); vertical-align: -2px; }
+
+  .welcome { position: absolute; left: 50%; width: 300px; margin-left: -150px; text-align: center; }
+  .welcome h1 { margin: 10px 0 2px; font-size: 17px; font-weight: 600; }
+  .wrow { display: flex; justify-content: space-between; height: 23px; align-items: center; font-size: 12.5px; text-align: left; }
+  .wrow .sec { font-size: 11.5px; }
+  .wsep { height: 1px; background: var(--sep); margin: 12px 0; }
+  .segctl { display: flex; background: var(--segBg); border-radius: 5px; padding: 1px; font-size: 10.5px; }
+  .segctl span { padding: 1px 8px; border-radius: 4px; color: var(--sec); }
+  .segctl span.on { background: var(--seg); color: var(--text); box-shadow: 0 .5px 1px rgba(0,0,0,.2); }
+  .switch { width: 28px; height: 16px; border-radius: 8px; background: var(--accent); position: relative; }
+  .switch::after { content: ""; position: absolute; right: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; }
+  .pill { padding: 1px 8px; border-radius: 5px; background: var(--button); font-size: 10.5px; box-shadow: 0 0 0 .5px var(--panelBorder); }
+
+  .palette { left: 242px; width: 540px; border-radius: 12px; background: var(--panel); box-shadow: var(--shadow), 0 0 0 .5px var(--panelBorder); overflow: hidden; }
+  .palette .pf { height: 42px; display: flex; align-items: center; padding: 0 16px; font-size: 15px; white-space: pre; }
+  .palette .pr { height: 28px; margin: 0 6px; border-radius: 6px; display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; }
+  .palette .pr.on { background: var(--accent); color: #fff; }
+  .palette .pr.on .sec, .palette .pr.on .doc { color: rgba(255,255,255,.75); }
+
+  .dhead { left: 0; height: 30px; background: var(--chrome); border-bottom: 1px solid var(--sep); display: flex; align-items: center; gap: 9px;
+    padding: 0 10px; font-size: 11.5px; white-space: nowrap; }
+  .dhead .path { font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+  .drow { position: absolute; left: 0; display: flex; white-space: pre; line-height: 15px; }
+  .dnum { position: absolute; text-align: right; color: var(--gutter); font-size: 10px; font-feature-settings: "tnum" 1; line-height: 15px; }
+
+  .caption { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; white-space: nowrap;
+    padding: 7px 15px; border-radius: 15px; background: var(--capBg); color: var(--capText); font-size: 13.5px; font-weight: 500;
+    box-shadow: 0 0 0 .5px var(--capBorder), 0 8px 24px rgba(0,0,0,.28); }
+  .caption kbd { font-family: Inter, sans-serif; font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 5px; background: var(--kbd); display: inline-block; }
+  .cursor { position: absolute; width: 18px; height: 24px; z-index: 10; transform-origin: 3px 2px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<img class="icon" src="../../site/icon.png" style="display:none" alt="">
+<script>
+"use strict";
+const D = window.PULSE_DATA;
+document.body.className = D.theme;
+
+// Geometry, in CSS pixels; record.mjs renders at 1.875x for a 1920x1200 frame.
+const W = 1024, H = 640, TITLE = 28, SIDE = 214, MAIN_X = 215, MAIN_W = W - MAIN_X, MAIN_H = H - TITLE;
+const TAB = 34, CRUMB = 22, STATUS = 22, FIND = 30, TERM = 196, LH = 15, PAD = 6, TEXT_X = 54, ROW = 19, DHEAD = 30;
+const ctx = document.createElement("canvas").getContext("2d");
+const measure = (s, font) => { ctx.font = font; return ctx.measureText(s).width; };
+const CW = measure("0".repeat(40), '11.5px "JetBrains Mono"') / 40;
+
+// MARK: Data
+
+const SRC = D.text.replace(/\t/g, "    ").split("\n");
+if (SRC[SRC.length - 1] === "") SRC.pop();
+const lineWith = needle => {
+  const index = SRC.findIndex(line => line.includes(needle));
+  if (index < 0) throw new Error("not in " + D.file + ": " + needle);
+  return index;
+};
+const Q1 = "func goBack", Q2 = "func go(to";
+const HITS = D.search;
+const OWN_HITS = HITS.filter(hit => hit.file === D.file);
+const PICK = OWN_HITS[OWN_HITS.length - 1];           // the declaration, last in the file
+const L = { back: lineWith("func goBack()"), go: lineWith("private func go(to place"), rec: PICK.line - 1 };
+const C = { back: SRC[L.back].indexOf(Q1), go: SRC[L.go].indexOf(Q2), rec: SRC[L.rec].indexOf(D.query) };
+const DIR = D.file.split("/").slice(0, -1), NAME = D.file.split("/").pop();
+const OTHER = D.other.text.replace(/\t/g, "    ").split("\n");
+if (OTHER[OTHER.length - 1] === "") OTHER.pop();
+const OTHER_DIR = D.other.file.split("/").slice(0, -1), OTHER_NAME = D.other.file.split("/").pop();
+
+// MARK: Timeline (seconds)
+
+const T = {
+  click: 1.9, folder: 2.05,
+  palette: 2.9, paletteType: 3.2, open: 4.9,
+  find: 6.2, findType: 6.5, findHit: 7.7, find2: 9.1, find2Type: 9.35, find2Hit: 10.4, findClose: 11.5,
+  back1: 12.0, back2: 13.1, fwd: 14.3,
+  search: 15.8, searchType: 16.1, results: 17.55, resultClick: 18.4,
+  blameClick: 20.35,
+  scm: 23.1, scmClick: 24.2,
+  tabClick: 27.0, split: 27.5, palette2: 27.95, palette2Type: 28.2, rightOpen: 29.0,
+  term: 29.8, termType: 30.2, build: 31.1, meter: 32.5,
+  end: 35.0,
+};
+window.DURATION = T.end;
+
+const CAPTIONS = [
+  [0.2, 1.65, "Welcome to Pulse"],
+  [1.75, 2.8, "Open a folder", ["⌘O"]],
+  [2.9, 6.05, "Go to any file", ["⌘P"]],
+  [6.2, 11.4, "Find in the file", ["⌘F"]],
+  [11.6, 14.15, "Go back to where you jumped from", ["⌃-"], [T.back1, T.back2]],
+  [14.2, 15.7, "And forward again", ["⌃⇧-"], [T.fwd]],
+  [15.8, 19.4, "Search the whole project", ["⇧⌘F"]],
+  [19.55, 22.95, "Blame shows who changed each line, when you ask"],
+  [23.1, 26.75, "Source control, with inline diffs", ["⌃⇧G"]],
+  [26.85, 29.65, "Split the editor", ["⌥⌘\\"], [T.split]],
+  [29.8, 32.4, "A terminal, started when you first open it", ["⌃`"]],
+  [32.5, 34.95, "Pulse’s own memory and CPU, live in the status bar"],
+];
+
+const clamp = (x, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, x));
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const ease = x => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2);
+const rand = i => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
+// Typing at a human, uneven pace.
+function typed(text, t, start, cps = 12) {
+  let time = start, count = 0;
+  for (let i = 0; i < text.length; i++) {
+    time += (0.7 + 0.6 * rand(i + text.length * 7)) / cps;
+    if (t >= time) count = i + 1; else break;
+  }
+  return text.slice(0, count);
+}
+const blink = (t, since) => (t - since) % 1.06 < 0.56;
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+// MARK: Syntax colors (as Language.swift: comments and strings win)
+
+const KEYWORDS = new Set(("associatedtype class deinit enum extension fileprivate func import init inout internal let open operator private " +
+  "protocol public rethrows static struct subscript typealias var break case continue default defer do else fallthrough for guard if in " +
+  "repeat return switch where while as catch false is nil super self Self throw throws true try await async lazy weak unowned override " +
+  "mutating final required convenience some any").split(" "));
+const TOKEN = /(\/\/.*$)|("(?:\\.|[^"\\])*")|(@\w+|#\w+)|(\b\d+(?:\.\d+)?\b)|(\b[A-Za-z_]\w*\b)/g;
+const colored = new Map();
+function highlight(line) {
+  if (colored.has(line)) return colored.get(line);
+  let out = "", last = 0;
+  line.replace(TOKEN, (m, comment, string, attribute, number, word, at) => {
+    out += esc(line.slice(last, at));
+    const kind = comment ? "c" : string ? "s" : attribute ? "a" : number ? "n" : KEYWORDS.has(word) ? "k" : /^[A-Z]/.test(word) ? "t" : "";
+    out += kind ? `<span class="${kind}">${esc(m)}</span>` : esc(m);
+    last = at + m.length;
+    return m;
+  });
+  out += esc(line.slice(last));
+  colored.set(line, out);
+  return out;
+}
+
+// MARK: Icons (SF Symbols, redrawn)
+
+const ICONS = {
+  search: '<circle cx="7" cy="7" r="4.6"/><path d="M10.4 10.4L14 14"/>',
+  folder: '<path d="M1.6 4.2c0-.6.4-1 1-1h3.3l1.5 1.6h6c.6 0 1 .4 1 1v6.6c0 .6-.4 1-1 1H2.6c-.6 0-1-.4-1-1z"/>',
+  doc: '<path d="M3.8 1.8h5.4l3 3v9.4H3.8z M9.1 1.8v3h3.1"/>',
+  right: '<path d="M6 3.8l4.2 4.2L6 12.2"/>',
+  down: '<path d="M3.8 6l4.2 4.2L12.2 6"/>',
+  up: '<path d="M3.8 10l4.2-4.2 4.2 4.2"/>',
+  branch: '<circle cx="4.5" cy="3.2" r="1.6"/><circle cx="11.5" cy="3.2" r="1.6"/><circle cx="8" cy="13" r="1.6"/><path d="M4.5 4.8v1.6c0 1.6 3.5 2.4 3.5 4.9 M11.5 4.8v1.6c0 1.6-3.5 2.4-3.5 4.9"/>',
+  lock: '<rect x="3.3" y="7.2" width="9.4" height="7" rx="1.4"/><path d="M5.3 7.2V5a2.7 2.7 0 0 1 5.4 0v2.2"/>',
+  person: '<circle cx="8" cy="5" r="2.8"/><path d="M2.6 14.4c.7-2.9 2.8-4.4 5.4-4.4s4.7 1.5 5.4 4.4"/>',
+  bug: '<ellipse cx="8" cy="9.4" rx="4.4" ry="5"/><path d="M8 4.4v10 M5.6 4.9l-1.6-2 M10.4 4.9l1.6-2 M3.6 8.4H1.6 M14.4 8.4h-2 M3.8 11.6l-1.8 1 M12.2 11.6l1.8 1"/>',
+  plus: '<path d="M8 2.6v10.8 M2.6 8h10.8"/>',
+  split: '<rect x="1.8" y="2.8" width="12.4" height="10.4" rx="1.6"/><path d="M8 2.8v10.4"/>',
+  trash: '<path d="M2.6 4.2h10.8 M6.2 4.2V2.6h3.6v1.6 M3.8 4.2l.8 9.6h6.8l.8-9.6"/>',
+  x: '<path d="M4.4 4.4l7.2 7.2 M11.6 4.4l-7.2 7.2"/>',
+  refresh: '<path d="M13 8a5 5 0 1 1-1.6-3.7 M13.2 2.4v3.2H10"/>',
+};
+const icon = (name, size = 12, extra = "") =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" ${extra}>${ICONS[name]}</svg>`;
+
+// MARK: The file tree (git ls-files, folders first, as FileNode sorts)
+
+const ROOT = { children: new Map() };
+for (const file of D.tree) {
+  let node = ROOT;
+  const parts = file.split("/");
+  parts.forEach((part, i) => {
+    if (!node.children.has(part)) {
+      node.children.set(part, { name: part, dir: i < parts.length - 1, path: parts.slice(0, i + 1).join("/"), children: new Map() });
+    }
+    node = node.children.get(part);
+  });
+}
+const sorted = node => [...node.children.values()].sort((a, b) =>
+  a.dir !== b.dir ? (a.dir ? -1 : 1) : a.name.localeCompare(b.name, "en", { numeric: true, sensitivity: "base" }));
+function treeRows(expanded) {
+  const rows = [];
+  const walk = (node, depth) => {
+    for (const child of sorted(node)) {
+      rows.push({ node: child, depth });
+      if (child.dir && expanded.has(child.path)) walk(child, depth + 1);
+    }
+  };
+  walk(ROOT, 0);
+  return rows;
+}
+// NSTextField's middle truncation, for long file names.
+function truncateMiddle(text, width, font) {
+  if (measure(text, font) <= width) return text;
+  let keep = text.length;
+  while (keep > 4) {
+    keep--;
+    const head = text.slice(0, Math.ceil(keep / 2)), tail = text.slice(text.length - Math.floor(keep / 2));
+    if (measure(head + "…" + tail, font) <= width) return head + "…" + tail;
+  }
+  return text.slice(0, 3) + "…";
+}
+
+// MARK: The editor's caret and scroll over time
+
+// Each jump: where the caret goes and whether the view scrolls to it.
+const visibleLines = height => Math.floor((height - PAD) / LH);
+const centered = (line, count) => Math.max(0, Math.min(SRC.length - count + 2, line - Math.floor(count / 2)));
+function paneHeight(t) {
+  return MAIN_H - STATUS - TAB - CRUMB - (findOpen(t) ? FIND : 0) - (t >= T.term ? TERM : 0);
+}
+const findOpen = t => t >= T.find && t < T.findClose;
+const JUMPS = [
+  { t: T.open, line: 0, col: 0 },
+  { t: T.findHit, line: L.back, col: C.back, len: Q1.length, indicator: true },
+  { t: T.find2Hit, line: L.go, col: C.go, len: Q2.length, indicator: true },
+  { t: T.back1, line: L.back, col: C.back },
+  { t: T.back2, line: 0, col: 0 },
+  { t: T.fwd, line: L.back, col: C.back },
+  { t: T.resultClick, line: L.rec, col: C.rec, len: D.query.length, indicator: true, center: true },
+];
+{
+  let top = 0;
+  for (const jump of JUMPS) {
+    const count = visibleLines(paneHeight(jump.t));
+    if (jump.center || jump.line < top + 1 || jump.line > top + count - 3) top = centered(jump.line, count);
+    jump.top = top;
+  }
+}
+const jumpAt = t => JUMPS.filter(jump => jump.t <= t).pop();
+
+// Blame: after the first line with text of each commit's run (and the caret's line).
+const blank = i => SRC[i].trim() === "";
+const BLAME_START = SRC.map((_, i) => {
+  if (blank(i)) return false;
+  for (let j = i - 1; j >= 0 && D.blame[j] === D.blame[i]; j--) if (!blank(j)) return false;
+  return true;
+});
+function age(time) {
+  const seconds = Math.max(0, D.now - time);
+  const ago = (count, unit) => (Math.floor(count) === 1 ? `1 ${unit} ago` : `${Math.floor(count)} ${unit}s ago`);
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return ago(seconds / 60, "minute");
+  if (seconds < 86400) return ago(seconds / 3600, "hour");
+  if (seconds < 604800) return ago(seconds / 86400, "day");
+  if (seconds < 2629800) return ago(seconds / 604800, "week");
+  if (seconds < 31557600) return ago(seconds / 2629800, "month");
+  return ago(seconds / 31557600, "year");
+}
+function blameLabel(line) {
+  const commit = D.commits[D.blame[line]];
+  const summary = commit.summary.length > 80 ? commit.summary.slice(0, 79) + "…" : commit.summary;
+  return `${commit.author}, ${age(commit.time)} · ${summary}`;
+}
+
+// MARK: Drawing
+
+function codeView(view, x, y, width, height, lines = SRC) {
+  const count = Math.ceil(height / LH) + 1;
+  // Whole device pixels, so a scroll moves the same glyphs (and encodes as motion).
+  const scroll = Math.round(view.top * LH * devicePixelRatio) / devicePixelRatio;
+  const first = Math.max(0, Math.floor((scroll + 0.5) / LH));
+  const offset = PAD - (scroll - first * LH);
+  let html = `<div class="abs clip code" style="left:${x}px;top:${y}px;width:${width}px;height:${height}px">`;
+  for (let i = first; i < Math.min(lines.length, first + count); i++) {
+    const top = offset + (i - first) * LH;
+    const current = i === view.line && !view.len;
+    if (i === view.line) html += `<div class="abs" style="left:0;top:${top}px;width:${width}px;height:${LH}px;background:var(--cur)"></div>`;
+    if (view.len && i === view.line) {
+      html += `<div class="abs" style="left:${TEXT_X + view.col * CW}px;top:${top}px;width:${view.len * CW}px;height:${LH}px;` +
+        `background:var(${view.focused ? "--textsel" : "--textselOff"})"></div>`;
+    }
+    html += `<div class="ln${i === view.line ? " cur" : ""}" style="top:${top}px">${i + 1}</div>`;
+    html += `<div class="tx" style="left:${TEXT_X}px;top:${top}px">${highlight(lines[i])}</div>`;
+    if (view.blame && (BLAME_START[i] || current)) {
+      html += `<div class="blame" style="left:${TEXT_X + SRC[i].replace(/\s+$/, "").length * CW + 24}px;top:${top}px">${esc(blameLabel(i))}</div>`;
+    }
+    if (current && view.focused && view.caretOn) {
+      html += `<div class="ins" style="left:${TEXT_X + view.col * CW - 0.5}px;top:${top}px"></div>`;
+    }
+    if (view.indicator !== undefined && i === view.line) {
+      const p = view.indicator, scale = p < 0.15 ? 1 + p / 0.15 * 0.35 : 1.35 - Math.min(1, (p - 0.15) / 0.15) * 0.35;
+      const opacity = 1 - prog(p, 0.75, 1);
+      const word = SRC[i].slice(view.col, view.col + view.len);
+      html += `<div class="indicator" style="left:${TEXT_X + view.col * CW}px;top:${top}px;transform:scale(${scale});opacity:${opacity}">${esc(word)}</div>`;
+    }
+  }
+  return html + "</div>";
+}
+
+function editorView(t, pane) {
+  const jump = jumpAt(t);
+  if (!jump) return null;
+  const view = { top: jump.top, line: jump.line, col: jump.col, len: jump.len || 0 };
+  if (jump.indicator && t - jump.t < 0.9) view.indicator = (t - jump.t) / 0.9;
+  if (pane === "right") view.indicator = undefined;
+  const focus = focusAt(t);
+  view.focused = focus === pane;
+  view.caretOn = blink(t, Math.max(jump.t, pane === "right" ? T.split : 0));
+  view.blame = t >= T.blameClick;
+  return view;
+}
+
+// Who has the keyboard: the editor panes, or a field, list or the terminal.
+function focusAt(t) {
+  if (t < T.palette) return "none";
+  if (t < T.open) return "palette";
+  if (t < T.find) return "left";
+  if (t < T.findClose) return "find";
+  if (t < T.search) return "left";
+  if (t < T.resultClick) return "searchField";
+  if (t < T.scm) return "left";
+  if (t < T.scmClick) return "list";
+  if (t < T.tabClick) return "diff";
+  if (t < T.split) return "left";
+  if (t < T.palette2) return "right";
+  if (t < T.rightOpen) return "palette";
+  if (t < T.term) return "right";
+  return "terminal";
+}
+
+function tabBar(x, width, tabs, active, dim, ids = []) {
+  const tabWidth = Math.min(174, Math.max(84, (width - 8) / tabs.length));
+  let html = `<div class="abs tabs" style="left:${x}px;width:${width}px">`;
+  tabs.forEach((title, i) => {
+    const on = i === active;
+    html += `<div class="tab${on ? " on" : ""}${on && dim ? " dim" : ""}"${ids[i] ? ` id="${ids[i]}"` : ""} style="left:${i * tabWidth}px;width:${tabWidth}px"><span class="name">${esc(title)}</span>` +
+      (on ? `<span class="x">${icon("x", 10)}</span>` : "") + "</div>";
+  });
+  return html + "</div>";
+}
+
+function crumbs(x, width, dir = DIR, name = NAME) {
+  const parts = dir.map(part => esc(part)).concat(`<b>${esc(name)}</b>`);
+  return `<div class="abs crumbs" style="left:${x}px;width:${width}px">${parts.join(`<span>›</span>`)}</div>`;
+}
+
+function welcome(x, width, height) {
+  const top = Math.max(20, (height - 400) / 2);
+  const row = (title, keys, id) => `<div class="wrow"${id ? ` id="${id}"` : ""}><span>${title}</span><span class="sec">${keys}</span></div>`;
+  const setting = (title, control) => `<div class="wrow" style="height:27px"><span>${title}</span>${control}</div>`;
+  return `<div class="abs" style="left:${x}px;top:${TAB}px;width:${width}px;height:${height}px">
+    <div class="welcome" style="top:${top}px">
+      <img src="../../site/icon.png" width="58" height="58" style="border-radius:13px" alt="">
+      <h1>Welcome to Pulse</h1><div class="sec" style="font-size:11px">Version ${esc(D.version)}</div>
+      <div style="height:16px"></div>
+      ${row("Open a folder…", "⌘O", "w-open")}${row("New file", "⌘N")}${row("Go to file", "⌘P")}${row("All commands", "⇧⌘P")}${row("Terminal", "⌃`")}
+      <div class="wsep"></div>
+      ${setting("Appearance", '<div class="segctl"><span class="on">Auto</span><span>Light</span><span>Dark</span></div>')}
+      ${setting('Terminal command <span class="mono" style="font-size:11px">pulse</span>', '<span class="pill">Installed</span>')}
+      ${setting("Autosave", '<div class="switch"></div>')}
+      ${setting("Default file mode", '<div class="segctl"><span class="on">Read only</span><span>Edit</span></div>')}
+      <div class="sec" style="margin-top:10px;font-size:11.5px;display:flex;justify-content:center;gap:6px;align-items:center">
+        <span style="width:12px;height:12px;border-radius:3px;box-shadow:inset 0 0 0 1px var(--ter)"></span>Show on launch</div>
+    </div></div>`;
+}
+
+function findBar(t, x, y, width) {
+  const second = t >= T.find2;
+  const query = second ? typed(Q2, t, T.find2Type) : typed(Q1, t, T.findType);
+  const selectAll = t >= T.find2 && t < T.find2Type + 0.08;
+  const hit = t >= (second ? T.find2Hit : T.findHit) || (second && query.length === 0);
+  const fieldWidth = width - 160;
+  const text = selectAll ? `<span style="background:var(--textsel)">${esc(Q1)}</span>` : esc(selectAll ? Q1 : query);
+  return `<div class="abs findbar" style="left:${x}px;top:${y}px;width:${width}px">
+    <div class="ff" style="width:${fieldWidth}px">${icon("search", 11, 'style="color:var(--sec)"')}
+      <span style="flex:1;white-space:pre">${text}${!selectAll && blink(t, T.find) ? '<span class="caret"></span>' : ""}</span>
+      <span class="count">${hit ? "1 of 1" : ""}</span></div>
+    <div class="btn" style="left:${fieldWidth + 18}px;width:44px;gap:10px">${icon("right", 9, 'style="transform:scaleX(-1)"')}${icon("right", 9)}</div>
+    <div class="btn" style="left:${fieldWidth + 70}px;width:52px">Done</div>
+  </div>`;
+}
+
+function diffView(x, y, width, height) {
+  const rows = D.diff;
+  const first = Math.max(0, rows.findIndex(row => row.kind !== " ") - 4);
+  const digits = String(Math.max(...rows.map(row => Math.max(row.old || 0, row.new || 0)))).length;
+  const digit = measure("8", "10px Inter");
+  const column = digits * digit + 12, gutter = column * 2 + 16;
+  const capacity = Math.floor((width - gutter - 8) / CW);
+  const added = rows.filter(row => row.kind === "+").length, removed = rows.filter(row => row.kind === "-").length;
+  let html = `<div class="abs dhead" style="left:${x}px;top:${y}px;width:${width}px">
+    <span class="path">${esc(D.file)}</span><span class="sec" style="font-size:10.5px">Changes</span>
+    <span style="font-size:10.5px;font-weight:600"><span style="color:var(--add)">+${added}</span> <span style="color:var(--del)">−${removed}</span></span>
+    <span style="flex:1"></span><span class="sec" style="display:flex;gap:8px">${icon("up", 11)}${icon("down", 11)}${icon("refresh", 11)}</span>
+    <span class="pill" style="font-size:10.5px">Open File</span></div>`;
+  html += `<div class="abs clip code" style="left:${x}px;top:${y + DHEAD}px;width:${width}px;height:${height - DHEAD}px">`;
+  html += `<div class="abs" style="left:0;top:0;width:${gutter - 6}px;height:${height}px;background:var(--gutterBg)"></div>`;
+  let top = 6;
+  // The k-th removed line of a change pairs with the k-th added one; their
+  // edited middles get a stronger tint when they share at least half.
+  const pair = new Map();
+  for (let i = 0; i < rows.length;) {
+    if (rows[i].kind === " ") { i++; continue; }
+    const removedRows = [], addedRows = [];
+    while (i < rows.length && rows[i].kind !== " ") (rows[i].kind === "-" ? removedRows : addedRows).push(i++);
+    removedRows.forEach((r, k) => { if (addedRows[k] !== undefined) { pair.set(r, addedRows[k]); pair.set(addedRows[k], r); } });
+  }
+  for (let i = first; i < rows.length && top < height; i++) {
+    const row = rows[i];
+    const tint = row.kind === "+" ? "var(--diffAdd)" : row.kind === "-" ? "var(--diffDel)" : "transparent";
+    const chunks = [];
+    for (let at = 0; at === 0 || at < row.text.length; at += capacity) chunks.push(row.text.slice(at, at + capacity));
+    const rowHeight = chunks.length * LH;
+    html += `<div class="abs" style="left:0;top:${top}px;width:${width}px;height:${rowHeight}px;background:${tint}"></div>`;
+    if (pair.has(i)) {
+      const other = rows[pair.get(i)].text, text = row.text;
+      let start = 0;
+      while (start < text.length && start < other.length && text[start] === other[start]) start++;
+      let end = 0;
+      while (end < text.length - start && end < other.length - start && text[text.length - 1 - end] === other[other.length - 1 - end]) end++;
+      if (start + end >= Math.min(text.length, other.length) / 2 && text.length - end > start && start < capacity) {
+        html += `<div class="abs" style="left:${gutter + start * CW}px;top:${top}px;width:${(Math.min(capacity, text.length - end) - start) * CW}px;` +
+          `height:${LH}px;background:${row.kind === "+" ? "var(--diffAddE)" : "var(--diffDelE)"}"></div>`;
+      }
+    }
+    if (row.old) html += `<div class="dnum" style="left:0;width:${column - 6}px;top:${top}px">${row.old}</div>`;
+    if (row.new) html += `<div class="dnum" style="left:${column}px;width:${column - 6}px;top:${top}px">${row.new}</div>`;
+    if (row.kind !== " ") {
+      html += `<div class="dnum" style="left:${column * 2 + 2}px;width:8px;text-align:left;top:${top}px;` +
+        `color:${row.kind === "+" ? "var(--add)" : "var(--del)"}">${row.kind === "+" ? "+" : "−"}</div>`;
+    }
+    chunks.forEach((chunk, k) => {
+      html += `<div class="tx" style="left:${gutter}px;top:${top + k * LH}px">${highlight(chunk)}</div>`;
+    });
+    top += rowHeight;
+  }
+  return html + "</div>";
+}
+
+function pane(t, side, x, width, height) {
+  let html = "";
+  if (side === "left") {
+    const tabs = ["Welcome"];
+    if (t >= T.open) tabs.push(NAME);
+    if (t >= T.scmClick) tabs.push(`${NAME} (Changes)`);
+    const active = t >= T.tabClick ? 1 : tabs.length - 1;
+    html += tabBar(x, width, tabs, active, t >= T.split, ["", "tab-file"]);
+    if (t < T.open) return html + welcome(x, width, height - TAB);
+    if (active === 2) return html + diffView(x, TAB, width, height - TAB);
+  } else {
+    const opened = t >= T.rightOpen;
+    html += tabBar(x, width, opened ? [NAME, OTHER_NAME] : [NAME], opened ? 1 : 0, false);
+    if (opened) {
+      const view = { top: 0, line: 0, col: 0, len: 0, focused: focusAt(t) === "right", caretOn: blink(t, T.rightOpen) };
+      return html + crumbs(x, width, OTHER_DIR, OTHER_NAME) + codeView(view, x, TAB + CRUMB, width, height - TAB - CRUMB, OTHER);
+    }
+  }
+  html += crumbs(x, width);
+  let y = TAB + CRUMB;
+  if (side === "left" && findOpen(t)) {
+    html += findBar(t, x, y, width);
+    y += FIND;
+  }
+  return html + codeView(editorView(t, side), x, y, width, height - y);
+}
+
+function memory(t) {
+  // The meter samples every 2 s.
+  const sample = Math.floor(t / 2) * 2;
+  const steps = [[0, 18.3], [T.folder, 19.2], [T.open, 21.4], [T.results, 21.9], [T.blameClick, 22.2], [T.scmClick, 22.9],
+    [T.split, 23.4], [T.rightOpen, 23.8], [T.term, 26.6], [T.build + 1.6, 26.9]];
+  const mb = steps.filter(step => step[0] <= sample).pop()[1];
+  const busy = [T.folder, T.open, T.findHit, T.find2Hit, T.results, T.blameClick, T.scmClick, T.split, T.rightOpen, T.term]
+    .some(time => time > sample - 2 && time <= sample);
+  return { mb, cpu: busy ? (sample >= T.open && sample < T.open + 2 ? 2 : 1) : 0 };
+}
+
+function statusBar(t, y) {
+  const meter = memory(t);
+  const jump = jumpAt(t);
+  const showsFile = t >= T.open && !(t >= T.scmClick && t < T.tabClick);
+  let left = "";
+  if (t >= T.folder) left += `<span class="it">${icon("branch", 11)}${esc(D.branch)}</span>`;
+  if (showsFile) {
+    const other = t >= T.rightOpen;
+    const blameOn = t >= T.blameClick && !other;
+    left += `<span class="it">${icon("lock", 10)}Read Only</span>`;
+    left += `<span class="it${blameOn ? " blue" : ""}" id="st-blame">${icon("person", 10)}Blame</span>`;
+    left += other ? `<span class="it">Ln 1, Col 1</span>`
+      : `<span class="it">Ln ${jump.line + 1}, Col ${jump.col + 1}${jump.len ? ` (${jump.len} selected)` : ""}</span>`;
+    left += `<span class="it">Swift</span><span class="it">Spaces: 4</span><span class="it">UTF-8</span>`;
+  }
+  const ring = t >= T.meter;
+  const shell = t >= T.term ? `<span style="margin-left:12px">Shell 2 MB</span>` : "";
+  return `<div class="abs status" style="top:${y}px">${left}<div class="right">
+    <span class="${ring ? "ring" : ""}" style="display:flex">Pulse ${Math.round(meter.mb)} MB · CPU ${meter.cpu}%${shell}</span>
+    <span style="margin-left:14px">${icon("bug", 11)}</span></div></div>`;
+}
+
+function terminal(t, y) {
+  const lines = [];
+  const prompt = '<span style="color:var(--termGreen)">pulse</span> % ';
+  const command = typed("swift build", t, T.termType, 11);
+  const output = [
+    [0.25, "Building for debugging...", "sec"],
+    [0.75, "[3/6] Compiling Pulse EditorViewController.swift", ""],
+    [1.35, "[5/6] Linking Pulse", ""],
+    [1.75, "[6/6] Applying Pulse", ""],
+    [2.0, "Build complete! (3.62s)", "green"],
+  ];
+  lines.push(prompt + esc(command) + (t < T.build ? (blink(t, T.term) ? '<span class="block"></span>' : "") : ""));
+  for (const [delay, text, kind] of output) {
+    if (t >= T.build + delay) lines.push(kind === "green" ? `<span style="color:var(--termGreen)">${esc(text)}</span>` : kind ? `<span class="sec">${esc(text)}</span>` : esc(text));
+  }
+  if (t >= T.build + 2.0) lines.push(prompt + (blink(t, T.build + 2) ? '<span class="block"></span>' : ""));
+  let html = `<div class="abs term" style="top:${y}px;height:${TERM}px"><div class="th">TERMINAL</div>
+    <div class="ti">${icon("plus", 11)}${icon("split", 11)}${icon("trash", 11)}</div>`;
+  lines.forEach((line, i) => { html += `<div class="tl" style="top:${30 + i * 15}px">${line}</div>`; });
+  return html + "</div>";
+}
+
+function sidebar(t) {
+  const mode = t >= T.scm ? 2 : t >= T.search ? 1 : 0;
+  const titles = ["EXPLORER", "SEARCH", "SOURCE CONTROL"];
+  let html = `<div class="abs side"><div class="abs shead"><b>${titles[mode]}</b><div class="seg">` +
+    ["folder", "search", "branch"].map((name, i) => `<span class="${i === mode ? "on" : ""}">${icon(name, 11)}</span>`).join("") +
+    `</div></div><div class="abs sbody clip">`;
+  if (mode === 0 && t >= T.folder) {
+    const opened = t >= T.open;
+    const expanded = new Set(opened ? DIR.map((_, i) => DIR.slice(0, i + 1).join("/")) : []);
+    html += `<div class="root">PULSE</div>`;
+    treeRows(expanded).forEach((row, i) => {
+      const x = 4 + row.depth * 13;
+      const on = opened && row.node.path === D.file;
+      const name = truncateMiddle(row.node.name, SIDE - x - 44, "11.5px Inter");
+      html += `<div class="row${on ? " on" : ""}" style="top:${24 + i * ROW}px;padding-left:${x}px">` +
+        `<span class="chev">${row.node.dir ? icon(expanded.has(row.node.path) ? "down" : "right", 9) : ""}</span>` +
+        `<span class="ico ${row.node.dir ? "fold" : "doc"}">${icon(row.node.dir ? "folder" : "doc", 13)}</span>` +
+        `<span style="margin-left:4px">${esc(name)}</span></div>`;
+    });
+  } else if (mode === 1) {
+    const query = typed(D.query, t, T.searchType, 14);
+    const focused = focusAt(t) === "searchField";
+    html += `<div class="field" style="top:4px">${icon("search", 11, 'style="color:var(--sec)"')}` +
+      `<span class="q">${esc(query)}${focused && blink(t, T.search) ? '<span class="caret"></span>' : ""}</span>` +
+      `<span class="opt">Aa</span><span class="opt">···</span></div>`;
+    if (t >= T.results) {
+      const files = [...new Set(HITS.map(hit => hit.file))];
+      html += `<div class="summary" style="top:36px">${HITS.length} result${HITS.length === 1 ? "" : "s"} in ${files.length} file${files.length === 1 ? "" : "s"}</div>`;
+      let y = 54;
+      for (const file of files) {
+        const parts = file.split("/");
+        html += `<div class="hit" style="top:${y}px;font-size:11.5px"><span class="chev" style="width:22px;display:flex;justify-content:center;color:var(--sec)">${icon("down", 9)}</span>` +
+          `<b style="font-weight:600">${esc(parts.pop())}</b><span class="sec" style="margin-left:6px;font-size:10.5px">${esc(parts.join("/"))}</span></div>`;
+        y += ROW;
+        for (const hit of HITS.filter(h => h.file === file)) {
+          const on = t >= T.resultClick && hit === PICK;
+          const trimmed = hit.text.replace(/^\s+/, ""), at = trimmed.indexOf(D.query);
+          const preview = esc(trimmed.slice(0, at)) + `<mark>${esc(D.query)}</mark>` + esc(trimmed.slice(at + D.query.length));
+          html += `<div class="hit${on ? " on" : ""}" id="${hit === PICK ? "s-pick" : ""}" style="top:${y}px"><span class="num">${hit.line}</span>` +
+            `<span class="mono" style="font-size:10.5px">${preview}</span></div>`;
+          y += ROW;
+        }
+      }
+    }
+  } else if (mode === 2) {
+    const count = D.changes.length;
+    html += `<div class="summary" style="top:8px;font-weight:600;font-size:10px;letter-spacing:.02em">${esc(D.branch.toUpperCase())}  ·  ${count} CHANGED</div>` +
+      `<span class="abs sec" style="right:12px;top:7px">${icon("refresh", 11)}</span>`;
+    html += `<div class="row" style="top:28px;padding-left:4px;font-size:10.5px;font-weight:600;color:var(--sec)">` +
+      `<span class="chev">${icon("down", 9)}</span><span style="margin-left:4px;flex:1">Changes</span>` +
+      `<span style="margin-right:12px">${count}</span></div>`;
+    D.changes.forEach((change, i) => {
+      const parts = change.file.split("/");
+      const name = parts.pop();
+      const color = change.status === "M" ? "var(--mod)" : change.status === "D" ? "var(--del)" : "var(--add)";
+      const on = t >= T.scmClick && change.file === D.file;
+      html += `<div class="row${on ? " on" : ""}" ${change.file === D.file ? 'id="c-pick"' : ""} style="top:${28 + (i + 1) * ROW}px;padding-left:30px;font-size:11px">` +
+        `<span style="color:${color}">${esc(name)}</span><span class="sec" style="margin-left:7px;font-size:10px;overflow:hidden;text-overflow:ellipsis;flex:1">${esc(parts.join("/"))}</span>` +
+        `<span class="mono" style="color:${color};font-size:10px;font-weight:600;margin:0 12px 0 6px">${change.status}</span></div>`;
+    });
+  }
+  return html + "</div></div>";
+}
+
+function palette(t) {
+  const second = t >= T.palette2 && t < T.rightOpen;
+  if (!second && (t < T.palette || t >= T.open)) return "";
+  const start = second ? T.palette2 : T.palette;
+  const query = second ? typed("navhist", t, T.palette2Type, 10) : typed("editorvc", t, T.paletteType, 10);
+  const matches = query ? fuzzy(query) : [];
+  const appear = ease(prog(t, start, start + 0.12));
+  let html = `<div class="abs palette" style="top:${84 - 6 * (1 - appear)}px;opacity:${appear}"><div class="pf">` +
+    (query ? esc(query) : '<span class="sec">Go to file  ·  &gt; commands  ·  : line</span>') +
+    (blink(t, start) ? '<span class="caret" style="height:17px"></span>' : "") + "</div>";
+  if (matches.length) {
+    html += `<div style="border-top:1px solid var(--sep);padding:5px 0 6px">`;
+    matches.forEach((file, i) => {
+      const parts = file.split("/");
+      const name = parts.pop();
+      html += `<div class="pr${i === 0 ? " on" : ""}"><span class="doc">${icon("doc", 13)}</span><span>${esc(name)}</span>` +
+        `<span class="sec" style="font-size:11px">${esc(parts.join("/"))}</span></div>`;
+    });
+    html += "</div>";
+  }
+  return html + "</div>";
+}
+
+// Go to File: the letters in order in the file name, tighter and earlier first.
+function fuzzy(query) {
+  const scored = [];
+  for (const file of D.tree) {
+    const name = file.split("/").pop(), lower = name.toLowerCase();
+    let at = -1, gaps = 0, first = -1;
+    let ok = true;
+    for (const ch of query) {
+      const next = lower.indexOf(ch, at + 1);
+      if (next < 0) { ok = false; break; }
+      if (first < 0) first = next;
+      if (at >= 0) gaps += next - at - 1;
+      at = next;
+    }
+    if (ok) scored.push({ file, score: gaps * 2 + first * 3 + name.length * 0.1 });
+  }
+  return scored.sort((a, b) => a.score - b.score).slice(0, 7).map(entry => entry.file);
+}
+
+function caption(t) {
+  for (const [start, end, text, keys = [], presses = []] of CAPTIONS) {
+    if (t < start || t >= end) continue;
+    const opacity = Math.min(prog(t, start, start + 0.2), 1 - prog(t, end - 0.2, end));
+    const lift = 6 * (1 - ease(prog(t, start, start + 0.25)));
+    const pulse = presses.some(time => t >= time && t < time + 0.25) ? 1.18 : 1;
+    const y = H - STATUS - 54;
+    return `<div class="caption" style="top:${y + lift}px;opacity:${opacity}">${esc(text)}` +
+      keys.map(key => `<kbd style="transform:scale(${pulse})">${esc(key)}</kbd>`).join("") + "</div>";
+  }
+  return "";
+}
+
+// MARK: The pointer: shown only for clicks and the scroll, hidden while typing.
+
+const POINTER = [
+  { show: [0, T.palette - 0.1], keys: [[0, [700, 470]], [1.65, "#w-open"]], clicks: [T.click] },
+  { show: [17.6, T.resultClick + 0.6], keys: [[17.6, [560, 380]], [18.25, "#s-pick"]], clicks: [T.resultClick] },
+  { show: [19.5, 22.3], keys: [[19.5, [640, 520]], [20.2, "#st-blame"], [20.55, "#st-blame"], [20.9, [720, 330]]], clicks: [T.blameClick] },
+  { show: [23.4, 24.8], keys: [[23.4, [520, 440]], [24.0, "#c-pick"]], clicks: [T.scmClick] },
+  { show: [26.3, 27.5], keys: [[26.3, [700, 380]], [26.85, "#tab-file"]], clicks: [T.tabClick] },
+];
+function pointAt(target) {
+  if (Array.isArray(target)) return target;
+  const element = document.querySelector(target);
+  if (!element) return null;
+  const box = element.getBoundingClientRect();
+  return [box.left + Math.min(46, box.width / 2), box.top + box.height / 2];
+}
+function cursor(t) {
+  const shown = POINTER.find(entry => t >= entry.show[0] && t < entry.show[1]);
+  if (!shown) return "";
+  const keys = shown.keys;
+  let x, y;
+  const last = keys.length - 1;
+  if (t >= keys[last][0]) {
+    [x, y] = pointAt(keys[last][1]) || pointAt(keys[last - 1][1]);
+  } else {
+    let i = 0;
+    while (i < last - 1 && t >= keys[i + 1][0]) i++;
+    const from = pointAt(keys[i][1]), to = pointAt(keys[i + 1][1]) || from;
+    const p = ease(prog(t, keys[i][0], keys[i + 1][0]));
+    x = from[0] + (to[0] - from[0]) * p;
+    y = from[1] + (to[1] - from[1]) * p;
+  }
+  const pressed = (shown.clicks || []).some(time => t >= time - 0.06 && t < time + 0.1);
+  return `<svg class="cursor" viewBox="0 0 18 24" style="left:${x - 3}px;top:${y - 2}px;transform:scale(${pressed ? 0.88 : 1})">
+    <path d="M3 2 L3 19.5 L7.4 15.4 L10.3 21.8 L13.2 20.5 L10.3 14.2 L16 14.2 Z" fill="#000" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg>`;
+}
+
+// MARK: One frame
+
+window.seek = function seek(t) {
+  const app = document.getElementById("app");
+  const termOpen = t >= T.term;
+  const panesHeight = MAIN_H - STATUS - (termOpen ? TERM : 0);
+  let main = "";
+  if (t >= T.split) {
+    const half = Math.floor((MAIN_W - 1) / 2);
+    main += `<div class="abs clip" style="left:0;top:0;width:${half}px;height:${panesHeight}px">${pane(t, "left", 0, half, panesHeight)}</div>`;
+    main += `<div class="abs" style="left:${half}px;top:0;width:1px;height:${panesHeight}px;background:var(--hard)"></div>`;
+    main += `<div class="abs clip" style="left:${half + 1}px;top:0;width:${MAIN_W - half - 1}px;height:${panesHeight}px">` +
+      pane(t, "right", 0, MAIN_W - half - 1, panesHeight) + "</div>";
+  } else {
+    main += `<div class="abs clip" style="left:0;top:0;width:${MAIN_W}px;height:${panesHeight}px">${pane(t, "left", 0, MAIN_W, panesHeight)}</div>`;
+  }
+  if (termOpen) main += terminal(t, panesHeight);
+  main += statusBar(t, MAIN_H - STATUS);
+  app.innerHTML = `<div class="abs title"><div class="abs lights"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i>` +
+    `<i style="background:#28c840"></i></div><div class="abs tsearch">${icon("search", 11)}<span>${t >= T.folder ? "pulse" : "Search"}</span></div></div>` +
+    sidebar(t) + `<div class="abs main">${main}</div>` + palette(t) + caption(t);
+  app.insertAdjacentHTML("beforeend", cursor(t));
+};
+</script>
+</body>
+</html>

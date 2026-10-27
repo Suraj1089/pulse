@@ -6,7 +6,7 @@
 
 **Pulse** is a native macOS code editor (Swift + AppKit) built around one constraint: **stay at 50–60 MB of physical footprint in normal use and never exceed 100 MB**, with zero CPU while idle. It ships as a standalone `.app` (ad-hoc signed, not notarized).
 
-- **Website**: <https://pulse0.app> (static, in `site/`; screenshots there and in `assets/` are cropped from the CI capture in `scripts/screenshot.sh`)
+- **Website**: <https://pulse0.app> (static, in `site/`; screenshots there and in `assets/` are cropped from the CI capture in `scripts/screenshot.sh`; the hero video, `site/demo-{dark,light}.mp4`, is rendered by `scripts/demo-video/record.mjs`)
 - **Install**: `curl -fsSL https://pulse0.app/install.sh | bash`
 
 ## Non-negotiables
@@ -60,6 +60,8 @@ scripts/
 ├── memory-compare.sh         PR vs. base build, alternating rounds (used by CI on PRs)
 ├── claude-ide-client.py      Stands in for Claude Code in the memory check's connected scenario
 ├── screenshot.sh             Real light/dark screenshots (CI publishes them to the `screenshots` branch)
+├── demo-video/               The website's hero video: demo.html redraws the window from the repo's real code, tree, blame, search and diff;
+│                             record.mjs renders it frame by frame (Playwright + ffmpeg). Run it again when the UI or features change
 ├── package.sh                Universal release: DMG, ZIP, Homebrew cask
 └── make-icons.swift         Every icon (app, site, favicon, README, social card) from assets/logo.svg
 ```
