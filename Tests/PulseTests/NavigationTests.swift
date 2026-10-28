@@ -11,8 +11,16 @@ final class NavigationTests: PulseTestCase {
         let root = try makeFolder(files: ["a.swift": NavigationTests.text, "b.swift": NavigationTests.text])
         let controller = makeController(opening: [root, root.appendingPathComponent("a.swift")])
         // Let the event that opened the file end (see EditorViewController.settling).
-        spin(0.02)
+        endEvent()
         return (root, controller)
+    }
+
+    /// Ends the event that made a jump: runs the main queue up to a block queued
+    /// now, so the one that clears `settling` has run however long it waited.
+    private func endEvent() {
+        var ran = false
+        DispatchQueue.main.async { ran = true }
+        wait(until: { ran })
     }
 
     /// The active file's name and the caret's zero-based line.
@@ -26,9 +34,9 @@ final class NavigationTests: PulseTestCase {
         let editor = controller.editor
         XCTAssertFalse(editor.canGoBack)
         editor.goToLine(120)
-        spin(0.02)
+        endEvent()
         editor.goToLine(30)
-        spin(0.02)
+        endEvent()
         XCTAssertEqual(position(editor), "a.swift:29")
 
         controller.goBack(nil)
@@ -44,9 +52,9 @@ final class NavigationTests: PulseTestCase {
 
         // A new jump after going back drops what Forward had.
         controller.goBack(nil)
-        spin(0.02)
+        endEvent()
         editor.goToLine(180)
-        spin(0.02)
+        endEvent()
         XCTAssertFalse(editor.canGoForward)
     }
 
@@ -54,11 +62,11 @@ final class NavigationTests: PulseTestCase {
         let (_, controller) = try project()
         let editor = controller.editor
         editor.goToLine(8)
-        spin(0.02)
+        endEvent()
         XCTAssertFalse(editor.canGoBack, "a few lines away")
         // A long paste moves the caret 60 lines, by an edit.
         editor.textView.insertText(String(repeating: "pasted\n", count: 60), replacementRange: editor.textView.selectedRange())
-        spin(0.02)
+        endEvent()
         XCTAssertEqual(position(editor), "a.swift:67")
         XCTAssertFalse(editor.canGoBack, "typing and pasting are not jumps")
     }
@@ -67,9 +75,9 @@ final class NavigationTests: PulseTestCase {
         let (root, controller) = try project()
         let editor = controller.editor
         editor.goToLine(40)
-        spin(0.02)
+        endEvent()
         editor.open(root.appendingPathComponent("b.swift"))
-        spin(0.02)
+        endEvent()
         XCTAssertEqual(position(editor), "b.swift:0")
 
         controller.goBack(nil)
@@ -89,11 +97,11 @@ final class NavigationTests: PulseTestCase {
         let (root, controller) = try project()
         let editor = controller.editor
         editor.goToLine(10)
-        spin(0.02)
+        endEvent()
         // What the search panel does with a match: open its file, then reveal it.
         editor.open(root.appendingPathComponent("b.swift"))
         editor.reveal(line: 150, column: 0, length: 4)
-        spin(0.02)
+        endEvent()
         XCTAssertEqual(position(editor), "b.swift:149")
 
         controller.goBack(nil)
@@ -105,13 +113,13 @@ final class NavigationTests: PulseTestCase {
         let (root, controller) = try project()
         let editor = controller.editor
         editor.goToLine(60)
-        spin(0.02)
+        endEvent()
         editor.open(root.appendingPathComponent("b.swift"))
-        spin(0.02)
+        endEvent()
         // b.swift in a new pane on the right; a.swift is only in the left one.
         controller.splitEditorRight(nil)
         layout(controller)
-        spin(0.02)
+        endEvent()
         let left = editor.panes[0]
         let right = editor.panes[1]
         XCTAssertTrue(editor.activePane === right)
@@ -132,7 +140,7 @@ final class NavigationTests: PulseTestCase {
         let (_, controller) = try project()
         XCTAssertFalse(controller.validateMenuItem(back.item), "nothing to go back to")
         controller.editor.goToLine(100)
-        spin(0.02)
+        endEvent()
         XCTAssertTrue(controller.validateMenuItem(back.item))
         XCTAssertFalse(controller.validateMenuItem(forward.item))
 
