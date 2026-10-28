@@ -17,7 +17,7 @@ final class EditorPane: NSView {
 
     struct ViewState {
         var selection: NSRange
-        var scroll: NSPoint
+        var scroll: ScrollAnchor
     }
 
     let tabBar = TabBarView()
@@ -42,9 +42,8 @@ final class EditorPane: NSView {
 
     init(delegate: NSTextViewDelegate) {
         // Container in a layout manager on a storage first, then the view.
-        let layoutManager = NSLayoutManager()
+        let layoutManager = FoldingLayoutManager()
         layoutManager.allowsNonContiguousLayout = true
-        layoutManager.delegate = FoldingLayoutDelegate.shared
         let container = NSTextContainer(size: NSSize(width: EditorPane.unbounded, height: EditorPane.unbounded))
         layoutManager.addTextContainer(container)
         let emptyStorage = NSTextStorage()
@@ -146,7 +145,7 @@ final class EditorPane: NSView {
         let length = document.length
         let location = min(state.selection.location, length)
         textView.setSelectedRange(NSRange(location: location, length: min(state.selection.length, length - location)))
-        scrollView.visibleTextOrigin = state.scroll
+        scrollView.visibleTextAnchor = state.scroll
         textView.needsDisplay = true
     }
 
@@ -175,17 +174,17 @@ final class EditorPane: NSView {
     }
 
     func viewState(for document: Document) -> ViewState {
-        viewStates[ObjectIdentifier(document)] ?? ViewState(selection: document.selectedRange, scroll: document.scrollPoint)
+        viewStates[ObjectIdentifier(document)] ?? ViewState(selection: document.selectedRange, scroll: document.scrollAnchor)
     }
 
     /// Saves the active tab's caret and scroll, here and on the document
     /// (which the session saves).
     func rememberViewState() {
         guard let document = activeDocument else { return }
-        let state = ViewState(selection: textView.selectedRange(), scroll: scrollView.visibleTextOrigin)
+        let state = ViewState(selection: textView.selectedRange(), scroll: scrollView.visibleTextAnchor)
         viewStates[ObjectIdentifier(document)] = state
         document.selectedRange = state.selection
-        document.scrollPoint = state.scroll
+        document.scrollAnchor = state.scroll
     }
 
     /// A new pane opens a file where the pane it was split from shows it.

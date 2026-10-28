@@ -104,6 +104,54 @@ final class EditorLayoutTests: PulseTestCase {
         assertTextClearsGutter(controller, "back at column 0")
     }
 
+    /// A file shown again is laid out afresh, and the lines above the visible
+    /// ones sit at estimated positions: coming back must show the same lines,
+    /// not the same point.
+    func testComingBackToAFileShowsTheSameLines() throws {
+        // Lines of varied length, so estimated positions are well off.
+        let long = (0..<4_000).map { $0 % 5 == 0 ? "" : "    value\($0) = " + String(repeating: "x + ", count: $0 % 9) + "1" }
+        let root = try makeFolder(files: ["long.py": long.joined(separator: "\n") + "\n", "short.py": lines(300)])
+        let controller = makeController(opening: [root, root.appendingPathComponent("long.py")])
+        let editor = controller.editor
+        let scroll = try XCTUnwrap(editor.textView.enclosingScrollView)
+        let document = try XCTUnwrap(editor.activeDocument)
+        func topLine() -> Int {
+            let textView = editor.textView!
+            let point = NSPoint(x: 0, y: textOrigin(scroll).y - textView.textContainerOrigin.y + 1)
+            let glyph = textView.layoutManager!.glyphIndex(for: point, in: textView.textContainer!)
+            return document.line(at: textView.layoutManager!.characterIndexForGlyph(at: glyph))
+        }
+        // Scrolled down a page at a time, as a reader would.
+        for step in 1...40 {
+            scrollText(scroll, to: NSPoint(x: 0, y: CGFloat(step) * 500 + 7))
+            layout(controller)
+        }
+        let left = topLine()
+        XCTAssertGreaterThan(left, 1_000)
+        editor.open(root.appendingPathComponent("short.py"))
+        layout(controller)
+        editor.open(root.appendingPathComponent("long.py"))
+        layout(controller)
+        XCTAssertEqual(topLine(), left, "the same line at the top")
+
+        // Back from a jump to another file, with the caret on screen.
+        editor.textView.setSelectedRange(NSRange(location: document.start(ofLine: left + 5), length: 0))
+        endEvent()
+        editor.open(root.appendingPathComponent("short.py"))
+        layout(controller)
+        endEvent()
+        controller.goBack(nil)
+        layout(controller)
+        XCTAssertEqual(topLine(), left, "Back shows the lines left")
+    }
+
+    /// Runs the main queue up to a block queued now (see EditorViewController.settling).
+    private func endEvent() {
+        var ran = false
+        DispatchQueue.main.async { ran = true }
+        wait(until: { ran })
+    }
+
     func testZoomKeepsTextRightOfTheGutter() throws {
         let root = try makeFolder(files: ["main.swift": lines(50)])
         let controller = makeController(opening: [root.appendingPathComponent("main.swift")])
