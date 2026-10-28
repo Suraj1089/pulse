@@ -158,6 +158,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             self.focusChanged(to: pane)
         }
         pane.textView.onRefuse = { [weak self] message in self?.statusBar.showMessage(message, isWarning: false) }
+        pane.textView.onGoToDefinition = { [weak self] in self?.goToDefinition() }
         pane.scrollView.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(didScroll(_:)),
                                                name: NSView.boundsDidChangeNotification, object: pane.scrollView.contentView)
@@ -805,6 +806,174 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         guard !settling else { return }
         settling = true
         DispatchQueue.main.async { [weak self] in self?.settling = false }
+    }
+
+    // MARK: Go to Definition
+
+    /// The window's file list, for the built-in search when neither ripgrep
+    /// nor git can run.
+    var fileIndex: FileIndex?
+    /// Find in Project for a name (the menu's last item).
+    var onFindInProject: ((String) -> Void)?
+    /// Shows the menu of definitions at a point in a view; tests replace it.
+    var presentDefinitionMenu: (NSMenu, NSPoint, NSView) -> Void = { menu, point, view in
+        _ = menu.popUp(positioning: nil, at: point, in: view)
+    }
+    /// The folder search a Go to Definition waits for; nil the rest of the time.
+    private(set) var definitionSearch: ProjectSearch?
+    private static let definitionMenuLimit = 20
+
+    private struct DefinitionChoice {
+        let definition: Definition
+        let origin: NavigationHistory.Place?
+    }
+
+    var canGoToDefinition: Bool {
+        guard let document = activeDocument, document.special == nil else { return false }
+        return document.language?.definitions.isEmpty == false
+    }
+
+    /// Go › Go to Definition (F12, ⌘-click): where the name at the caret is
+    /// defined. This file is read where it is, its locals included; then a
+    /// short-lived ripgrep or git grep reads the folder's files of the same
+    /// language. Nothing is indexed ahead or kept afterwards. One place
+    /// opens; several show a menu at the name, this file and its folder first.
+    func goToDefinition() {
+        guard let pane = activePane, let document = pane.activeDocument, document.special == nil,
+              let language = document.language else { return NSSound.beep() }
+        let text = document.storage.string as NSString
+        guard let nameRange = text.identifierRange(at: pane.textView.selectedRange().location) else { return NSSound.beep() }
+        let name = text.substring(with: nameRange)
+        guard let pattern = language.definitionPattern(for: name, withLocals: true),
+              let regex = try? NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines]) else { return NSSound.beep() }
+        let ranges = ProjectSearch.definitionRanges(of: name, in: text, regex: regex, limit: ProjectSearch.maxDefinitions)
+        let onDefinition = ranges.contains { NSEqualRanges($0, nameRange) }
+        // In this file, the nearest first: a local is usually just above.
+        let nameLine = document.line(at: nameRange.location)
+        let here = ranges.filter { !NSEqualRanges($0, nameRange) }.map { range -> Definition in
+            let line = document.line(at: range.location)
+            let lineText = text.substring(with: text.lineRange(for: NSRange(location: range.location, length: 0)))
+            return Definition(url: document.url, path: document.displayName, line: line + 1,
+                              column: range.location - document.start(ofLine: line), length: range.length,
+                              preview: lineText.trimmingCharacters(in: .whitespacesAndNewlines))
+        }.sorted { abs($0.line - 1 - nameLine) < abs($1.line - 1 - nameLine) }
+        let origin = place(in: pane)
+        let show: ([(String, Definition)]) -> Void = { [weak self, weak pane, weak document] elsewhere in
+            guard let self else { return }
+            self.definitionSearch = nil
+            // Another file by now: the answer is for a question no longer asked.
+            guard let pane, let document, pane.activeDocument === document else { return }
+            self.showDefinitions(here.map { ("This File", $0) } + elsewhere, of: name, at: nameRange,
+                                 onDefinition: onDefinition, in: pane, from: origin)
+        }
+        definitionSearch?.cancel()
+        guard let root = projectRoot, let projectPattern = language.definitionPattern(for: name, withLocals: false) else {
+            definitionSearch = nil
+            return show([])
+        }
+        let search = ProjectSearch()
+        definitionSearch = search
+        let folder = document.url.map { EditorViewController.folders(of: $0, in: root) }
+        search.findDefinitions(of: name, pattern: projectPattern, extensions: language.extensions, root: root, index: fileIndex) { found in
+            // The rest of the folder: this file's folder first, then the closest.
+            let elsewhere = found.filter { $0.url?.standardizedFileURL != document.url?.standardizedFileURL }
+                .map { definition -> (Int, String, Definition) in
+                    let folders = (definition.path as NSString).deletingLastPathComponent.split(separator: "/").map(String.init)
+                    let shared = folder.map { mine in zip(mine, folders).prefix(while: { $0.0 == $0.1 }).count } ?? 0
+                    return (shared, folders == folder ? "Same Folder" : "Other Files", definition)
+                }
+                .sorted { ($1.0, $0.2.path, $0.2.line) < ($0.0, $1.2.path, $1.2.line) }
+            show(elsewhere.map { ($0.1, $0.2) })
+        }
+    }
+
+    /// The folders from `root` down to `url`'s.
+    private static func folders(of url: URL, in root: URL) -> [String] {
+        let rootPath = root.standardizedFileURL.path
+        let path = url.standardizedFileURL.deletingLastPathComponent().path
+        guard path.hasPrefix(rootPath) else { return [] }
+        return path.dropFirst(rootPath.count).split(separator: "/").map(String.init)
+    }
+
+    /// Opens the one definition, or shows the menu: the places by section
+    /// (at most `definitionMenuLimit`), or that there are none, with Find in
+    /// Project for the name. The menu and its items go when it closes.
+    private func showDefinitions(_ found: [(String, Definition)], of name: String, at nameRange: NSRange,
+                                 onDefinition: Bool, in pane: EditorPane, from origin: NavigationHistory.Place?) {
+        if found.count == 1 { return jump(to: found[0].1, from: origin) }
+        let menu = NSMenu(title: "Definitions")
+        menu.autoenablesItems = false
+        func note(_ title: String) {
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            menu.addItem(item)
+        }
+        if found.isEmpty {
+            let place = projectRoot == nil ? "this file" : "this folder"
+            note(onDefinition ? "This is the only definition of “\(name)”" : "No definition of “\(name)” in \(place)")
+        } else {
+            let more = found.count >= ProjectSearch.maxDefinitions ? "+" : ""
+            note("\(found.count)\(more) definitions of “\(name)”")
+            var section: String?
+            for (title, definition) in found.prefix(EditorViewController.definitionMenuLimit) {
+                if title != section {
+                    section = title
+                    menu.addItem(.sectionHeader(title: title))
+                }
+                let location = "\(definition.path):\(definition.line)"
+                let preview = definition.preview.count > 80 ? String(definition.preview.prefix(79)) + "…" : definition.preview
+                let item = NSMenuItem(title: "\(preview)   \(location)", action: #selector(openDefinition(_:)), keyEquivalent: "")
+                let label = NSMutableAttributedString(string: preview, attributes: [.font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)])
+                label.append(NSAttributedString(string: "   " + location, attributes: [.font: NSFont.menuFont(ofSize: 11),
+                                                                                         .foregroundColor: NSColor.secondaryLabelColor]))
+                item.attributedTitle = label
+                item.target = self
+                item.representedObject = DefinitionChoice(definition: definition, origin: origin)
+                menu.addItem(item)
+            }
+        }
+        if projectRoot != nil {
+            menu.addItem(.separator())
+            let item = NSMenuItem(title: "Find “\(name)” in Project", action: #selector(findDefinitionInProject(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = name
+            menu.addItem(item)
+        }
+        // Under the name, if it is still in view.
+        let textView = pane.textView
+        var point = NSPoint(x: textView.visibleRect.midX, y: textView.visibleRect.midY)
+        if NSMaxRange(nameRange) <= (textView.string as NSString).length, let layoutManager = textView.layoutManager,
+           let container = textView.textContainer {
+            let glyphs = layoutManager.glyphRange(forCharacterRange: nameRange, actualCharacterRange: nil)
+            let rect = layoutManager.boundingRect(forGlyphRange: glyphs, in: container)
+                .offsetBy(dx: textView.textContainerOrigin.x, dy: textView.textContainerOrigin.y)
+            if textView.visibleRect.intersects(rect) { point = NSPoint(x: rect.minX, y: rect.maxY + 2) }
+        }
+        presentDefinitionMenu(menu, point, textView)
+    }
+
+    @objc private func openDefinition(_ sender: NSMenuItem) {
+        guard let choice = sender.representedObject as? DefinitionChoice else { return }
+        jump(to: choice.definition, from: choice.origin)
+    }
+
+    @objc private func findDefinitionInProject(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String else { return }
+        onFindInProject?(name)
+    }
+
+    /// Selects the name where it is defined. Always a jump, however near:
+    /// Back returns to where Go to Definition was asked.
+    private func jump(to definition: Definition, from origin: NavigationHistory.Place?) {
+        if let origin {
+            history.record(origin)
+            settle()
+        }
+        if let url = definition.url, url.standardizedFileURL != activeDocument?.url?.standardizedFileURL {
+            open(url)
+            guard activeDocument?.url?.standardizedFileURL == url.standardizedFileURL else { return }
+        }
+        reveal(line: definition.line, column: definition.column, length: definition.length)
     }
 
     /// Re-applies the editor size from Theme to every open document.

@@ -238,8 +238,36 @@ final class CodeTextView: NSTextView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        if unfoldPlaceholder(at: convert(event.locationInWindow, from: nil)) { return }
+        let point = convert(event.locationInWindow, from: nil)
+        if unfoldPlaceholder(at: point) { return }
+        if let index = definitionClick(event, at: point) {
+            window?.makeFirstResponder(self)
+            setSelectedRange(NSRange(location: index, length: 0))
+            onGoToDefinition?()
+            return
+        }
         super.mouseDown(with: event)
+    }
+
+    // MARK: Go to Definition (⌘-click)
+
+    /// ⌘-click on a name: EditorViewController looks for its definition.
+    var onGoToDefinition: (() -> Void)?
+
+    /// The character clicked, when `event` is a ⌘-click on a name in a
+    /// language Go to Definition knows. A ⌘-drag stays AppKit's (it adds a
+    /// selection): this reads ahead to the mouse-up or the first drag.
+    private func definitionClick(_ event: NSEvent, at point: NSPoint) -> Int? {
+        guard event.modifierFlags.intersection([.command, .shift, .option, .control]) == .command, event.clickCount == 1,
+              onGoToDefinition != nil, document?.language?.definitions.isEmpty == false,
+              let layoutManager, let textContainer, let window else { return nil }
+        let local = NSPoint(x: point.x - textContainerOrigin.x, y: point.y - textContainerOrigin.y)
+        let index = layoutManager.characterIndex(for: local, in: textContainer, fractionOfDistanceBetweenInsertionPoints: nil)
+        let glyphs = layoutManager.glyphRange(forCharacterRange: NSRange(location: index, length: 1), actualCharacterRange: nil)
+        guard nsText.isIdentifierCharacter(at: index), nsText.identifierRange(at: index) != nil,
+              layoutManager.boundingRect(forGlyphRange: glyphs, in: textContainer).contains(local),
+              window.nextEvent(matching: [.leftMouseUp, .leftMouseDragged])?.type == .leftMouseUp else { return nil }
+        return index
     }
 
     override func moveRight(_ sender: Any?) { if !stepOverFold(forward: true) { super.moveRight(sender) } }

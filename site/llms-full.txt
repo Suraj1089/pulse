@@ -23,6 +23,7 @@ Pulse is a native macOS code editor written in Swift and AppKit. Its design cons
 - **Find and replace**: the standard macOS find bar (⌘F, ⌥⌘F, ⌘G, ⌘E).
 - **Project search** (⇧⌘F): runs ripgrep (`rg`) as a short-lived child process when installed, otherwise a built-in scan. Results grouped by file; click to jump to the match. The `…` button shows "files to include" and "files to exclude": comma-separated globs as in VS Code (`*.ts`, `src`, `./src`, `src/**/*.test.ts`, `*.{ts,tsx}`), case-insensitive; a folder pattern covers everything inside it, and an exclude beats an include.
 - **Back and forward** (⌃- and ⌃⇧-, Go › Back / Forward): return to where the caret jumped from and forward again, as in VS Code. A jump is a switch to another file or a move of more than ten lines that typing and the arrow keys didn't make (Find, Go to Line, a search result, a click). At most 50 places each way per window, recorded only on a jump; a closed file is reopened from its path.
+- **Go to Definition** (⌘-click or F12, Go › Go to Definition): jumps to where the function, class or variable under the caret is defined. The open file is read first (its local variables count), then one short-lived `rg` (or `git grep`, or a built-in scan) reads the folder's files of the same language, matching each language's definition shapes (`def`/`class`, `func`/`let`, `function`/`const`, …). One place opens with the name selected and ⌃- returns; several show a menu at the name, this file and its folder first, at most 20 places, with Find in Project. Nothing is indexed and nothing is kept between uses. It is matched by shape, not by type, so a common name can list several places.
 - **Command palette**: ⌘P go to file (fuzzy), ⇧⌘P commands, ⌘L go to line. Developer: Reload Window replaces the window with a new one built from its folder, tabs, unsaved text and terminal, as after a relaunch.
 - **Integrated terminal** (⌃`): your login shell via SwiftTerm, created on first use. New Terminal (⌃⇧`) adds a tab, Split Terminal (⌘\) a pane beside the current one; each has its own shell. Hiding the panel keeps the shells running; "Kill Terminal" ends the focused one.
 - **Source control** (⌃⇧G): staged and unstaged changes for the open folder's Git repository, with buttons to stage (+) or unstage (−) a file or a whole section. A click on a changed file opens its diff in a tab: the whole file with removed and added lines highlighted in place, the edited part of a changed line marked, and old and new line numbers, like VS Code's inline diff (a file longer than 50,000 lines shows only its changes). A double-click opens the file. Status and diffs come from short-lived `git` processes, run only while the panel is on screen or when asked.
@@ -107,6 +108,7 @@ Open a folder from Terminal: `pulse .`
 | ⇧⌘P | Command palette |
 | ⌘L | Go to line |
 | ⌃- / ⌃⇧- | Go back / forward |
+| F12 / ⌘-click | Go to definition |
 | ⌘F / ⌥⌘F | Find / Find and replace |
 | ⌥⌘[ / ⌥⌘] | Fold / unfold |
 | ⇧⌘F | Search the project |

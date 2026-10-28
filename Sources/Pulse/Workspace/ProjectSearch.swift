@@ -331,3 +331,156 @@ final class ProjectSearch {
                            preview: preview, previewStart: previewStart)
     }
 }
+
+// MARK: Go to Definition
+
+/// A line that defines a name, and where the name is in it.
+struct Definition {
+    /// Nil for the file being edited when it has never been saved.
+    let url: URL?
+    /// Relative to the folder, as the menu shows it.
+    let path: String
+    let line: Int        // one-based
+    let column: Int      // UTF-16 offset of the name within the line
+    let length: Int
+    let preview: String  // the line without its indentation
+}
+
+extension ProjectSearch {
+    /// Definitions read per search: plenty for a menu, never a project's worth.
+    static let maxDefinitions = 50
+
+    /// The lines under `root` that define `name` (`pattern`, from
+    /// Language.definitionPattern), in files with `extensions`. ripgrep, or
+    /// git grep in a repository, runs as a short-lived child process, so its
+    /// memory is never Pulse's; without either, the built-in scan reads the
+    /// files one at a time. Nothing is kept once `completion` has them.
+    func findDefinitions(of name: String, pattern: String, extensions: [String], root: URL, index: FileIndex?,
+                         useRipgrep: Bool = ProjectSearch.ripgrep != nil, useGit: Bool = GitStatus.git != nil,
+                         completion: @escaping ([Definition]) -> Void) {
+        cancel()
+        let current = generation
+        let deliver: ([Definition]) -> Void = { [weak self] found in
+            DispatchQueue.main.async {
+                guard let self, self.generation == current else { return }
+                self.process = nil
+                completion(found)
+            }
+        }
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines]) else { return deliver([]) }
+        var command: (String, [String])?
+        if useRipgrep, let rg = ProjectSearch.ripgrep {
+            command = (rg, ["--line-number", "--no-heading", "--null", "--color", "never", "--case-sensitive",
+                            "--max-columns", "400", "--max-count", "20", "-e", pattern]
+                           + extensions.flatMap { ["--glob", "*.\($0)"] } + ["--", "."])
+        } else if useGit, let git = GitStatus.git, GitStatus.repositoryRoot(for: root) != nil {
+            // git grep reads a line at a time, so a class needs no "\n" (which POSIX can't say).
+            command = (git, ["grep", "--untracked", "-I", "-n", "-z", "--no-color", "-E",
+                             "-e", pattern.replacingOccurrences(of: "\\n", with: ""), "--"]
+                            + extensions.map { "*.\($0)" })
+        }
+        guard let command else {
+            guard let index else { return deliver([]) }
+            index.withPaths { paths in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    deliver(ProjectSearch.scanDefinitions(of: name, regex: regex, extensions: Set(extensions), paths: paths, root: root))
+                }
+            }
+            return
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: command.0)
+        task.currentDirectoryURL = root
+        task.arguments = command.1
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+        process = task
+        do { try task.run() } catch { return deliver([]) }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            var found: [Definition] = []
+            _ = ProjectSearch.readLines(of: task, from: pipe) { bytes in
+                if let definition = ProjectSearch.definition(fromOutput: bytes, name: name, regex: regex, root: root) {
+                    found.append(definition)
+                }
+                return found.count < ProjectSearch.maxDefinitions
+            }
+            deliver(found)
+        }
+    }
+
+    /// A line of ripgrep's output (path NUL line:text) or git grep's (path
+    /// NUL line NUL text). The regex decides where the name is, so every
+    /// tool's lines are judged the same way.
+    private static func definition(fromOutput bytes: Data, name: String, regex: NSRegularExpression, root: URL) -> Definition? {
+        let record = String(decoding: bytes.last == UInt8(ascii: "\r") ? bytes.dropLast() : bytes, as: UTF8.self)
+        guard let nul = record.firstIndex(of: "\0") else { return nil }
+        var path = String(record[..<nul])
+        if path.hasPrefix("./") { path.removeFirst(2) }
+        let rest = record[record.index(after: nul)...]
+        let digits = rest.prefix(while: { $0.isASCII && $0.isNumber })
+        guard let line = Int(digits), digits.endIndex < rest.endIndex else { return nil }
+        let text = String(rest[rest.index(after: digits.endIndex)...]) as NSString
+        guard let found = definitionRanges(of: name, in: text, regex: regex, limit: 1).first else { return nil }
+        return Definition(url: root.appendingPathComponent(path), path: path, line: line, column: found.location,
+                          length: found.length, preview: previewOf(text as String, column: 0).0)
+    }
+
+    /// Built-in search, when neither ripgrep nor git can run.
+    private static func scanDefinitions(of name: String, regex: NSRegularExpression, extensions: Set<String>,
+                                        paths: [String], root: URL) -> [Definition] {
+        var found: [Definition] = []
+        for path in paths where extensions.contains((path as NSString).pathExtension.lowercased()) {
+            let url = root.appendingPathComponent(path)
+            guard let data = try? Data(contentsOf: url, options: .mappedIfSafe),
+                  data.count < 2_000_000, !data.prefix(4096).contains(0) else { continue }
+            let text = String(decoding: data, as: UTF8.self) as NSString
+            guard text.range(of: name, options: .literal).location != NSNotFound else { continue }
+            var line = 1
+            var counted = 0
+            for range in definitionRanges(of: name, in: text, regex: regex, limit: maxDefinitions - found.count) {
+                line += newlines(in: text, from: counted, to: range.location)
+                counted = range.location
+                let lineRange = text.lineRange(for: NSRange(location: range.location, length: 0))
+                found.append(Definition(url: url, path: path, line: line, column: range.location - lineRange.location,
+                                        length: range.length, preview: previewOf(text.substring(with: lineRange), column: 0).0
+                                            .trimmingCharacters(in: .newlines)))
+            }
+            if found.count >= maxDefinitions { break }
+        }
+        return found
+    }
+
+    private static func newlines(in text: NSString, from start: Int, to end: Int) -> Int {
+        var count = 0
+        var search = NSRange(location: start, length: end - start)
+        while true {
+            let found = text.range(of: "\n", options: .literal, range: search)
+            guard found.location != NSNotFound else { return count }
+            count += 1
+            search = NSRange(location: found.location + 1, length: end - found.location - 1)
+        }
+    }
+
+    /// Where `name` is in each place `regex` finds a definition in `text`:
+    /// its first use as a whole word within the match.
+    static func definitionRanges(of name: String, in text: NSString, regex: NSRegularExpression, limit: Int) -> [NSRange] {
+        var ranges: [NSRange] = []
+        regex.enumerateMatches(in: text as String, range: NSRange(location: 0, length: text.length)) { match, _, stop in
+            guard let match else { return }
+            var search = match.range
+            while true {
+                let found = text.range(of: name, options: .literal, range: search)
+                if found.location == NSNotFound { break }
+                if !text.isIdentifierCharacter(at: found.location - 1), !text.isIdentifierCharacter(at: NSMaxRange(found)) {
+                    ranges.append(found)
+                    break
+                }
+                search = NSRange(location: found.location + 1, length: NSMaxRange(match.range) - found.location - 1)
+            }
+            if ranges.count >= limit { stop.pointee = true }
+        }
+        return ranges
+    }
+}
