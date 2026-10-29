@@ -50,8 +50,8 @@ final class Document {
     var diffTarget: GitDiffTarget?
 
     var selectedRange = NSRange(location: 0, length: 0)
-    /// Document point at the top-left of the visible text (see EditorScrollView).
-    var scrollPoint: NSPoint = .zero
+    /// Where the visible text starts (see EditorScrollView.visibleTextAnchor).
+    var scrollAnchor = ScrollAnchor()
     var onDirtyChange: (() -> Void)?
 
     var isDirty = false {

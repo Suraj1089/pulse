@@ -30,8 +30,14 @@ final class CodeTextView: NSTextView {
             refuse("This file is read-only. Click Read Only in the status bar to edit it.")
             return
         }
+        handlingInput = true
+        defer { handlingInput = false }
         super.keyDown(with: event)
     }
+
+    /// Set while this view handles a key or a click, so selections it makes
+    /// that reach into a fold take it in rather than open it (Folding.swift).
+    private(set) var handlingInput = false
 
     private var indentUnit: String { String(repeating: " ", count: indentWidth) }
     private var nsText: NSString { string as NSString }
@@ -246,6 +252,8 @@ final class CodeTextView: NSTextView {
             onGoToDefinition?()
             return
         }
+        handlingInput = true
+        defer { handlingInput = false }
         super.mouseDown(with: event)
     }
 

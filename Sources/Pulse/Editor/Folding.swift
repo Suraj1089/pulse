@@ -1,9 +1,11 @@
 import AppKit
 
 extension NSAttributedString.Key {
-    /// On the characters a fold hides. A text storage attribute, so a fold
-    /// moves with edits and every pane showing the file folds alike. Never
-    /// typed (CodeTextView strips it from its typing attributes), never saved.
+    /// On the characters a fold hides: how many folds hide them (an Int), so
+    /// a block folded inside a folded block stays folded when the outer one
+    /// opens. A text storage attribute, so a fold moves with edits and every
+    /// pane showing the file folds alike. Never typed (CodeTextView strips it
+    /// from its typing attributes), never saved.
     static let folded = NSAttributedString.Key("PulseFolded")
 }
 
@@ -15,8 +17,11 @@ extension NSAttributedString.Key {
 ///
 /// A fold is the `.folded` attribute on what it hides, from the header's line
 /// break to the end of the block's last line, so the line after the block
-/// (often its closing brace) stays visible. `FoldingLayoutDelegate` lays
-/// those characters out as nothing, so a folded block takes no lines.
+/// (often its closing brace) stays visible. `FoldingLayoutManager` gives
+/// the lines it hides no height and doesn't draw them, so a folded block
+/// takes no space. Folds never touch: the line break that ends a block's last
+/// line stays visible, so the hidden run around a character is the outermost
+/// fold hiding it.
 enum Folding {
     /// Where the line starting at `start` ends, before its line break.
     static func contentEnd(ofLineAt start: Int, in text: NSString) -> Int {
@@ -83,74 +88,90 @@ enum Folding {
 }
 
 extension NSTextStorage {
-    /// The fold hiding the character at `index`, if it is folded.
+    /// The outermost fold hiding the character at `index`, if it is hidden:
+    /// the run of hidden text around it.
     func fold(at index: Int) -> NSRange? {
-        guard index >= 0, index < length else { return nil }
-        var range = NSRange()
-        let value = attribute(.folded, at: index, longestEffectiveRange: &range, in: NSRange(location: 0, length: length))
-        return value == nil ? nil : range
+        guard isFolded(at: index) else { return nil }
+        let all = NSRange(location: 0, length: length)
+        var run = NSRange()
+        // Nested folds split the run by depth; one step per depth change.
+        var start = index
+        while start > 0, attribute(.folded, at: start - 1, longestEffectiveRange: &run, in: all) != nil { start = run.location }
+        var end = index
+        while end < length, attribute(.folded, at: end, longestEffectiveRange: &run, in: all) != nil { end = NSMaxRange(run) }
+        return NSRange(location: start, length: end - start)
     }
 
     func isFolded(at index: Int) -> Bool {
         index >= 0 && index < length && attribute(.folded, at: index, effectiveRange: nil) != nil
     }
 
-    /// Folds or unfolds `ranges`, and has every layout manager on this text
-    /// generate their glyphs again (an attribute change alone only lays
-    /// them out again).
-    func setFolded(_ folded: Bool, in ranges: [NSRange]) {
+    /// Folds `ranges` (`by` 1) or opens one level of folding in them (-1).
+    /// Like any attribute change, every layout manager on this text lays
+    /// those lines out again.
+    func changeFolding(by delta: Int, in ranges: [NSRange]) {
         guard !ranges.isEmpty else { return }
         beginEditing()
         for range in ranges {
-            if folded { addAttribute(.folded, value: true, range: range) } else { removeAttribute(.folded, range: range) }
-        }
-        endEditing()
-        for layoutManager in layoutManagers {
-            for range in ranges {
-                layoutManager.invalidateGlyphs(forCharacterRange: range, changeInLength: 0, actualCharacterRange: nil)
-                layoutManager.invalidateLayout(forCharacterRange: range, actualCharacterRange: nil)
+            var runs: [(NSRange, Int)] = []
+            enumerateAttribute(.folded, in: range) { value, run, _ in runs.append((run, (value as? Int) ?? 0)) }
+            for (run, depth) in runs {
+                if depth + delta > 0 { addAttribute(.folded, value: depth + delta, range: run) } else { removeAttribute(.folded, range: run) }
             }
         }
+        endEditing()
     }
 }
 
-/// Lays folded text out as nothing: its glyphs are null, and its line
-/// breaks and tabs zero-width control characters, so a folded block adds no
-/// line fragments. Stateless: one instance serves every editor pane.
-final class FoldingLayoutDelegate: NSObject, NSLayoutManagerDelegate {
-    static let shared = FoldingLayoutDelegate()
+/// The editor panes' layout manager: lays folded text out as nothing. A line
+/// that starts in hidden text gets no height, and hidden glyphs aren't drawn.
+/// Each hidden line stays a line of its own with its own glyphs, so typing
+/// on a folded block's first line lays out that line alone (folding with null
+/// glyphs and zero-width line breaks made the block one line: each keystroke
+/// typeset all of it, and the shared typesetter kept buffers that large).
+final class FoldingLayoutManager: NSLayoutManager, NSLayoutManagerDelegate {
+    override init() {
+        super.init()
+        delegate = self
+    }
 
-    func layoutManager(_ layoutManager: NSLayoutManager, shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
-                       properties: UnsafePointer<NSLayoutManager.GlyphProperty>, characterIndexes: UnsafePointer<Int>,
-                       font: NSFont, forGlyphRange glyphRange: NSRange) -> Int {
-        guard let storage = layoutManager.textStorage, glyphRange.length > 0 else { return 0 }
-        let first = characterIndexes[0]
-        let span = NSRange(location: first, length: characterIndexes[glyphRange.length - 1] - first + 1)
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// Draws the lines that have height. By line, not by character: AppKit
+    /// draws whole lines, and the line break after a fold ends a hidden line.
+    override func drawGlyphs(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
+        guard let storage = textStorage, glyphsToShow.length > 0 else { return super.drawGlyphs(forGlyphRange: glyphsToShow, at: origin) }
         var hasFolds = false
-        storage.enumerateAttribute(.folded, in: span, options: .longestEffectiveRangeNotRequired) { value, _, stop in
+        storage.enumerateAttribute(.folded, in: characterRange(forGlyphRange: glyphsToShow, actualGlyphRange: nil),
+                                   options: .longestEffectiveRangeNotRequired) { value, _, stop in
             if value != nil {
                 hasFolds = true
                 stop.pointee = true
             }
         }
-        guard hasFolds else { return 0 }
-        let changed = UnsafeMutablePointer<NSLayoutManager.GlyphProperty>.allocate(capacity: glyphRange.length)
-        defer { changed.deallocate() }
-        for i in 0..<glyphRange.length {
-            let property = properties[i]
-            if storage.isFolded(at: characterIndexes[i]) {
-                changed[i] = property.contains(.controlCharacter) ? .controlCharacter : .null
-            } else {
-                changed[i] = property
-            }
+        guard hasFolds else { return super.drawGlyphs(forGlyphRange: glyphsToShow, at: origin) }
+        var shownFrom = glyphsToShow.location
+        func drawShown(upTo end: Int) {
+            if end > shownFrom { super.drawGlyphs(forGlyphRange: NSRange(location: shownFrom, length: end - shownFrom), at: origin) }
         }
-        layoutManager.setGlyphs(glyphs, properties: changed, characterIndexes: characterIndexes, font: font, forGlyphRange: glyphRange)
-        return glyphRange.length
+        enumerateLineFragments(forGlyphRange: glyphsToShow) { rect, _, _, glyphs, _ in
+            guard rect.height == 0 else { return }
+            drawShown(upTo: max(shownFrom, glyphs.location))
+            shownFrom = max(shownFrom, NSMaxRange(glyphs))
+        }
+        drawShown(upTo: NSMaxRange(glyphsToShow))
     }
 
-    func layoutManager(_ layoutManager: NSLayoutManager, shouldUse action: NSLayoutManager.ControlCharacterAction,
-                       forControlCharacterAt charIndex: Int) -> NSLayoutManager.ControlCharacterAction {
-        layoutManager.textStorage?.isFolded(at: charIndex) == true ? .zeroAdvancement : action
+    func layoutManager(_ layoutManager: NSLayoutManager, shouldSetLineFragmentRect lineFragmentRect: UnsafeMutablePointer<NSRect>,
+                       lineFragmentUsedRect: UnsafeMutablePointer<NSRect>, baselineOffset: UnsafeMutablePointer<CGFloat>,
+                       in textContainer: NSTextContainer, forGlyphRange glyphRange: NSRange) -> Bool {
+        guard let storage = textStorage, glyphRange.length > 0,
+              storage.isFolded(at: characterIndexForGlyph(at: glyphRange.location)) else { return false }
+        lineFragmentRect.pointee.size.height = 0
+        lineFragmentUsedRect.pointee.size.height = 0
+        baselineOffset.pointee = 0
+        return true
     }
 }
 
@@ -203,12 +224,13 @@ extension CodeTextView {
 
     /// Folds every outermost block (a block inside one is hidden with it).
     func foldAll() {
+        guard let storage = textStorage else { return }
         let text = foldText
         var regions: [NSRange] = []
         var start = 0
         while start < text.length {
             if let region = Folding.region(ofLineAt: start, in: text, tabWidth: indentWidth) {
-                regions.append(region)
+                if !storage.isFolded(at: region.location) { regions.append(region) }
                 start = NSMaxRange(text.lineRange(for: NSRange(location: NSMaxRange(region), length: 0)))
             } else {
                 start = NSMaxRange(text.lineRange(for: NSRange(location: start, length: 0)))
@@ -218,13 +240,18 @@ extension CodeTextView {
     }
 
     func unfoldAll() {
-        guard let storage = textStorage, storage.length > 0 else { return }
-        unfold(NSRange(location: 0, length: storage.length))
+        guard let storage = textStorage else { return }
+        var folds: [NSRange] = []
+        storage.enumerateAttribute(.folded, in: NSRange(location: 0, length: storage.length)) { value, run, _ in
+            if value != nil { folds.append(run) }
+        }
+        storage.changeFolding(by: -Int.max, in: folds) // every level
+        foldsDidChange()
     }
 
     private func fold(_ regions: [NSRange]) {
         guard let storage = textStorage, !regions.isEmpty else { return }
-        storage.setFolded(true, in: regions)
+        storage.changeFolding(by: 1, in: regions)
         // A caret left in hidden text goes to the end of its fold's first line.
         let caret = selectedRange()
         if let fold = regions.first(where: { NSIntersectionRange($0, caret).length > 0 || ($0.location < caret.location && caret.location <= NSMaxRange($0)) }) {
@@ -233,36 +260,67 @@ extension CodeTextView {
         foldsDidChange()
     }
 
+    /// Opens one level: a block folded inside this one stays folded.
     private func unfold(_ range: NSRange) {
-        textStorage?.setFolded(false, in: [range])
+        textStorage?.changeFolding(by: -1, in: [range])
         foldsDidChange()
     }
 
-    /// Every pane showing this text redraws its gutter.
+    /// Every pane showing this text redraws its text and gutter: the lines
+    /// below the fold moved, and laying them out again doesn't redraw them.
     private func foldsDidChange() {
         for layoutManager in textStorage?.layoutManagers ?? [] {
-            layoutManager.firstTextView?.enclosingScrollView?.verticalRulerView?.needsDisplay = true
+            guard let textView = layoutManager.firstTextView else { continue }
+            textView.setNeedsDisplay(textView.visibleRect)
+            textView.enclosingScrollView?.verticalRulerView?.needsDisplay = true
         }
     }
 
     /// Keeps the caret out of folded text. A click or End past a fold lands
-    /// at the end of the folded line, as in VS Code; a jump into hidden text
-    /// (Go to Line, a search match) unfolds it, as does a selection that
-    /// takes in part of a fold.
+    /// at the end of the folded line, as in VS Code, and a key that moves the
+    /// caret into one (⌥→) goes past it. A selection made with keys or the
+    /// mouse that reaches into a fold takes it in whole (⇧→ at the end of a
+    /// folded line, a triple-click on it). A jump into hidden text (Go to
+    /// Line, a search match) unfolds it, as does a selection that takes in
+    /// part of a fold otherwise.
     func rangesAroundFolds(_ ranges: [NSValue]) -> [NSValue] {
         guard let storage = textStorage, storage.length > 0 else { return ranges }
+        let previous = selectedRange().location
         return ranges.map { value in
-            let range = value.rangeValue
+            var range = value.rangeValue
             if range.length > 0 {
-                for index in [range.location, NSMaxRange(range) - 1] {
-                    if let fold = storage.fold(at: index), NSIntersectionRange(fold, range).length < fold.length { unfold(fold) }
-                }
-                return value
+                if handlingInput { range = takingInFolds(range) }
+                unfoldPartlyCovered(by: range)
+                return NSValue(range: range)
             }
-            guard range.location > 0, let fold = storage.fold(at: range.location - 1) else { return value }
-            if range.location == NSMaxRange(fold) { return NSValue(range: NSRange(location: fold.location, length: 0)) }
-            unfold(fold)
+            // Folds inside folds open from the outside in, until the caret shows.
+            while range.location > 0, let fold = storage.fold(at: range.location - 1) {
+                if range.location == NSMaxRange(fold) { return NSValue(range: NSRange(location: fold.location, length: 0)) }
+                if handlingInput {
+                    let forward = previous <= fold.location && NSMaxRange(fold) < storage.length
+                    return NSValue(range: NSRange(location: forward ? NSMaxRange(fold) + 1 : fold.location, length: 0))
+                }
+                unfold(fold)
+            }
             return value
+        }
+    }
+
+    /// `range` widened over each fold it reaches into from outside.
+    private func takingInFolds(_ range: NSRange) -> NSRange {
+        guard let storage = textStorage else { return range }
+        var start = range.location
+        var end = NSMaxRange(range)
+        if let fold = storage.fold(at: start), fold.location < start, end >= NSMaxRange(fold) { start = fold.location }
+        if let fold = storage.fold(at: end - 1), end < NSMaxRange(fold), start <= fold.location { end = NSMaxRange(fold) }
+        return NSRange(location: start, length: end - start)
+    }
+
+    /// Unfolds each fold `range` takes in only part of (at either end).
+    private func unfoldPartlyCovered(by range: NSRange) {
+        guard let storage = textStorage else { return }
+        for index in [range.location, NSMaxRange(range) - 1] {
+            while let fold = storage.fold(at: index), NSIntersectionRange(fold, range).length < fold.length { unfold(fold) }
         }
     }
 
@@ -285,15 +343,16 @@ extension CodeTextView {
         return true
     }
 
-    /// An edit that takes away part of a fold unfolds it first. One that
+    /// An edit that takes away part of a fold unfolds it first, as does one
+    /// right after its hidden text: deleting the line break there (⌫ at the
+    /// start of the next line) would join that line to a hidden one. One that
     /// removes a whole fold, or inserts into one (Indent on a selection
     /// around it), leaves it folded.
     func unfoldPartlyChanged(_ ranges: [NSRange]) {
         guard let storage = textStorage else { return }
-        for range in ranges where range.length > 0 {
-            for index in [range.location, NSMaxRange(range) - 1] {
-                if let fold = storage.fold(at: index), NSIntersectionRange(fold, range).length < fold.length { unfold(fold) }
-            }
+        for range in ranges {
+            while let fold = storage.fold(at: range.location - 1), NSMaxRange(fold) == range.location { unfold(fold) }
+            if range.length > 0 { unfoldPartlyCovered(by: range) }
         }
     }
 
@@ -305,7 +364,9 @@ extension CodeTextView {
         let characters = layoutManager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
         var placeholders: [(fold: NSRange, rect: NSRect)] = []
         storage.enumerateAttribute(.folded, in: characters) { value, run, _ in
-            guard value != nil, let fold = storage.fold(at: run.location), fold.location >= characters.location else { return }
+            // A fold nested in one shown here, or one this run continues.
+            guard value != nil, NSMaxRange(run) > NSMaxRange(placeholders.last?.fold ?? NSRange()),
+                  let fold = storage.fold(at: run.location), fold.location >= characters.location else { return }
             let glyph = layoutManager.glyphIndexForCharacter(at: fold.location)
             let line = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
             let height = min(line.height - 2, 16)

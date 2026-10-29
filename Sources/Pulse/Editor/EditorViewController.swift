@@ -768,10 +768,13 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         guard let document = pane.activeDocument, document.special == nil,
               document === place.document || document.url?.standardizedFileURL == place.url?.standardizedFileURL else { return }
         let caret = NSRange(location: min(place.location, document.length), length: 0)
-        let origin = pane.scrollView.contentView.bounds.origin
+        // The lines shown, not the point: laying out the caret's line can move
+        // the point the text is at (lines above it were at estimated
+        // positions) without moving the text.
+        let shown = pane.scrollView.visibleTextAnchor
         pane.textView.setSelectedRange(caret)
         pane.textView.scrollRangeToVisible(caret)
-        if pane.scrollView.contentView.bounds.origin != origin { pane.textView.centerSelectionInVisibleArea(nil) }
+        if pane.scrollView.visibleTextAnchor != shown { pane.textView.centerSelectionInVisibleArea(nil) }
         view.window?.makeFirstResponder(pane.textView)
     }
 

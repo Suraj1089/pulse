@@ -1,5 +1,14 @@
 import AppKit
 
+/// Where the visible text starts, as a place in the text: the first
+/// character of the line at the top, how far above the top that line
+/// starts, and the horizontal scroll.
+struct ScrollAnchor: Equatable {
+    var character = 0
+    var offset: CGFloat = 0
+    var x: CGFloat = 0
+}
+
 /// The editor's scroll view.
 ///
 /// Since macOS 14 the vertical ruler floats over the clip view instead of
@@ -23,6 +32,39 @@ final class EditorScrollView: NSScrollView {
             let clip = contentView
             clip.scroll(to: NSPoint(x: newValue.x - clip.contentInsets.left, y: newValue.y - clip.contentInsets.top))
             reflectScrolledClipView(clip)
+        }
+    }
+
+    /// The visible text's start as a line rather than a point. A file shown
+    /// again is laid out afresh, and with non-contiguous layout the lines
+    /// above the visible ones sit at estimated positions until laid out: the
+    /// same point showed lines dozens or hundreds away from the ones left.
+    var visibleTextAnchor: ScrollAnchor {
+        get {
+            let origin = visibleTextOrigin
+            guard let textView = documentView as? NSTextView, let layoutManager = textView.layoutManager,
+                  let container = textView.textContainer, layoutManager.numberOfGlyphs > 0 else {
+                return ScrollAnchor(character: 0, offset: origin.y, x: origin.x)
+            }
+            let y = origin.y - textView.textContainerOrigin.y
+            var glyphs = NSRange()
+            let line = layoutManager.lineFragmentRect(forGlyphAt: layoutManager.glyphIndex(for: NSPoint(x: 0, y: y), in: container),
+                                                      effectiveRange: &glyphs)
+            return ScrollAnchor(character: layoutManager.characterIndexForGlyph(at: glyphs.location), offset: y - line.minY, x: origin.x)
+        }
+        set {
+            guard let textView = documentView as? NSTextView, let layoutManager = textView.layoutManager,
+                  let length = textView.textStorage?.length, length > 0 else {
+                visibleTextOrigin = NSPoint(x: newValue.x, y: newValue.offset)
+                return
+            }
+            let character = min(newValue.character, length - 1)
+            // Right after new text, non-contiguous layout may not have grown
+            // the text view down to the line yet, and the clip view would stop
+            // short; scrollRangeToVisible lays out and sizes it first.
+            textView.scrollRangeToVisible(NSRange(location: character, length: 0))
+            let line = layoutManager.lineFragmentRect(forGlyphAt: layoutManager.glyphIndexForCharacter(at: character), effectiveRange: nil)
+            visibleTextOrigin = NSPoint(x: newValue.x, y: textView.textContainerOrigin.y + line.minY + newValue.offset)
         }
     }
 
