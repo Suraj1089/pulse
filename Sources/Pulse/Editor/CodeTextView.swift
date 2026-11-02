@@ -80,9 +80,24 @@ final class CodeTextView: NSTextView {
         strips.update()
     }
 
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: nil)
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        if let window {
+            NotificationCenter.default.addObserver(self, selector: #selector(occlusionChanged), name: NSWindow.didChangeOcclusionStateNotification, object: window)
+        }
         strips.update()
+    }
+
+    /// A window nobody can see gives its strips' memory back (a full-window
+    /// editor is about 20 MB of them); they draw again when it shows.
+    @objc private func occlusionChanged() {
+        guard let window else { return }
+        if window.occlusionState.contains(.visible) { strips.update() } else { strips.removeAll() }
     }
 
     override func viewDidChangeBackingProperties() {
