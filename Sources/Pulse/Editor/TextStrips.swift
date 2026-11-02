@@ -43,6 +43,11 @@ final class TextStrips: NSObject, CALayerDelegate {
         guard !updating, let host = view.layer, let layoutManager = view.layoutManager, let container = view.textContainer else { return }
         updating = true
         defer { updating = false }
+        // A window on screen that nobody can see (covered by another, in
+        // another Space, minimised) keeps no strips; they draw again when it shows.
+        if let window = view.window, window.isVisible, !window.occlusionState.contains(.visible) {
+            return removeAll()
+        }
         // Lay out first, so drawing never resizes the view while Core
         // Animation displays. The visible rect is read after: filling layout
         // holes can change the view's height and scroll position.
